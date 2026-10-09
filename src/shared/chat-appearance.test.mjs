@@ -14,7 +14,7 @@ test("chat appearance exposes the four font sizes and two layout modes", () => {
   assert.deepEqual(CHAT_FONT_SIZES, ["small", "standard", "large", "extra-large"]);
   assert.deepEqual(CHAT_LAYOUTS, ["fixed", "wide"]);
   assert.deepEqual(CHAT_FONT_SCALE, { small: 0.9, standard: 1, large: 1.15, "extra-large": 1.3 });
-  assert.deepEqual(DEFAULT_CHAT_APPEARANCE, { fontSize: "standard", layout: "fixed", assistantWidth: "comfortable" });
+  assert.deepEqual(DEFAULT_CHAT_APPEARANCE, { fontSize: "standard", layout: "wide", assistantWidth: "comfortable" });
 });
 
 test("normalization preserves known values and repairs fields independently", () => {
@@ -30,7 +30,7 @@ test("normalization preserves known values and repairs fields independently", ()
 
   assert.deepEqual(normalizeChatAppearance({ fontSize: "large", layout: "future" }), {
     fontSize: "large",
-    layout: "fixed",
+    layout: "wide",
     assistantWidth: "comfortable",
   });
   assert.deepEqual(normalizeChatAppearance({ fontSize: 2, layout: "wide", assistantWidth: "comfortable" }), {
@@ -54,7 +54,7 @@ test("malformed chat appearance values use backward-compatible defaults", () => 
   for (const value of [undefined, null, true, "large", [], { fontSize: "future" }]) {
     assert.deepEqual(normalizeChatAppearance(value), {
       fontSize: "standard",
-      layout: "fixed",
+      layout: "wide",
       assistantWidth: "comfortable",
     });
     assert.equal(isChatAppearancePreferences(value), false);

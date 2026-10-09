@@ -130,7 +130,7 @@ html[data-chat-font-size="extra-large"] .chat-appearance-scope {
 }
 
 html[data-chat-layout="wide"] .chat-appearance-scope {
-  --chat-content-max-width: clamp(760px, 74%, 960px);
+  --chat-content-max-width: clamp(760px, 80%, 1280px);
 }
 
 .chat-content-column {

@@ -38,7 +38,7 @@ test("chat appearance CSS defines scoped font scales and both width modes", () =
   assert.match(cssSource, /data-chat-font-size="small"[\s\S]*?--chat-font-scale:\s*0\.9/);
   assert.match(cssSource, /data-chat-font-size="large"[\s\S]*?--chat-font-scale:\s*1\.15/);
   assert.match(cssSource, /data-chat-font-size="extra-large"[\s\S]*?--chat-font-scale:\s*1\.3/);
-  assert.match(cssSource, /data-chat-layout="wide"[\s\S]*?--chat-content-max-width:\s*clamp\(760px,\s*74%,\s*960px\)/);
+  assert.match(cssSource, /data-chat-layout="wide"[\s\S]*?--chat-content-max-width:\s*clamp\(760px,\s*80%,\s*1280px\)/);
   assert.doesNotMatch(cssSource, /data-chat-layout="full"|--chat-content-max-width:\s*100%/);
   assert.match(cssSource, /\.chat-content-column\s*\{[\s\S]*?max-width:\s*var\(--chat-content-max-width\)/);
   assert.doesNotMatch(cssSource, /var\(--chat-font-scale\)(?!\s*:)/);

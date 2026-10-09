@@ -15,7 +15,7 @@ export interface ChatAppearancePreferences {
 
 export const DEFAULT_CHAT_APPEARANCE: ChatAppearancePreferences = Object.freeze({
   fontSize: "standard",
-  layout: "fixed",
+  layout: "wide",
   assistantWidth: "comfortable",
 });
 

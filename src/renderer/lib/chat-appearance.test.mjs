@@ -35,11 +35,11 @@ test("controller loads defaults after a read failure without blocking startup", 
 
   await controller.load();
   assert.deepEqual(controller.getSnapshot(), {
-    preferences: { fontSize: "standard", layout: "fixed", assistantWidth: "comfortable" },
+    preferences: { fontSize: "standard", layout: "wide", assistantWidth: "comfortable" },
     loaded: true,
     saving: false,
   });
-  assert.deepEqual(applied, [{ fontSize: "standard", layout: "fixed", assistantWidth: "comfortable" }]);
+  assert.deepEqual(applied, [{ fontSize: "standard", layout: "wide", assistantWidth: "comfortable" }]);
 });
 
 test("controller applies immediately and rolls back a failed save", async () => {

@@ -501,7 +501,7 @@ export async function runSmokeHostChecks(
                   chatScopeStyle.getPropertyValue("--chat-font-scale").trim() === "1.3" &&
                   fixedColumnWidth <= 760.5 &&
                   wideColumnWidth > 760.5 &&
-                  wideColumnWidth <= 960.5 &&
+                  wideColumnWidth <= 1280.5 &&
                   wideColumnWidth > fixedColumnWidth &&
                   narrowLayout &&
                   getComputedStyle(chatFontSizeSelect).fontSize === settingsFontSize &&
