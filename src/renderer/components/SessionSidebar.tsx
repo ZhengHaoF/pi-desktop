@@ -337,12 +337,35 @@ export function SessionSidebar({
   const toggleProjectGroupCollapse = useCallback((projectRoot: string) => {
     setCollapsedProjectRoots((previous) => {
       const next = new Set(previous);
-      if (next.has(projectRoot)) next.delete(projectRoot);
+      // Stored roots may use a different path spelling than the live one.
+      const collapsedRoot = [...next].find((root) => worktreePathsEqual(root, projectRoot));
+      if (collapsedRoot !== undefined) next.delete(collapsedRoot);
       else next.add(projectRoot);
       saveCollapsedProjectRoots(next);
       return next;
     });
   }, []);
+
+  // Reveal the group of a newly opened session (deep link, restore, or a pick
+  // in another group) exactly once per selection. A render-time override would
+  // fight the user's own collapse choice, so the reveal is event-driven.
+  const revealedSessionIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selectedSessionId || revealedSessionIdRef.current === selectedSessionId) return;
+    const selected = allSessions.find((s) => s.id === selectedSessionId);
+    const root = selected?.projectRoot ?? selected?.cwd;
+    // The session may not be indexed yet; retry when the list catches up.
+    if (!root) return;
+    revealedSessionIdRef.current = selectedSessionId;
+    setCollapsedProjectRoots((previous) => {
+      const collapsedRoot = [...previous].find((entry) => worktreePathsEqual(entry, root));
+      if (collapsedRoot === undefined) return previous;
+      const next = new Set(previous);
+      next.delete(collapsedRoot);
+      saveCollapsedProjectRoots(next);
+      return next;
+    });
+  }, [allSessions, selectedSessionId]);
 
   const { mode: sessionListMode } = useSessionListMode();
   const aggregated = sessionListMode === "aggregated";
@@ -424,7 +447,7 @@ export function SessionSidebar({
           runningCount: sessions.filter((s) => runningSessionIds.has(s.id)).length,
           unreadCount: sessions.filter((s) => unreadSessionIds.has(s.id)).length,
           // A collapsed group still expands when it holds the open session.
-          collapsed: collapsedProjectRoots.has(projectRoot) && !sessions.some((s) => s.id === selectedSessionId),
+          collapsed: collapsedProjectRoots.has(projectRoot),
         };
       })
     : [];
