@@ -153,6 +153,11 @@ export interface ModelPreferencesResult {
   models: ModelInfo[];
   /** null means every available model is enabled, including models added later. */
   enabledModels: string[] | null;
+  /**
+   * Persisted default model for new conversations (Pi global settings).
+   * null when unset or when the saved default is filtered out of the picker.
+   */
+  defaultModel: { provider: string; modelId: string } | null;
 }
 
 export interface ModelsConfig {

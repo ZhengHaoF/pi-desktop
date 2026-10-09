@@ -22,7 +22,7 @@ export { assertHerdrParamKeys } from "./handlers/herdr";
 
 import { assertPathAllowed } from "./path-authorization";
 
-export { projectModelsList } from "./handlers/model-catalog";
+export { projectModelsList, projectModelPreferences, includeDefaultModelInEnabled } from "./handlers/model-catalog";
 export { credentialMutationFailure } from "./handlers/auth";
 
 import type { RpcServer, RpcRequestContext } from "../contract/rpc";
@@ -270,6 +270,8 @@ export function registerHandlers(server: RpcServer): () => Promise<void> {
     "models.preferences.get": guard(modelCatalogHandlers.getPreferences),
 
     "models.preferences.set": guard(modelCatalogHandlers.setPreferences),
+
+    "models.default.set": guard(modelCatalogHandlers.setDefaultModel),
 
     "modelsConfig.get": guard(modelConfigHandlers.get),
     "modelsConfig.set": guard(modelConfigHandlers.set),

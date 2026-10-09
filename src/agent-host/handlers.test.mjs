@@ -453,7 +453,7 @@ test("model config saves reject payloads the runtime would drop and keep the pre
 test("registerHandlers exposes every contract method exactly once", async () => {
   const { handlers } = await captureHandlers();
   // Keep in sync with src/contract/api.ts: one handler per contract method.
-  assert.equal(Object.keys(handlers).length, 106);
+  assert.equal(Object.keys(handlers).length, 107);
   for (const method of [
     "host.ping",
     "host.toolchain",
@@ -472,6 +472,7 @@ test("registerHandlers exposes every contract method exactly once", async () => 
     "models.refreshCancel",
     "models.preferences.get",
     "models.preferences.set",
+    "models.default.set",
     "auth.providers",
     "skills.list",
     "plugins.list",
@@ -742,6 +743,41 @@ test("model list projection isolates provider availability failures and keeps th
     },
   ]);
   assert.doesNotMatch(JSON.stringify(result), /secret provider failure detail/);
+});
+
+test("model preferences project the persisted default and keep it enabled", async () => {
+  const { projectModelPreferences, includeDefaultModelInEnabled } = await loadHandlersModule();
+  const available = [
+    { id: "alpha", name: "Alpha", provider: "fixture" },
+    { id: "beta", name: "Beta", provider: "fixture" },
+  ];
+  const settings = {
+    getDefaultProvider() {
+      return "fixture";
+    },
+    getDefaultModel() {
+      return "beta";
+    },
+  };
+
+  const unfiltered = projectModelPreferences(available, undefined, settings);
+  assert.deepEqual(unfiltered.enabledModels, null);
+  assert.deepEqual(unfiltered.defaultModel, { provider: "fixture", modelId: "beta" });
+
+  // A default filtered out of the picker never surfaces, so it must not be projected.
+  const filteredOut = projectModelPreferences(available, ["fixture/alpha"], settings);
+  assert.equal(filteredOut.defaultModel, null);
+
+  // Persisting a default adds it back to enabledModels, matching Pi's own behavior.
+  assert.deepEqual(includeDefaultModelInEnabled(["fixture/alpha"], "fixture", "beta"), [
+    "fixture/alpha",
+    "fixture/beta",
+  ]);
+  assert.deepEqual(includeDefaultModelInEnabled(["fixture/beta"], "fixture", "beta"), ["fixture/beta"]);
+  // A thinking-level suffix still refers to the same model.
+  assert.deepEqual(includeDefaultModelInEnabled(["fixture/beta:high"], "fixture", "beta"), ["fixture/beta:high"]);
+  assert.equal(includeDefaultModelInEnabled(undefined, "fixture", "beta"), undefined);
+  assert.deepEqual(includeDefaultModelInEnabled([], "fixture", "beta"), []);
 });
 
 test("file, git, worktree, skill, plugin, and system handlers return contract-shaped results", async (t) => {

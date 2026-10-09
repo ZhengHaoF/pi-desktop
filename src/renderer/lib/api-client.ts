@@ -236,6 +236,10 @@ export async function setModelPreferences(cwd: string | undefined, enabledModels
   return call("models.preferences.set", { ...(cwd ? { cwd } : {}), enabledModels });
 }
 
+export async function setDefaultModel(cwd: string | undefined, provider: string, modelId: string) {
+  return call("models.default.set", { ...(cwd ? { cwd } : {}), provider, modelId });
+}
+
 export async function fileIndex(root: string, query?: string) {
   return call("files.index", { root, query });
 }

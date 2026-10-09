@@ -28,24 +28,58 @@ function stripThinkingSuffix(modelRef: string): string {
 }
 
 function filterByExactEnabledModels<T extends { id: string; provider: string }>(
-  available: T[],
+  available: readonly T[],
   enabledModels: string[] | undefined,
-): T[] {
+): readonly T[] {
   if (!enabledModels || enabledModels.length === 0) return available;
   const refs = new Set(enabledModels.map(stripThinkingSuffix).filter(Boolean));
   const visible = available.filter((m) => refs.has(`${m.provider}/${m.id}`) || refs.has(m.id));
   return visible.length > 0 ? visible : available;
 }
 
-function projectModelPreferences<T extends { id: string; name: string; provider: string }>(
+function resolveDefaultModel(
+  settings: Pick<SettingsManager, "getDefaultProvider" | "getDefaultModel">,
+  visible: readonly { provider: string; id: string }[],
+): { provider: string; modelId: string } | null {
+  const provider = settings.getDefaultProvider();
+  const modelId = settings.getDefaultModel();
+  if (provider && modelId && visible.some((model) => model.provider === provider && model.id === modelId)) {
+    return { provider, modelId };
+  }
+  return null;
+}
+
+/**
+ * Mirrors Pi's own persisted-default handling: a default filtered out by
+ * enabledModels never reaches the picker, so it is added back to the list.
+ */
+export function includeDefaultModelInEnabled(
+  enabledModels: string[] | undefined,
+  provider: string,
+  modelId: string,
+): string[] | undefined {
+  if (!enabledModels || enabledModels.length === 0) return enabledModels;
+  const reference = `${provider}/${modelId}`.toLowerCase();
+  if (enabledModels.some((entry) => stripThinkingSuffix(entry).toLowerCase() === reference)) return enabledModels;
+  return [...enabledModels, `${provider}/${modelId}`];
+}
+
+export function projectModelPreferences<T extends { id: string; name: string; provider: string }>(
   available: readonly T[],
   enabledModels: string[] | undefined,
+  settings: Pick<SettingsManager, "getDefaultProvider" | "getDefaultModel">,
 ): ModelPreferencesResult {
   const models: ModelInfo[] = available
     .map((model) => ({ id: model.id, name: model.name, provider: model.provider }))
     .sort((a, b) => a.name.localeCompare(b.name) || a.provider.localeCompare(b.provider) || a.id.localeCompare(b.id));
   const normalized = [...new Set((enabledModels ?? []).map(stripThinkingSuffix).filter(Boolean))];
-  return { models, enabledModels: normalized.length > 0 ? normalized : null };
+  return {
+    models,
+    enabledModels: normalized.length > 0 ? normalized : null,
+    // The picker hides models filtered out by enabledModels, so a default that is
+    // filtered out would never surface; project it against the same visible set.
+    defaultModel: resolveDefaultModel(settings, filterByExactEnabledModels(available, enabledModels)),
+  };
 }
 
 function normalizeEnabledModelsInput(value: unknown): string[] | undefined {
@@ -161,16 +195,9 @@ export async function projectModelsList(
     if (model.thinkingLevelMap) thinkingLevelMaps[key] = model.thinkingLevelMap;
   }
 
-  let defaultModel: { provider: string; modelId: string } | null = null;
-  const provider = settings.getDefaultProvider();
-  const modelId = settings.getDefaultModel();
-  if (provider && modelId && visible.some((model) => model.provider === provider && model.id === modelId)) {
-    defaultModel = { provider, modelId };
-  }
-
   return {
     models,
-    defaultModel,
+    defaultModel: resolveDefaultModel(settings, visible),
     thinkingLevels,
     thinkingLevelMaps,
     nameMap,
@@ -186,6 +213,7 @@ type ModelCatalogHandlers = {
   cancelRefresh: NonNullable<ApiHandler["models.refreshCancel"]>;
   getPreferences: NonNullable<ApiHandler["models.preferences.get"]>;
   setPreferences: NonNullable<ApiHandler["models.preferences.set"]>;
+  setDefaultModel: NonNullable<ApiHandler["models.default.set"]>;
 };
 
 export const modelCatalogHandlers = {
@@ -229,7 +257,7 @@ export const modelCatalogHandlers = {
     const cwd = resolveModelsCwd(params as { cwd?: string } | void);
     const services = await createAgentSessionServices({ cwd, agentDir: getAgentDir() });
     const { models: available } = await resolveAvailableModels(services.modelRuntime);
-    return projectModelPreferences(available, services.settingsManager.getEnabledModels());
+    return projectModelPreferences(available, services.settingsManager.getEnabledModels(), services.settingsManager);
   },
 
   setPreferences: async (params) => {
@@ -242,6 +270,30 @@ export const modelCatalogHandlers = {
       throw new RpcError({ code: "BAD_REQUEST", message: "At least one available model must remain enabled" });
     }
     services.settingsManager.setEnabledModels(enabledModels);
-    return projectModelPreferences(available, enabledModels);
+    return projectModelPreferences(available, enabledModels, services.settingsManager);
+  },
+
+  setDefaultModel: async (params) => {
+    const body = params as { cwd?: string; provider?: unknown; modelId?: unknown };
+    const cwd = resolveModelsCwd(body);
+    const provider = typeof body.provider === "string" ? body.provider.trim() : "";
+    const modelId = typeof body.modelId === "string" ? body.modelId.trim() : "";
+    if (!provider || !modelId) {
+      throw new RpcError({ code: "BAD_REQUEST", message: "provider and modelId are required" });
+    }
+    const services = await createAgentSessionServices({ cwd, agentDir: getAgentDir() });
+    const { models: available } = await resolveAvailableModels(services.modelRuntime);
+    if (!available.some((model) => model.provider === provider && model.id === modelId)) {
+      throw new RpcError({ code: "BAD_REQUEST", message: `Model is not available: ${provider}/${modelId}` });
+    }
+    const settings = services.settingsManager;
+    settings.setDefaultModelAndProvider(provider, modelId);
+    const enabledModels = includeDefaultModelInEnabled(settings.getEnabledModels(), provider, modelId);
+    if (enabledModels) settings.setEnabledModels(enabledModels);
+    await settings.flush();
+    if (settings.drainErrors().some((error) => error.scope === "global")) {
+      throw new RpcError({ code: "INTERNAL", message: "Global Pi settings could not be saved" });
+    }
+    return projectModelPreferences(available, settings.getEnabledModels(), settings);
   },
 } satisfies ModelCatalogHandlers;

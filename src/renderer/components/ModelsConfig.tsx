@@ -16,7 +16,7 @@ import {
   type ModelsJson,
   type ProviderEntry,
 } from "@/lib/models-config-state";
-import { call, getModelPreferences, setModelPreferences } from "@/lib/api-client";
+import { call, getModelPreferences, setDefaultModel, setModelPreferences } from "@/lib/api-client";
 import type {
   ModelPreferencesResult,
   ProviderStatus as OAuthProvider,
@@ -64,6 +64,7 @@ export function ModelsConfig({
   const [modelPreferencesLoading, setModelPreferencesLoading] = useState(true);
   const [modelPreferencesSaving, setModelPreferencesSaving] = useState(false);
   const [modelPreferencesError, setModelPreferencesError] = useState<string | null>(null);
+  const [defaultModelSaving, setDefaultModelSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const addProviderButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -103,6 +104,21 @@ export function ModelsConfig({
         setModelPreferencesError(error instanceof Error ? error.message : String(error));
       } finally {
         setModelPreferencesSaving(false);
+      }
+    },
+    [cwd, onChanged],
+  );
+
+  // Persists the conversation default model (Pi global settings). Failures surface
+  // inline on the button, so the rejection is forwarded to the caller.
+  const setConversationDefaultModel = useCallback(
+    async (providerName: string, modelId: string) => {
+      setDefaultModelSaving(true);
+      try {
+        setModelPreferencesState(await setDefaultModel(cwd ?? undefined, providerName, modelId));
+        onChanged?.();
+      } finally {
+        setDefaultModelSaving(false);
       }
     },
     [cwd, onChanged],
@@ -344,6 +360,12 @@ export function ModelsConfig({
         model={model}
         onChange={(m) => updateModel(selection.providerName, selection.index, m)}
         onDelete={() => removeModel(selection.providerName, selection.index)}
+        isDefault={
+          modelPreferences?.defaultModel?.provider === selection.providerName &&
+          modelPreferences?.defaultModel?.modelId === model.id
+        }
+        settingDefault={defaultModelSaving}
+        onSetDefault={() => setConversationDefaultModel(selection.providerName, model.id)}
       />
     );
   })();

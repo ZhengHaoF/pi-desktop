@@ -47,6 +47,7 @@ const { ModelsConfig, useSessionModels, testApi } = await importTestBundle("mode
         export async function refreshModels() {throw new Error('Unexpected remote catalog refresh');}
         export async function getModelPreferences() {state.reads++;return {models:[model],enabledModels:null};}
         export async function setModelPreferences(cwd, enabledModels) {state.writes.push({cwd,enabledModels});return await state.writeResult;}
+        export async function setDefaultModel(cwd, provider, modelId) {return await call('models.default.set', {...(cwd?{cwd}:{}), provider, modelId});}
         const take = (queue, fallback) => { const next=queue.shift(); return typeof next === 'function' ? next() : next ?? fallback; };
         export async function subscribeAuthLogin(provider,on) {
           const entry={provider,on,closed:0};state.sources.push(entry);
@@ -702,4 +703,26 @@ test("model connection results preserve endpoint status and latency separately f
   await fixture.click("Test", fixture.detail("ModelDetail"));
   await fixture.reply(1, { ok: true, responseText: "OK", status: 200, latencyMs: 3 });
   assert.match(JSON.stringify(fixture.renderer.toJSON()), /Connected/);
+});
+
+test("setting the conversation default persists it through the host and greys out that model's button", async (t) => {
+  const fixture = await mount(t, { config: editorConfig("https://default.test") });
+  await fixture.select("custom-model");
+  assert.equal(fixture.requests.length, 0);
+
+  await fixture.click("Set as default", fixture.detail("ModelDetail"));
+  assert.equal(fixture.requests.length, 1);
+  assert.equal(fixture.requests[0].method, "models.default.set");
+  assert.deepEqual(fixture.requests[0].params, { cwd: "/project", provider: "custom", modelId: "custom-model" });
+
+  await fixture.reply(0, {
+    models: [{ id: "custom-model", name: "custom-model", provider: "custom" }],
+    enabledModels: null,
+    defaultModel: { provider: "custom", modelId: "custom-model" },
+  });
+  assert.equal(fixture.changed, 1, "the session model catalog must refresh with the new default");
+  const greyed = fixture
+    .detail("ModelDetail")
+    .findAll((node) => node.type === "button" && text(node) === "Default" && node.props.disabled === true);
+  assert.equal(greyed.length, 1, "the persisted default renders as one greyed-out button");
 });

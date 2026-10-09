@@ -420,16 +420,25 @@ export function ModelDetail({
   model,
   onChange,
   onDelete,
+  isDefault = false,
+  settingDefault = false,
+  onSetDefault,
 }: {
   providerName: string;
   provider: ProviderEntry;
   model: ModelEntry;
   onChange: (m: ModelEntry) => void;
   onDelete: () => void;
+  isDefault?: boolean;
+  settingDefault?: boolean;
+  onSetDefault?: () => void | Promise<void>;
 }) {
   const { t } = useI18n();
   const [testState, setTestState] = useState<ModelTestState>({ phase: "idle" });
   const [fillState, setFillState] = useState<ModelFillState>({ phase: "idle" });
+  const [defaultState, setDefaultState] = useState<{ phase: "idle" | "saving" | "error"; message?: string }>({
+    phase: "idle",
+  });
   const fillSnapshot = useRef<ModelEntry | null>(null);
   const set = <K extends keyof ModelEntry>(k: K, v: ModelEntry[K]) => onChange({ ...model, [k]: v });
   const costVal = (k: keyof NonNullable<ModelEntry["cost"]>) =>
@@ -466,6 +475,7 @@ export function ModelDetail({
   useEffect(() => {
     setTestState({ phase: "idle" });
     setFillState({ phase: "idle" });
+    setDefaultState({ phase: "idle" });
     fillSnapshot.current = null;
   }, [providerName, provider.baseUrl, provider.api, provider.apiKey, model.id, model.api]);
 
@@ -493,6 +503,18 @@ export function ModelDetail({
       setTestState({ phase: "error", message: e instanceof Error ? e.message : String(e) });
     }
   }, [model, provider, providerName, t, testState.phase]);
+
+  const savingDefault = defaultState.phase === "saving" || settingDefault;
+  const handleSetDefault = useCallback(async () => {
+    if (!model.id.trim() || isDefault || savingDefault) return;
+    setDefaultState({ phase: "saving" });
+    try {
+      await onSetDefault?.();
+      setDefaultState({ phase: "idle" });
+    } catch (e) {
+      setDefaultState({ phase: "error", message: e instanceof Error ? e.message : String(e) });
+    }
+  }, [isDefault, model.id, onSetDefault, savingDefault]);
 
   const handleFillInfo = useCallback(async () => {
     if (!model.id.trim() || fillState.phase === "loading") return;
@@ -690,6 +712,56 @@ export function ModelDetail({
               : testState.phase === "success"
                 ? "OK"
                 : t("modelTest", "Test")}
+          </button>
+          {defaultState.phase === "error" && (
+            <span
+              title={defaultState.message}
+              style={{
+                maxWidth: 260,
+                height: 24,
+                padding: "0 8px",
+                border: "1px solid var(--danger-border)",
+                borderRadius: 4,
+                background: "var(--danger-soft)",
+                color: "var(--danger)",
+                fontSize: 11,
+                display: "inline-flex",
+                alignItems: "center",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                boxSizing: "border-box",
+              }}
+            >
+              {defaultState.message || t("modelSetDefaultFailed", "Failed to set the default model.")}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handleSetDefault}
+            disabled={isDefault || !model.id.trim() || savingDefault}
+            title={t("modelSetAsDefaultHint", "New conversations start with this model")}
+            style={{
+              height: 32,
+              padding: "0 10px",
+              background: "none",
+              border: "1px solid var(--border)",
+              borderRadius: 4,
+              color: isDefault || !model.id.trim() || savingDefault ? "var(--text-dim)" : "var(--text-muted)",
+              cursor: isDefault || !model.id.trim() || savingDefault ? "not-allowed" : "pointer",
+              fontSize: 12,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 5,
+              boxSizing: "border-box",
+            }}
+          >
+            {savingDefault
+              ? t("modelSetDefaultSaving", "Setting…")
+              : isDefault
+                ? t("modelCurrentDefault", "Default")
+                : t("modelSetAsDefault", "Set as default")}
           </button>
           <button
             type="button"

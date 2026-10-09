@@ -387,6 +387,10 @@ export interface Api {
     params: { cwd?: string; enabledModels: string[] | null };
     result: ModelPreferencesResult;
   };
+  "models.default.set": {
+    params: { cwd?: string; provider: string; modelId: string };
+    result: ModelPreferencesResult;
+  };
   "modelsConfig.get": { params: void; result: ModelsConfigSnapshot };
   "modelsConfig.set": {
     params: { config: ModelsConfig; expectedVersion: string };
