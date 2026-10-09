@@ -65,6 +65,44 @@ test("editing one model preserves 0.87.1 limits, cache, overrides, sampling, and
   assert.equal(original.providers.custom.models[0].name, "Old name");
 });
 
+test("importing a fetched model list appends new entries and skips duplicates or blank ids", async () => {
+  const { importModelsTransition } = await loadModule();
+  const original = {
+    revision: 7,
+    providers: {
+      stepfun: {
+        api: "openai-completions",
+        models: [{ id: "step-5-preview", name: "Step 5 Preview" }],
+        futureProviderField: true,
+      },
+    },
+  };
+
+  const first = importModelsTransition(original, "stepfun", [
+    { id: "step-5-preview" },
+    { id: "step-3.5-flash", name: "Step 3.5 Flash" },
+    { id: "  " },
+    { id: "step-3.7-flash" },
+  ]);
+
+  assert.deepEqual(first.added, [{ id: "step-3.5-flash", name: "Step 3.5 Flash" }, { id: "step-3.7-flash" }]);
+  assert.equal(first.skippedCount, 2);
+  assert.deepEqual(first.config.providers.stepfun.models, [
+    { id: "step-5-preview", name: "Step 5 Preview" },
+    { id: "step-3.5-flash", name: "Step 3.5 Flash" },
+    { id: "step-3.7-flash" },
+  ]);
+  assert.equal(first.config.providers.stepfun.futureProviderField, true);
+  assert.equal(first.config.revision, 7);
+
+  // Re-importing the same catalog changes nothing.
+  const second = importModelsTransition(first.config, "stepfun", [{ id: "step-3.5-flash" }, { id: "step-3.7-flash" }]);
+  assert.deepEqual(second.added, []);
+  assert.equal(second.skippedCount, 2);
+  assert.deepEqual(second.config, first.config);
+  assert.deepEqual(original.providers.stepfun.models, [{ id: "step-5-preview", name: "Step 5 Preview" }]);
+});
+
 test("setting a built-in provider base URL creates an override without redefining models", async () => {
   const { setProviderBaseUrl } = await loadModule();
   const original = { revision: 7, providers: {} };

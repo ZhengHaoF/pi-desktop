@@ -196,3 +196,35 @@ export function replaceModelEntry(
     },
   };
 }
+
+/**
+ * Merge models fetched from a provider's remote catalog into its model list.
+ * Entries already present (by id) are skipped, so re-importing is idempotent.
+ */
+export function importModelsTransition(
+  config: ModelsJson,
+  providerName: string,
+  imported: readonly ModelEntry[],
+): { config: ModelsJson; added: ModelEntry[]; skippedCount: number } {
+  const provider = config.providers?.[providerName] ?? {};
+  const knownIds = new Set((provider.models ?? []).map((m) => m.id).filter(Boolean));
+  const added: ModelEntry[] = [];
+  for (const entry of imported) {
+    const id = entry.id.trim();
+    if (!id || knownIds.has(id)) continue;
+    knownIds.add(id);
+    added.push({ ...entry, id });
+  }
+  if (added.length === 0) return { config, added, skippedCount: imported.length };
+  return {
+    config: {
+      ...config,
+      providers: {
+        ...(config.providers ?? {}),
+        [providerName]: { ...provider, models: [...(provider.models ?? []), ...added] },
+      },
+    },
+    added,
+    skippedCount: imported.length - added.length,
+  };
+}

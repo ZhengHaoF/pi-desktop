@@ -9,6 +9,8 @@ import type {
   FileMeta,
   HistoryWindow,
   LoginProgressEvent,
+  ListModelsResult,
+  ModelInfoFillResult,
   ModelPreferencesResult,
   ModelsConfig,
   ModelsConfigSnapshot,
@@ -398,6 +400,24 @@ export interface Api {
       [key: string]: unknown;
     };
     result: TestResult;
+  };
+  "modelsConfig.listModels": {
+    params: {
+      providerName?: string;
+      provider?: Record<string, unknown>;
+      [key: string]: unknown;
+    };
+    result: ListModelsResult;
+  };
+  "modelsConfig.fillModelInfo": {
+    params: {
+      modelId?: string;
+      providerName?: string;
+      provider?: Record<string, unknown>;
+      model?: Record<string, unknown>;
+      [key: string]: unknown;
+    };
+    result: ModelInfoFillResult;
   };
 
   "auth.providers": { params: void; result: { providers: ProviderStatus[] } };

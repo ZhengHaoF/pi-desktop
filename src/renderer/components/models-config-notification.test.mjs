@@ -333,6 +333,185 @@ test("config and model-selection saves keep their existing single committed-chan
   assert.equal(testApi.state.catalogReads, 3);
 });
 
+test("fetching a provider model list imports the picked entries locally and persists them on save", async (t) => {
+  const fixture = await mount(t, {
+    config: {
+      providers: {
+        "stepfun-provider": {
+          baseUrl: "https://api.stepfun.com/step_plan/v1",
+          api: "openai-completions",
+          apiKey: "fixture-key",
+        },
+      },
+    },
+  });
+  await fixture.click("Fetch model list");
+  assert.equal(fixture.requests.length, 1);
+  assert.equal(fixture.requests[0].method, "modelsConfig.listModels");
+  assert.equal(fixture.requests[0].params.providerName, "stepfun-provider");
+  assert.equal(fixture.requests[0].params.provider.baseUrl, "https://api.stepfun.com/step_plan/v1");
+
+  await fixture.reply(0, {
+    ok: true,
+    status: 200,
+    models: [{ id: "step-3.5-flash", name: "Step 3.5 Flash" }, { id: "step-5-preview" }],
+  });
+  const panel = fixture.detail("ImportModelsPanel");
+  assert.match(text(panel), /Fetched 2 models/);
+  assert.match(text(panel), /Step 3\.5 Flash/);
+
+  const checkboxes = panel.findAll((node) => node.type === "input" && node.props.type === "checkbox");
+  assert.equal(checkboxes.length, 3, "select-all plus one checkbox per fetched model");
+  await act(async () => checkboxes[2].props.onChange({ target: { checked: true } }));
+  await fixture.click("Add selected models (1)", panel);
+  assert.match(text(panel), /Added/);
+
+  // Importing stays local: nothing is written until the explicit Save.
+  assert.equal(fixture.requests.length, 1, "importing must not persist models.json");
+  assert.match(text(fixture.renderer.root), /step-5-preview/);
+
+  await fixture.click("Save");
+  assert.equal(fixture.requests[1].method, "modelsConfig.set");
+  assert.deepEqual(fixture.requests[1].params.config.providers["stepfun-provider"].models, [{ id: "step-5-preview" }]);
+  await fixture.reply(1, { ok: true, version: "two" });
+  assert.equal(fixture.changed, 1);
+});
+
+test("a failed model list fetch keeps the editor usable and supports retrying", async (t) => {
+  const fixture = await mount(t, {
+    config: {
+      providers: { "stepfun-provider": { baseUrl: "https://api.stepfun.com/step_plan/v1", apiKey: "fixture-key" } },
+    },
+  });
+  await fixture.click("Fetch model list");
+  assert.equal(fixture.requests[0].method, "modelsConfig.listModels");
+  await fixture.fail(0, "INTERNAL", "Provider unreachable");
+  assert.match(text(fixture.detail("ImportModelsPanel")), /Provider unreachable/);
+  assert.equal(fixture.changed, 0);
+
+  await fixture.click("Retry", fixture.detail("ImportModelsPanel"));
+  assert.equal(fixture.requests.length, 2);
+  assert.equal(fixture.requests[1].method, "modelsConfig.listModels");
+  await fixture.reply(1, { ok: false, unsupported: true, error: "not supported" });
+  assert.match(text(fixture.detail("ImportModelsPanel")), /does not support fetching the model list/);
+  assert.equal(fixture.requests.length, 2, "an unsupported API must not retry");
+});
+
+test("filling model info from models.dev applies fields locally and can be undone before saving", async (t) => {
+  const fixture = await mount(t, {
+    config: {
+      providers: {
+        "stepfun-provider": {
+          baseUrl: "https://api.stepfun.com/step_plan/v1",
+          api: "openai-completions",
+          apiKey: "fixture-key",
+          models: [{ id: "step-5-preview" }],
+        },
+      },
+    },
+  });
+  await fixture.select("step-5-preview");
+  assert.ok(fixture.detail("ModelDetail"));
+
+  await fixture.click("Fill model info");
+  assert.equal(fixture.requests.length, 1);
+  assert.equal(fixture.requests[0].method, "modelsConfig.fillModelInfo");
+  assert.equal(fixture.requests[0].params.modelId, "step-5-preview");
+  assert.equal(fixture.requests[0].params.providerName, "stepfun-provider");
+  assert.equal(fixture.requests[0].params.provider.baseUrl, "https://api.stepfun.com/step_plan/v1");
+
+  await fixture.reply(0, {
+    ok: true,
+    fields: {
+      name: "Step 5 Preview",
+      contextWindow: 1_000_000,
+      maxTokens: 65_536,
+      reasoning: true,
+      input: ["text", "image"],
+      // A filled cost is always complete: models.json requires all four keys.
+      cost: { input: 0.959, output: 2.741, cacheRead: 0.048, cacheWrite: 0 },
+    },
+    filled: ["name", "contextWindow", "maxTokens", "reasoning", "input", "cost"],
+    stale: false,
+    source: {
+      kind: "models-dev",
+      providerName: "StepFun Step Plan (China)",
+      matchedBy: "baseUrl",
+      priceProviderName: "StepFun (China)",
+    },
+  });
+
+  const detail = fixture.detail("ModelDetail");
+  const numbers = detail.findAll((node) => node.type === "input" && node.props.type === "number");
+  assert.deepEqual(
+    numbers.map((node) => node.props.value),
+    ["1000000", "65536", "0.959", "2.741", "0.048", "0"],
+  );
+  const checkboxes = detail.findAll((node) => node.type === "input" && node.props.type === "checkbox");
+  assert.equal(checkboxes[0].props.checked, true, "reasoning is switched on by the fill");
+  assert.equal(checkboxes[1].props.checked, true, "image input is switched on by the fill");
+  assert.match(text(detail), /Filled 6 fields/);
+  assert.match(text(detail), /pricing matched by Base URL: StepFun \(China\)/);
+  assert.match(text(detail), /Source: models\.dev/);
+
+  // Filling is a local edit: nothing is persisted until the explicit Save.
+  assert.equal(fixture.requests.length, 1, "filling must not persist models.json");
+
+  await fixture.click("Undo");
+  const restored = fixture
+    .detail("ModelDetail")
+    .findAll((node) => node.type === "input" && node.props.type === "number");
+  assert.deepEqual(
+    restored.map((node) => node.props.value),
+    ["", "", "", "", "", ""],
+  );
+  assert.equal(
+    fixture.detail("ModelDetail").findAll((node) => node.type === "input" && node.props.type === "checkbox")[0].props
+      .checked,
+    false,
+  );
+
+  // Re-fill, then persist through the normal save path.
+  await fixture.click("Fill model info");
+  assert.equal(fixture.requests.length, 2);
+  await fixture.reply(1, {
+    ok: true,
+    fields: { contextWindow: 1_000_000, cost: { input: 0.959 } },
+    filled: ["contextWindow", "cost"],
+    source: { kind: "models-dev", providerName: "StepFun (China)", matchedBy: "global" },
+  });
+  assert.match(text(fixture.detail("ModelDetail")), /Filled 2 fields/);
+  await fixture.click("Save");
+  assert.equal(fixture.requests[2].method, "modelsConfig.set");
+  const savedModel = fixture.requests[2].params.config.providers["stepfun-provider"].models[0];
+  assert.equal(savedModel.contextWindow, 1_000_000);
+  assert.equal(savedModel.cost.input, 0.959);
+  await fixture.reply(2, { ok: true, version: "two" });
+  assert.equal(fixture.changed, 1);
+});
+
+test("a model info miss keeps the form untouched and explains why", async (t) => {
+  const fixture = await mount(t, {
+    config: {
+      providers: {
+        "stepfun-provider": { api: "openai-completions", apiKey: "fixture-key", models: [{ id: "step-5-preview" }] },
+      },
+    },
+  });
+  await fixture.select("step-5-preview");
+  await fixture.click("Fill model info");
+  await fixture.reply(0, { ok: false, error: 'No model information found for "step-5-preview".' });
+  assert.match(text(fixture.detail("ModelDetail")), /No model information found/);
+  const numbers = fixture
+    .detail("ModelDetail")
+    .findAll((node) => node.type === "input" && node.props.type === "number");
+  assert.deepEqual(
+    numbers.map((node) => node.props.value),
+    ["", "", "", "", "", ""],
+  );
+  assert.equal(fixture.requests.length, 1);
+});
+
 test("OAuth reset must settle before subscribing and a cancelled reset cannot start a login", async (t) => {
   const fixture = await mount(t);
   await fixture.select("OAuth fixture");

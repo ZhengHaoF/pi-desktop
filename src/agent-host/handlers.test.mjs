@@ -1,6 +1,15 @@
 import { importTestBundle } from "#test-bundle";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  truncateSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
 import { MessageChannel } from "node:worker_threads";
@@ -151,10 +160,300 @@ test("model connection tests use isolated configuration and preserve success and
   if (before.version === "missing") assert.throws(() => readFileSync(modelFile), { code: "ENOENT" });
 });
 
+test("model list fetches use isolated configuration and parse provider catalogs", async (t) => {
+  const { handlers } = await captureHandlers();
+  const calls = [];
+  let fail = false;
+  const server = createServer(async (request, response) => {
+    calls.push({
+      url: request.url,
+      auth: request.headers.authorization,
+      version: request.headers["anthropic-version"],
+    });
+    if (request.url === "/models") {
+      // No version segment: exercises the /v1 fallback candidate.
+      response.writeHead(404, { "Content-Type": "text/plain" }).end("not found");
+      return;
+    }
+    if (fail) {
+      response
+        .writeHead(401, { "Content-Type": "application/json" })
+        .end(JSON.stringify({ error: { message: "PLAN22_MODEL_LIST_FAILURE", type: "invalid_api_key" } }));
+      return;
+    }
+    response.writeHead(200, { "Content-Type": "application/json" }).end(
+      JSON.stringify({
+        object: "list",
+        data: [
+          { id: "fixture-alpha", object: "model", created: 1, owned_by: "fixture" },
+          { id: "fixture-beta", display_name: "Fixture Beta" },
+          { id: "   " },
+          { object: "model" },
+        ],
+      }),
+    );
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  });
+  const before = await handlers["modelsConfig.get"]();
+  const modelFile = path.join(isolatedAgentDirectory, "models.json");
+  const provider = {
+    baseUrl: "http://127.0.0.1:" + server.address().port + "/v1",
+    api: "openai-completions",
+    apiKey: "nonsecret-local-fixture",
+    // Half-edited model rows must not block the provider composition used for listing.
+    models: [{ id: "" }],
+  };
+
+  const result = await handlers["modelsConfig.listModels"]({ providerName: "plan22-list-test", provider });
+  assert.equal(result.ok, true, result.error);
+  assert.deepEqual(result.models, [{ id: "fixture-alpha" }, { id: "fixture-beta", name: "Fixture Beta" }]);
+  assert.equal(result.status, 200);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "/v1/models");
+  assert.equal(calls[0].auth, "Bearer nonsecret-local-fixture");
+
+  fail = true;
+  const failure = await handlers["modelsConfig.listModels"]({ providerName: "plan22-list-test", provider });
+  assert.equal(failure.ok, false);
+  assert.equal(failure.status, 401);
+  assert.match(failure.error, /PLAN22_MODEL_LIST_FAILURE/);
+  assert.equal(calls.length, 2, "provider failures must not retry other endpoint candidates");
+
+  // A base URL without the version segment falls back to /v1/models, and
+  // Anthropic-style catalogs authenticate with x-api-key instead of Bearer.
+  fail = false;
+  const anthropic = await handlers["modelsConfig.listModels"]({
+    providerName: "plan22-list-test",
+    provider: {
+      baseUrl: "http://127.0.0.1:" + server.address().port,
+      api: "anthropic-messages",
+      apiKey: "nonsecret-local-fixture",
+    },
+  });
+  assert.equal(anthropic.ok, true, anthropic.error);
+  assert.equal(calls.length, 4);
+  assert.equal(calls[2].url, "/models");
+  assert.equal(calls[3].url, "/v1/models");
+  assert.equal(calls[3].auth, undefined);
+  assert.equal(calls[3].version, "2023-06-01");
+
+  const missing = await handlers["modelsConfig.listModels"]({ provider: {} });
+  assert.equal(missing.ok, false);
+  assert.match(missing.error, /providerName is required/);
+  const unsupported = await handlers["modelsConfig.listModels"]({
+    providerName: "plan22-list-test",
+    provider: { baseUrl: "https://example.invalid", api: "google-generative-ai", apiKey: "nonsecret-local-fixture" },
+  });
+  assert.equal(unsupported.ok, false);
+  assert.equal(unsupported.unsupported, true);
+
+  assert.deepEqual(await handlers["modelsConfig.get"](), before);
+  if (before.version === "missing") assert.throws(() => readFileSync(modelFile), { code: "ENOENT" });
+});
+
+const modelsDevFixture = {
+  "stepfun-step-plan": {
+    id: "stepfun-step-plan",
+    name: "StepFun Step Plan (China)",
+    api: "https://api.stepfun.com/step_plan/v1",
+    models: {
+      "step-5-preview": {
+        id: "step-5-preview",
+        name: "Step 5 Preview",
+        reasoning: true,
+        modalities: { input: ["text", "image", "video"], output: ["text"] },
+        limit: { context: 1_000_000, output: 65_536 },
+        canonical_model_id: "stepfun/step-5-preview",
+      },
+    },
+  },
+  stepfun: {
+    id: "stepfun",
+    name: "StepFun (China)",
+    api: "https://api.stepfun.com/v1",
+    models: {
+      "step-5-preview": {
+        id: "step-5-preview",
+        name: "Step 5 Preview",
+        limit: { context: 1_000_000, output: 65_536 },
+        cost: { input: 0.959, output: 2.741, cache_read: 0.048 },
+      },
+    },
+  },
+};
+
+test("model info fills match by base URL, cache the catalog, and never upload provider data", async (t) => {
+  const { handlers } = await captureHandlers();
+  const requests = [];
+  const nativeFetch = globalThis.fetch;
+  const cacheFile = path.join(isolatedAgentDirectory, "models-dev-catalog.json");
+  rmSync(cacheFile, { force: true });
+  globalThis.fetch = async (url) => {
+    requests.push(String(url));
+    return { ok: true, json: async () => modelsDevFixture };
+  };
+  t.after(() => {
+    globalThis.fetch = nativeFetch;
+    rmSync(cacheFile, { force: true });
+  });
+
+  const before = await handlers["modelsConfig.get"]();
+  const modelFile = path.join(isolatedAgentDirectory, "models.json");
+  const result = await handlers["modelsConfig.fillModelInfo"]({
+    modelId: "step-5-preview",
+    providerName: "stepfun-provider",
+    provider: { baseUrl: "https://api.stepfun.com/step_plan/v1", apiKey: "nonsecret-local-fixture" },
+    model: { id: "step-5-preview" },
+  });
+
+  assert.equal(result.ok, true, result.error);
+  assert.deepEqual(result.fields, {
+    name: "Step 5 Preview",
+    contextWindow: 1_000_000,
+    maxTokens: 65_536,
+    reasoning: true,
+    input: ["text", "image"],
+    // The filled cost is always complete: models.json requires all four keys.
+    cost: { input: 0.959, output: 2.741, cacheRead: 0.048, cacheWrite: 0 },
+  });
+  assert.deepEqual(result.source, {
+    kind: "models-dev",
+    providerName: "StepFun Step Plan (China)",
+    matchedBy: "baseUrl",
+    priceProviderName: "StepFun (China)",
+  });
+  assert.equal(result.stale, false);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0], "https://models.dev/api.json", "the catalog URL is fixed");
+  assert.ok(existsSync(cacheFile), "the catalog is cached on disk");
+
+  // The second call is served from the cache, and nothing is written to models.json.
+  const cached = await handlers["modelsConfig.fillModelInfo"]({
+    modelId: "step-5-preview",
+    providerName: "stepfun-provider",
+    provider: { baseUrl: "https://api.stepfun.com/step_plan/v1" },
+    model: {
+      id: "step-5-preview",
+      contextWindow: 1_000_000,
+      maxTokens: 65_536,
+      reasoning: true,
+      input: ["text", "image"],
+      cost: { input: 0.959, output: 2.741, cacheRead: 0.048, cacheWrite: 0 },
+      name: "Step 5 Preview",
+    },
+  });
+  assert.equal(cached.ok, true, cached.error);
+  assert.equal(requests.length, 1);
+  assert.deepEqual(cached.filled, [], "an entry that already matches reports nothing to fill");
+  assert.deepEqual(await handlers["modelsConfig.get"](), before);
+  if (before.version === "missing") assert.throws(() => readFileSync(modelFile), { code: "ENOENT" });
+
+  const missing = await handlers["modelsConfig.fillModelInfo"]({
+    modelId: "no-such-model",
+    model: { id: "no-such-model" },
+  });
+  assert.equal(missing.ok, false);
+  assert.match(missing.error, /no-such-model/);
+  const invalid = await handlers["modelsConfig.fillModelInfo"]({ model: {} });
+  assert.equal(invalid.ok, false);
+  assert.match(invalid.error, /modelId is required/);
+});
+
+test("model info fills fall back to the built-in catalogs when the network is unavailable", async (t) => {
+  const { handlers } = await captureHandlers();
+  const nativeFetch = globalThis.fetch;
+  const cacheFile = path.join(isolatedAgentDirectory, "models-dev-catalog.json");
+  rmSync(cacheFile, { force: true });
+  globalThis.fetch = async () => {
+    throw new Error("offline");
+  };
+  t.after(() => {
+    globalThis.fetch = nativeFetch;
+    rmSync(cacheFile, { force: true });
+  });
+
+  const builtin = await handlers["modelsConfig.fillModelInfo"]({
+    modelId: "deepseek-flash",
+    providerName: "my-provider",
+    provider: { baseUrl: "https://example.invalid/v1" },
+    model: { id: "deepseek-flash" },
+  });
+  assert.equal(builtin.ok, true, builtin.error);
+  assert.equal(builtin.source.kind, "builtin");
+  assert.match(builtin.source.providerName, /deepseek/i);
+  assert.ok(builtin.filled.length > 0);
+  assert.equal(existsSync(cacheFile), false, "a failed download must not create a cache file");
+});
+
+test("model config saves reject payloads the runtime would drop and keep the previous file", async (t) => {
+  const { handlers } = await captureHandlers();
+  const modelFile = path.join(isolatedAgentDirectory, "models.json");
+  const before = await handlers["modelsConfig.get"]();
+  t.after(async () => {
+    const current = await handlers["modelsConfig.get"]();
+    if (before.version === "missing") {
+      rmSync(modelFile, { force: true });
+      return;
+    }
+    if (current.version !== before.version) {
+      await handlers["modelsConfig.set"]({ config: before.config, expectedVersion: current.version });
+    }
+  });
+
+  // A partial cost object makes the SDK drop every provider, so the save is refused.
+  await assert.rejects(
+    () =>
+      handlers["modelsConfig.set"]({
+        expectedVersion: before.version,
+        config: {
+          providers: {
+            "plan22-validate": {
+              api: "openai-completions",
+              baseUrl: "https://example.invalid/v1",
+              apiKey: "nonsecret-local-fixture",
+              models: [{ id: "fixture", cost: { input: 1, output: 2, cacheRead: 0 } }],
+            },
+          },
+        },
+      }),
+    (error) =>
+      error.code === "BAD_REQUEST" &&
+      /cacheWrite/.test(error.message) &&
+      /rejected by the model runtime/.test(error.message),
+  );
+  assert.deepEqual(await handlers["modelsConfig.get"](), before, "a rejected save must not touch models.json");
+
+  // The same config with a complete cost saves.
+  const saved = await handlers["modelsConfig.set"]({
+    expectedVersion: before.version,
+    config: {
+      providers: {
+        "plan22-validate": {
+          api: "openai-completions",
+          baseUrl: "https://example.invalid/v1",
+          apiKey: "nonsecret-local-fixture",
+          models: [{ id: "fixture", cost: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 } }],
+        },
+      },
+    },
+  });
+  assert.equal(saved.ok, true);
+  const reloaded = await handlers["modelsConfig.get"]();
+  assert.equal(reloaded.config.providers["plan22-validate"].models[0].cost.cacheWrite, 0);
+
+  // Removing every provider stays legitimate.
+  const cleared = await handlers["modelsConfig.set"]({ expectedVersion: reloaded.version, config: { providers: {} } });
+  assert.equal(cleared.ok, true);
+});
+
 test("registerHandlers exposes every contract method exactly once", async () => {
   const { handlers } = await captureHandlers();
   // Keep in sync with src/contract/api.ts: one handler per contract method.
-  assert.equal(Object.keys(handlers).length, 104);
+  assert.equal(Object.keys(handlers).length, 106);
   for (const method of [
     "host.ping",
     "host.toolchain",
@@ -666,7 +965,9 @@ test("session, model configuration, and auth handlers isolate state and preserve
   const v087Config = {
     providers: {
       custom: {
-        headers: { Authorization: "Bearer test", "X-Remove-Me": null },
+        api: "openai-completions",
+        baseUrl: "https://example.invalid/v1",
+        headers: { Authorization: "Bearer test", "X-Remove-Me": "dropped" },
         models: [
           {
             id: "model-one",
@@ -694,7 +995,7 @@ test("session, model configuration, and auth handlers isolate state and preserve
   assert.notEqual(winningSave.version, editorOne.version);
   await assert.rejects(
     handlers["modelsConfig.set"]({
-      config: { providers: { stale: { api: "openai-completions" } } },
+      config: { providers: { stale: { api: "openai-completions", baseUrl: "https://example.invalid/v1" } } },
       expectedVersion: editorTwo.version,
     }),
     (error) =>

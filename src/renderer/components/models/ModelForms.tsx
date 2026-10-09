@@ -1,9 +1,20 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Check, Field, NumInput, SecretTextInput, Select, SectionTitle, TextInput } from "../form-controls";
 import { applyStrictOptionalPositiveInteger } from "@/lib/strict-integer";
 import { useI18n } from "@/i18n";
 import { type ModelEntry, type ProviderEntry } from "@/lib/models-config-state";
 import { call } from "@/lib/api-client";
+import type { ModelInfoFillResult } from "@contract/types";
+import { ImportModelsPanel } from "./ImportModelsPanel";
+
+/** Public database behind the "fill model info" action. */
+const MODELS_DEV_URL = "https://models.dev";
+
+type ModelFillState =
+  | { phase: "idle" }
+  | { phase: "loading" }
+  | { phase: "done"; result: ModelInfoFillResult }
+  | { phase: "error"; message: string };
 
 type ModelTestState =
   | { phase: "idle" }
@@ -19,15 +30,18 @@ export function ProviderDetail({
   onChange,
   onRename,
   onDelete,
+  onImportModels,
 }: {
   name: string;
   provider: ProviderEntry;
   onChange: (p: ProviderEntry) => void;
   onRename: (n: string) => void;
   onDelete: () => void;
+  onImportModels: (models: ModelEntry[]) => void;
 }) {
   const { t } = useI18n();
   const [editingName, setEditingName] = useState(name);
+  const [importOpen, setImportOpen] = useState(false);
   useEffect(() => setEditingName(name), [name]);
   const set = <K extends keyof ProviderEntry>(k: K, v: ProviderEntry[K]) => onChange({ ...provider, [k]: v });
 
@@ -111,6 +125,60 @@ export function ProviderDetail({
           required
         />
       </Field>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <button
+          type="button"
+          onClick={() => setImportOpen((open) => !open)}
+          aria-expanded={importOpen}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            alignSelf: "flex-start",
+            gap: 6,
+            minHeight: 32,
+            padding: "0 12px",
+            background: "none",
+            border: "1px solid var(--border)",
+            borderRadius: 5,
+            color: "var(--text-muted)",
+            cursor: "pointer",
+            fontSize: 12,
+          }}
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          {t("modelFetchModelList", "Fetch model list")}
+        </button>
+        {!importOpen && (
+          <span style={{ fontSize: 10, color: "var(--text-dim)", lineHeight: 1.5 }}>
+            {t(
+              "modelFetchModelListHint",
+              "Fetches the provider's available models using the Base URL and API Key above, then adds the ones you pick.",
+            )}
+          </span>
+        )}
+        {importOpen && (
+          <ImportModelsPanel
+            providerName={name}
+            provider={provider}
+            onImport={onImportModels}
+            onClose={() => setImportOpen(false)}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -361,12 +429,24 @@ export function ModelDetail({
 }) {
   const { t } = useI18n();
   const [testState, setTestState] = useState<ModelTestState>({ phase: "idle" });
+  const [fillState, setFillState] = useState<ModelFillState>({ phase: "idle" });
+  const fillSnapshot = useRef<ModelEntry | null>(null);
   const set = <K extends keyof ModelEntry>(k: K, v: ModelEntry[K]) => onChange({ ...model, [k]: v });
   const costVal = (k: keyof NonNullable<ModelEntry["cost"]>) =>
     model.cost?.[k] !== undefined ? String(model.cost[k]) : "";
   const setCost = (k: keyof NonNullable<ModelEntry["cost"]>, v: string) => {
     const n = parseFloat(v);
-    onChange({ ...model, cost: { ...(model.cost ?? {}), [k]: isNaN(n) ? undefined : n } });
+    // models.json requires all four cost keys whenever a cost object exists, so
+    // editing one field materializes the complete object; a cleared field is 0.
+    const previous = model.cost;
+    const cost = {
+      input: previous?.input ?? 0,
+      output: previous?.output ?? 0,
+      cacheRead: previous?.cacheRead ?? 0,
+      cacheWrite: previous?.cacheWrite ?? 0,
+      [k]: isNaN(n) ? 0 : n,
+    };
+    onChange({ ...model, cost });
   };
   const testSummary = (() => {
     if (testState.phase === "idle") return null;
@@ -385,6 +465,8 @@ export function ModelDetail({
 
   useEffect(() => {
     setTestState({ phase: "idle" });
+    setFillState({ phase: "idle" });
+    fillSnapshot.current = null;
   }, [providerName, provider.baseUrl, provider.api, provider.apiKey, model.id, model.api]);
 
   const handleTest = useCallback(async () => {
@@ -411,6 +493,119 @@ export function ModelDetail({
       setTestState({ phase: "error", message: e instanceof Error ? e.message : String(e) });
     }
   }, [model, provider, providerName, t, testState.phase]);
+
+  const handleFillInfo = useCallback(async () => {
+    if (!model.id.trim() || fillState.phase === "loading") return;
+    setFillState({ phase: "loading" });
+    try {
+      const result = await call("modelsConfig.fillModelInfo", { modelId: model.id, providerName, provider, model });
+      if (!result.ok) {
+        setFillState({
+          phase: "error",
+          message: result.error ?? t("modelFillInfoFailed", "Failed to fetch model info."),
+        });
+        return;
+      }
+      const filled = result.filled ?? [];
+      if (filled.length > 0 && result.fields) {
+        fillSnapshot.current = model;
+        onChange({ ...model, ...result.fields });
+      }
+      setFillState({ phase: "done", result });
+    } catch (e) {
+      setFillState({ phase: "error", message: e instanceof Error ? e.message : String(e) });
+    }
+  }, [fillState.phase, model, onChange, provider, providerName, t]);
+
+  const handleUndoFill = useCallback(() => {
+    if (fillSnapshot.current) onChange(fillSnapshot.current);
+    fillSnapshot.current = null;
+    setFillState({ phase: "idle" });
+  }, [onChange]);
+
+  const fillStatus = (() => {
+    if (fillState.phase !== "done") return null;
+    const result = fillState.result;
+    const filledCount = result.filled?.length ?? 0;
+    const source = result.source;
+    const sourceLabel = source?.kind === "builtin" ? t("modelFillInfoSourceBuiltin", "Built-in catalog") : "models.dev";
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 6,
+          fontSize: 11,
+          color: "var(--text-muted)",
+        }}
+      >
+        <span>
+          {filledCount > 0
+            ? t("modelFillInfoFilledCount", "Filled {count} fields").replace("{count}", String(filledCount))
+            : t("modelFillInfoUpToDate", "Model info already matches the source")}
+        </span>
+        {source?.priceProviderName && (
+          <span>
+            ·{" "}
+            {t("modelFillInfoPriceFrom", "pricing matched by Base URL: {provider}").replace(
+              "{provider}",
+              source.priceProviderName,
+            )}
+          </span>
+        )}
+        {source && source.matchedBy === "global" && !source.priceProviderName && (
+          <span>
+            ·{" "}
+            {t("modelFillInfoGlobalMatch", "matched by model ID: {provider}").replace(
+              "{provider}",
+              source.providerName,
+            )}
+          </span>
+        )}
+        <span style={{ color: "var(--text-dim)" }}>
+          {t("modelFillInfoSourceLabel", "Source: {source}").replace("{source}", sourceLabel)}
+          {result.stale ? ` ${t("modelFillInfoStaleCache", "(offline cache)")}` : ""}
+        </span>
+        {source?.kind === "models-dev" && (
+          <button
+            type="button"
+            onClick={() => void window.piBridge?.openExternal(MODELS_DEV_URL)}
+            title={t("modelFillInfoOpenSource", "Open models.dev")}
+            aria-label={t("modelFillInfoOpenSource", "Open models.dev")}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              color: "var(--accent)",
+              cursor: "pointer",
+              fontSize: 11,
+              textDecoration: "underline",
+            }}
+          >
+            ↗
+          </button>
+        )}
+        {filledCount > 0 && fillSnapshot.current && (
+          <button
+            type="button"
+            onClick={handleUndoFill}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              color: "var(--text-muted)",
+              cursor: "pointer",
+              fontSize: 11,
+              textDecoration: "underline",
+            }}
+          >
+            {t("modelFillInfoUndo", "Undo")}
+          </button>
+        )}
+      </div>
+    );
+  })();
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -527,6 +722,56 @@ export function ModelDetail({
             placeholder={t("modelDisplayName", "Display name")}
           />
         </Field>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <button
+          type="button"
+          onClick={() => void handleFillInfo()}
+          disabled={!model.id.trim() || fillState.phase === "loading"}
+          title={t(
+            "modelFillInfoHint",
+            "Fills context window, max output tokens, and pricing from the models.dev database.",
+          )}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            alignSelf: "flex-start",
+            gap: 6,
+            minHeight: 30,
+            padding: "0 12px",
+            background: "none",
+            border: "1px solid var(--border)",
+            borderRadius: 4,
+            color: !model.id.trim() || fillState.phase === "loading" ? "var(--text-dim)" : "var(--text-muted)",
+            cursor: !model.id.trim() || fillState.phase === "loading" ? "not-allowed" : "pointer",
+            fontSize: 12,
+          }}
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+          {fillState.phase === "loading"
+            ? t("modelFillInfoLoading", "Querying models.dev…")
+            : t("modelFillInfo", "Fill model info")}
+        </button>
+        {fillStatus}
+        {fillState.phase === "error" && (
+          <span style={{ fontSize: 11, color: "#f87171", lineHeight: 1.5, overflowWrap: "anywhere" }}>
+            {fillState.message}
+          </span>
+        )}
       </div>
 
       <Field label={t("modelApiOverride", "API override")}>

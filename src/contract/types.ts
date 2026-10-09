@@ -172,6 +172,49 @@ export interface TestResult {
   responseText?: string;
 }
 
+/** One model advertised by a provider's remote catalog endpoint. */
+export interface ProviderModelInfo {
+  id: string;
+  name?: string;
+}
+
+export interface ListModelsResult {
+  ok: boolean;
+  models?: ProviderModelInfo[];
+  error?: string;
+  latencyMs?: number;
+  status?: number;
+  /** True when the provider API has no remote model-list endpoint (e.g. google-generative-ai). */
+  unsupported?: boolean;
+}
+
+/** Model metadata ready to merge into a models.json model entry. */
+export interface ModelInfoFillFields {
+  name?: string;
+  contextWindow?: number;
+  maxTokens?: number;
+  reasoning?: true;
+  input?: string[];
+  cost?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
+}
+
+export interface ModelInfoFillResult {
+  ok: boolean;
+  error?: string;
+  fields?: ModelInfoFillFields;
+  /** Field names whose values actually differ from the current entry. */
+  filled?: string[];
+  /** True when the answer came from an expired local cache (offline refresh failed). */
+  stale?: boolean;
+  source?: {
+    kind: "models-dev" | "builtin";
+    providerName: string;
+    matchedBy: "baseUrl" | "host" | "global" | "builtin";
+    /** Present when pricing came from a different provider entry than the metadata. */
+    priceProviderName?: string;
+  };
+}
+
 export interface ProviderStatus {
   id: string;
   name: string;

@@ -4,6 +4,7 @@ import { useI18n } from "@/i18n";
 import {
   addModelTransition,
   deleteProviderTransition,
+  importModelsTransition,
   modelsConfigEditorReducer,
   renameProviderEntry,
   replaceModelEntry,
@@ -230,6 +231,13 @@ export function ModelsConfig({
     [setConfig, setSelection],
   );
 
+  const importModels = useCallback(
+    (providerName: string, imported: ModelEntry[]) => {
+      setConfig((prev) => importModelsTransition(prev, providerName, imported).config);
+    },
+    [setConfig],
+  );
+
   const handleSave = useCallback(async () => {
     if (!configVersion) return;
     setSaving(true);
@@ -321,6 +329,7 @@ export function ModelsConfig({
           onChange={(p) => updateProvider(selection.name, p)}
           onRename={(n) => renameProvider(selection.name, n)}
           onDelete={() => deleteProvider(selection.name)}
+          onImportModels={(models) => importModels(selection.name, models)}
         />
       );
     }
