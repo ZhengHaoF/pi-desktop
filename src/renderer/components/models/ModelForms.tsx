@@ -394,9 +394,21 @@ function ThinkingLevelMapEditor({
   );
 }
 
+/**
+ * DeepSeek reasoning-model compatibility profile, mirroring the core of Pi's
+ * built-in deepseek provider entries (deepseek-flash / deepseek-v4-pro):
+ * the thinking switch protocol, mandatory reasoning_content on replayed
+ * assistant messages, the system (not developer) instruction role, and
+ * DeepSeek's request shape. Pi only auto-detects these from a deepseek.com
+ * base URL, so relays and custom endpoints need them applied explicitly.
+ */
 const DEEPSEEK_COMPAT = {
   thinkingFormat: "deepseek",
   requiresReasoningContentOnAssistantMessages: true,
+  supportsDeveloperRole: false,
+  supportsStore: false,
+  maxTokensField: "max_tokens",
+  supportsStrictMode: true,
 } as const;
 
 function hasDeepseekCompat(model: ModelEntry): boolean {
@@ -409,8 +421,7 @@ function setDeepseekCompat(model: ModelEntry, enabled: boolean): ModelEntry {
   }
   if (!model.compat) return model;
   const rest = { ...model.compat };
-  delete rest.thinkingFormat;
-  delete rest.requiresReasoningContentOnAssistantMessages;
+  for (const key of Object.keys(DEEPSEEK_COMPAT)) delete rest[key];
   return { ...model, compat: Object.keys(rest).length ? rest : undefined };
 }
 
@@ -865,11 +876,27 @@ export function ModelDetail({
 
       {model.reasoning && (
         <>
-          <Check
-            label={t("modelDeepSeekCompat", "DeepSeek thinking compatibility")}
-            checked={hasDeepseekCompat(model)}
-            onChange={(v) => onChange(setDeepseekCompat(model, v))}
-          />
+          <div>
+            <Check
+              label={t("modelDeepSeekCompat", "DeepSeek compatibility")}
+              checked={hasDeepseekCompat(model)}
+              onChange={(v) => onChange(setDeepseekCompat(model, v))}
+            />
+            <div
+              style={{
+                fontSize: 11,
+                lineHeight: 1.5,
+                color: "var(--text-dim)",
+                marginTop: 2,
+                maxWidth: 520,
+              }}
+            >
+              {t(
+                "modelDeepSeekCompatHint",
+                "Sends DeepSeek's request protocol: the thinking switch, the system (not developer) role, and reasoning_content on replayed assistant messages. Enable for DeepSeek models behind a relay or custom endpoint.",
+              )}
+            </div>
+          </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <SectionTitle>{t("modelThinkingLevelMap", "Thinking level map")}</SectionTitle>

@@ -726,3 +726,62 @@ test("setting the conversation default persists it through the host and greys ou
     .findAll((node) => node.type === "button" && text(node) === "Default" && node.props.disabled === true);
   assert.equal(greyed.length, 1, "the persisted default renders as one greyed-out button");
 });
+
+const deepseekCompatibleConfig = (compat) => ({
+  providers: {
+    custom: {
+      api: "openai-completions",
+      baseUrl: "https://relay.test/v1",
+      models: [{ id: "custom-model", reasoning: true, ...(compat ? { compat } : {}) }],
+    },
+  },
+});
+
+const DEEPSEEK_PROFILE = {
+  thinkingFormat: "deepseek",
+  requiresReasoningContentOnAssistantMessages: true,
+  supportsDeveloperRole: false,
+  supportsStore: false,
+  maxTokensField: "max_tokens",
+  supportsStrictMode: true,
+};
+
+const toggleDeepseekCompat = async (fixture, checked) => {
+  const label = fixture.renderer.root.find((node) => node.type === "label" && text(node) === "DeepSeek compatibility");
+  await act(async () => label.find((node) => node.type === "input").props.onChange({ target: { checked } }));
+};
+
+test("the DeepSeek compatibility switch applies the full profile so relays stop hitting the developer-role rejection", async (t) => {
+  const fixture = await mount(t, { config: deepseekCompatibleConfig() });
+  await fixture.select("custom-model");
+  await toggleDeepseekCompat(fixture, true);
+
+  await fixture.click("Save");
+  assert.equal(fixture.requests[0].method, "modelsConfig.set");
+  assert.deepEqual(fixture.requests[0].params.config.providers.custom.models[0].compat, DEEPSEEK_PROFILE);
+  await fixture.reply(0, { ok: true, version: "two" });
+});
+
+test("turning the DeepSeek compatibility switch off removes exactly the profile it owns", async (t) => {
+  const fixture = await mount(t, { config: deepseekCompatibleConfig(DEEPSEEK_PROFILE) });
+  await fixture.select("custom-model");
+  await toggleDeepseekCompat(fixture, false);
+
+  await fixture.click("Save");
+  assert.equal(fixture.requests[0].params.config.providers.custom.models[0].compat, undefined);
+  await fixture.reply(0, { ok: true, version: "two" });
+});
+
+test("an already-profiled DeepSeek model keeps its extra compat keys when the switch is turned off", async (t) => {
+  const fixture = await mount(t, {
+    config: deepseekCompatibleConfig({ ...DEEPSEEK_PROFILE, supportsMidConvoSystemMessages: true }),
+  });
+  await fixture.select("custom-model");
+  await toggleDeepseekCompat(fixture, false);
+
+  await fixture.click("Save");
+  assert.deepEqual(fixture.requests[0].params.config.providers.custom.models[0].compat, {
+    supportsMidConvoSystemMessages: true,
+  });
+  await fixture.reply(0, { ok: true, version: "two" });
+});

@@ -46,7 +46,9 @@ export const enUS: Record<string, string> = {
   modelDirectoryLoadFailedCached:
     "Unable to load the model directory. Cached models remain available; retry from the model picker.",
   modelDirectoryRefreshFailed: "Unable to refresh the model directory. Cached models remain available.",
-  modelDeepSeekCompat: "DeepSeek thinking compatibility",
+  modelDeepSeekCompat: "DeepSeek compatibility",
+  modelDeepSeekCompatHint:
+    "Sends DeepSeek's request protocol: the thinking switch, the system (not developer) role, and reasoning_content on replayed assistant messages. Enable for DeepSeek models behind a relay or custom endpoint.",
   modelDefault: "Default",
   modelDisableAll: "Disable all",
   modelDisabled: "Disabled",
@@ -176,7 +178,9 @@ export const zhCN: Record<string, string> = {
   modelDirectoryLoadFailed: "无法加载模型目录。请从模型选择器重试，或检查 Agent Host 连接。",
   modelDirectoryLoadFailedCached: "无法加载模型目录。仍可使用缓存模型；请从模型选择器重试。",
   modelDirectoryRefreshFailed: "无法刷新模型目录。仍可继续使用缓存模型。",
-  modelDeepSeekCompat: "DeepSeek 思考兼容模式",
+  modelDeepSeekCompat: "DeepSeek 兼容模式",
+  modelDeepSeekCompatHint:
+    "按 DeepSeek 协议发送请求：思考开关、system（而非 developer）角色，以及多轮回放时补全 reasoning_content。通过中转或自定义端点访问 DeepSeek 模型时建议开启。",
   modelDefault: "默认",
   modelDisableAll: "全部禁用",
   modelDisabled: "禁用",
@@ -304,7 +308,9 @@ export const zhTW: Record<string, string> = {
   modelDirectoryLoadFailed: "無法載入模型目錄。請從模型選擇器重試，或檢查 Agent Host 連線。",
   modelDirectoryLoadFailedCached: "無法載入模型目錄。仍可繼續使用快取模型；請從模型選擇器重試。",
   modelDirectoryRefreshFailed: "無法重新整理模型目錄。仍可繼續使用快取模型。",
-  modelDeepSeekCompat: "DeepSeek 思考相容模式",
+  modelDeepSeekCompat: "DeepSeek 相容模式",
+  modelDeepSeekCompatHint:
+    "按 DeepSeek 協定傳送請求：思考開關、system（而非 developer）角色，以及多輪重播時補齊 reasoning_content。透過中轉或自訂端點存取 DeepSeek 模型時建議開啟。",
   modelDefault: "預設",
   modelDisableAll: "全部停用",
   modelDisabled: "停用",
