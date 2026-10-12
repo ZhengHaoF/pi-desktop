@@ -1,8 +1,9 @@
 import { importTestBundle } from "#test-bundle";
 import assert from "node:assert/strict";
 import path from "node:path";
-import test from "node:test";
+import test, { after } from "node:test";
 import { createElement } from "react";
+import { act, create } from "react-test-renderer";
 import { renderToStaticMarkup } from "react-dom/server";
 import { redactHerdrPersistedMessage } from "../../agent-host/herdr/session-redaction.ts";
 
@@ -31,6 +32,13 @@ const { MessageView } = await importTestBundle("src/renderer/components/message-
       },
     },
   ],
+});
+
+const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+after(() => {
+  if (previousActEnvironment === undefined) delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  else globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
 });
 
 test("MessageView is memoized to preserve unchanged historical messages", () => {
@@ -154,15 +162,50 @@ test("renders compaction summaries collapsed by default", () => {
   assert.doesNotMatch(html, /A long summary that should stay hidden/);
 });
 
-function renderToolResult(result) {
+function nodeText(node) {
+  if (typeof node === "string") return node;
+  if (!node?.children) return "";
+  return node.children.map(nodeText).join("");
+}
+
+function toolCallMessage(result) {
+  return assistant({
+    content: [{ type: "toolCall", toolCallId: result.toolCallId, toolName: result.toolName, input: {} }],
+  });
+}
+
+function renderCollapsedToolResult(result) {
   return renderToStaticMarkup(
     createElement(MessageView, {
-      message: assistant({
-        content: [{ type: "toolCall", toolCallId: result.toolCallId, toolName: result.toolName, input: {} }],
-      }),
+      message: toolCallMessage(result),
       toolResults: new Map([[result.toolCallId, result]]),
     }),
   );
+}
+
+// A collapsed card keeps only its header, so result assertions render the card
+// expanded by clicking its header — the same interaction a user performs.
+function renderExpandedToolResult(result) {
+  let renderer;
+  act(() => {
+    renderer = create(
+      createElement(MessageView, {
+        message: toolCallMessage(result),
+        toolResults: new Map([[result.toolCallId, result]]),
+      }),
+    );
+  });
+  const header = renderer.root
+    .findAll((node) => node.type === "button")
+    .find((node) => nodeText(node).includes(result.toolName));
+  act(() => header.props.onClick());
+  const html = JSON.stringify(renderer.toJSON());
+  act(() => renderer.unmount());
+  return html;
+}
+
+function renderToolResult(result) {
+  return renderExpandedToolResult(result);
 }
 
 function persistedHerdrResult(isError = false, output = "PRIVATE_FIXTURE_OUTPUT") {
@@ -219,4 +262,37 @@ test("actual tool output and a different tool's text are not mistaken for a Herd
     assert.ok(html.includes(output));
     assert.doesNotMatch(html, /The original output was not saved in history/);
   }
+});
+
+test("a collapsed tool call card keeps only its header until it is expanded", () => {
+  const result = {
+    role: "toolResult",
+    toolCallId: "collapsed-card",
+    toolName: "bash",
+    content: [{ type: "text", text: "first line\nsecond line\nthird line" }],
+    isError: false,
+  };
+
+  const collapsed = renderCollapsedToolResult(result);
+  assert.match(collapsed, /bash/);
+  assert.doesNotMatch(collapsed, /first line/);
+  assert.doesNotMatch(collapsed, /second line/);
+
+  const expanded = renderExpandedToolResult(result);
+  assert.match(expanded, /first line/);
+  assert.match(expanded, /second line/);
+});
+
+test("a collapsed failed tool call surfaces the failure reason as its header hint", () => {
+  const result = {
+    role: "toolResult",
+    toolCallId: "failed-card",
+    toolName: "bash",
+    content: [{ type: "text", text: "command exited with 1\ntraceback details" }],
+    isError: true,
+  };
+
+  const collapsed = renderCollapsedToolResult(result);
+  assert.match(collapsed, /title="command exited with 1"/);
+  assert.doesNotMatch(collapsed, /traceback details/);
 });

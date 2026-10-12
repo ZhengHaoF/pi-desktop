@@ -1172,6 +1172,13 @@ function ToolCallBlock({
   const browserTabId = isBrowserToolName(block.toolName) ? browserTabIdFromResult(resultText) : null;
   const browserSummary =
     isBrowserToolName(block.toolName) && resultText && !isError ? browserResultSummary(resultText, t) : null;
+  // A collapsed card shows only its header, so the failure reason (or a browser
+  // tool's compact summary) rides along as the hover hint instead of a preview.
+  const collapsedHint = (() => {
+    if (expanded) return null;
+    if (isError) return resultText?.split("\n")[0]?.trim() || null;
+    return browserSummary;
+  })();
 
   return (
     <div
@@ -1189,6 +1196,7 @@ function ToolCallBlock({
       {/* ── Tool call header ── */}
       <button
         onClick={() => setExpanded((v) => !v)}
+        title={collapsedHint ?? undefined}
         style={{
           display: "flex",
           alignItems: "center",
@@ -1262,36 +1270,18 @@ function ToolCallBlock({
         </div>
       )}
 
-      {/* ── Paired result — always show summary; expand for full detail ── */}
-      {result &&
+      {/* ── Paired result — only while expanded ──
+          A collapsed card keeps just its header, so long outputs never form a
+          wall; the hover hint on the header carries the failure reason. */}
+      {expanded &&
+        result &&
         (resultDiff ? (
-          expanded ? (
-            <PairedDiffResult diff={resultDiff} />
-          ) : (
-            <div
-              style={{
-                padding: "8px 12px",
-                color: "var(--tool-fg)",
-                whiteSpace: "pre-wrap",
-                maxHeight: 80,
-                overflow: "hidden",
-                opacity: 0.9,
-              }}
-            >
-              {resultDiff.text.split("\n").slice(0, 4).join("\n")}
-              {resultDiff.text.split("\n").length > 4 ? "\n…" : ""}
-            </div>
-          )
+          <PairedDiffResult diff={resultDiff} />
         ) : (
-          <PairedResult
-            text={!expanded && browserSummary ? browserSummary : (resultText ?? "")}
-            isEmpty={resultIsEmpty}
-            isError={isError}
-            collapsed={!expanded}
-          />
+          <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
         ))}
-      {result && <DeferredContentActions content={result.content} onLoad={onLoadDeferredContent} />}
-      {browserTabId && (
+      {expanded && result && <DeferredContentActions content={result.content} onLoad={onLoadDeferredContent} />}
+      {expanded && browserTabId && (
         <button
           type="button"
           onClick={() =>
@@ -1648,17 +1638,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function PairedResult({
-  text,
-  isEmpty,
-  isError,
-  collapsed,
-}: {
-  text: string;
-  isEmpty: boolean;
-  isError: boolean;
-  collapsed?: boolean;
-}) {
+function PairedResult({ text, isEmpty, isError }: { text: string; isEmpty: boolean; isError: boolean }) {
   return (
     <div
       style={{
@@ -1675,7 +1655,7 @@ function PairedResult({
           color: isError ? "var(--danger)" : isEmpty ? "var(--text-dim)" : "var(--tool-fg)",
           fontSize: scaledChatFont(12),
           lineHeight: 1.5,
-          maxHeight: collapsed ? 180 : 400,
+          maxHeight: 400,
           overflow: "auto",
           background: "transparent",
           whiteSpace: "pre-wrap",
