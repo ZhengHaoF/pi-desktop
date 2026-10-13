@@ -1,8 +1,11 @@
 import {
   RIGHT_PANEL_DEFAULT_WIDTH,
   RIGHT_PANEL_MIN_WIDTH,
+  SIDEBAR_WIDTH,
   loadRightPanelPreferredWidth,
+  loadSidebarPreferredWidth,
   saveRightPanelPreferredWidth,
+  saveSidebarPreferredWidth,
 } from "@/lib/layout-preferences";
 const BROWSER_PANEL_WIDTH_KEY = "pi-desktop.browser-panel-width";
 
@@ -29,5 +32,21 @@ export function loadBrowserPanelPreferredWidth(): number {
     return Number.isFinite(value) && value >= RIGHT_PANEL_MIN_WIDTH ? value : 520;
   } catch {
     return 520;
+  }
+}
+
+export function initialSidebarPreferredWidth(): number {
+  try {
+    return loadSidebarPreferredWidth(window.localStorage);
+  } catch {
+    return SIDEBAR_WIDTH;
+  }
+}
+
+export function persistSidebarPreferredWidth(width: number): void {
+  try {
+    saveSidebarPreferredWidth(window.localStorage, width);
+  } catch {
+    // Storage can become unavailable after startup; keep the in-memory preference.
   }
 }

@@ -4,6 +4,9 @@ export const RIGHT_PANEL_DEFAULT_WIDTH = 360;
 export const RIGHT_PANEL_MAX_VIEWPORT_RATIO = 0.4;
 export const CHAT_MIN_WIDTH = 420;
 export const SIDEBAR_WIDTH = 280;
+export const SIDEBAR_WIDTH_STORAGE_KEY = "pi-desktop:sidebar-width:v1";
+export const SIDEBAR_MIN_WIDTH = 240;
+export const SIDEBAR_MAX_WIDTH = 480;
 
 const RIGHT_PANEL_KEYBOARD_STEP = 16;
 const RIGHT_PANEL_KEYBOARD_LARGE_STEP = 48;
@@ -14,6 +17,11 @@ export interface StorageLike {
 }
 
 export interface RightPanelWidthBounds {
+  minWidth: number;
+  maxWidth: number;
+}
+
+export interface SidebarWidthBounds {
   minWidth: number;
   maxWidth: number;
 }
@@ -77,6 +85,44 @@ export function clampRightPanelWidth(
 export function shouldCollapseSidebarForRightPanel(viewportWidth: number): boolean {
   if (!Number.isFinite(viewportWidth)) return false;
   return viewportWidth < SIDEBAR_WIDTH + CHAT_MIN_WIDTH + RIGHT_PANEL_MIN_WIDTH;
+}
+
+export function loadSidebarPreferredWidth(storage?: StorageLike | null): number {
+  try {
+    const stored = Number(storage?.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
+    if (Number.isFinite(stored) && stored >= SIDEBAR_MIN_WIDTH) return Math.round(stored);
+  } catch {
+    // Storage can be unavailable in privacy-restricted renderer contexts.
+  }
+  return SIDEBAR_WIDTH;
+}
+
+export function saveSidebarPreferredWidth(storage: StorageLike | null | undefined, width: number): void {
+  if (!Number.isFinite(width)) return;
+  const clamped = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(width)));
+  try {
+    storage?.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(clamped));
+  } catch {
+    // Resizing remains useful for the current session even when persistence fails.
+  }
+}
+
+export function getSidebarWidthBounds(viewportWidth: number): SidebarWidthBounds {
+  if (!Number.isFinite(viewportWidth) || viewportWidth <= 0) {
+    return { minWidth: SIDEBAR_MIN_WIDTH, maxWidth: SIDEBAR_MAX_WIDTH };
+  }
+  // Never let the sidebar take more than half the window, so the conversation
+  // column keeps a usable share on narrow viewports.
+  const halfViewport = Math.floor(viewportWidth / 2);
+  const maxWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, halfViewport));
+  return { minWidth: SIDEBAR_MIN_WIDTH, maxWidth };
+}
+
+export function clampSidebarWidth(width: number, viewportWidth: number): number {
+  const { minWidth, maxWidth } = getSidebarWidthBounds(viewportWidth);
+  if (maxWidth <= 0) return SIDEBAR_WIDTH;
+  const candidate = Number.isFinite(width) ? width : SIDEBAR_WIDTH;
+  return Math.round(Math.min(maxWidth, Math.max(minWidth, candidate)));
 }
 
 export function getKeyboardAdjustedRightPanelWidth(

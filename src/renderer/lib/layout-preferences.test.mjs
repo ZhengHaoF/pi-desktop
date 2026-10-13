@@ -6,11 +6,19 @@ import {
   RIGHT_PANEL_DEFAULT_WIDTH,
   RIGHT_PANEL_MIN_WIDTH,
   RIGHT_PANEL_WIDTH_STORAGE_KEY,
+  SIDEBAR_MAX_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+  SIDEBAR_WIDTH,
+  SIDEBAR_WIDTH_STORAGE_KEY,
   clampRightPanelWidth,
+  clampSidebarWidth,
   getKeyboardAdjustedRightPanelWidth,
   getRightPanelWidthBounds,
+  getSidebarWidthBounds,
   loadRightPanelPreferredWidth,
+  loadSidebarPreferredWidth,
   saveRightPanelPreferredWidth,
+  saveSidebarPreferredWidth,
   shouldCollapseSidebarForRightPanel,
 } from "./layout-preferences.ts";
 
@@ -94,4 +102,55 @@ test("keyboard resizing follows the separator direction and respects bounds", ()
   assert.equal(getKeyboardAdjustedRightPanelWidth(360, "ArrowLeft", 1514, true, true), 408);
   assert.equal(getKeyboardAdjustedRightPanelWidth(360, "Home", 1514, true), 280);
   assert.equal(getKeyboardAdjustedRightPanelWidth(360, "End", 1514, true), Math.floor(1514 * 0.4));
+});
+
+test("sidebar width preference loads the stored value and the default otherwise", () => {
+  assert.equal(loadSidebarPreferredWidth(createStorage()), SIDEBAR_WIDTH);
+  assert.equal(loadSidebarPreferredWidth(createStorage({ [SIDEBAR_WIDTH_STORAGE_KEY]: "331" })), 331);
+  assert.equal(
+    loadSidebarPreferredWidth(createStorage({ [SIDEBAR_WIDTH_STORAGE_KEY]: String(SIDEBAR_MIN_WIDTH - 1) })),
+    SIDEBAR_WIDTH,
+  );
+  assert.equal(
+    loadSidebarPreferredWidth(createStorage({ [SIDEBAR_WIDTH_STORAGE_KEY]: "not-a-number" })),
+    SIDEBAR_WIDTH,
+  );
+});
+
+test("saves a clamped rounded sidebar preference without throwing on storage failures", () => {
+  const storage = createStorage();
+  saveSidebarPreferredWidth(storage, 312.6);
+  assert.equal(storage.getItem(SIDEBAR_WIDTH_STORAGE_KEY), "313");
+
+  saveSidebarPreferredWidth(storage, 100);
+  assert.equal(storage.getItem(SIDEBAR_WIDTH_STORAGE_KEY), String(SIDEBAR_MIN_WIDTH));
+
+  saveSidebarPreferredWidth(storage, 5_000);
+  assert.equal(storage.getItem(SIDEBAR_WIDTH_STORAGE_KEY), String(SIDEBAR_MAX_WIDTH));
+
+  assert.doesNotThrow(() =>
+    saveSidebarPreferredWidth(
+      {
+        getItem() {
+          return null;
+        },
+        setItem() {
+          throw new Error("blocked");
+        },
+      },
+      400,
+    ),
+  );
+});
+
+test("sidebar bounds cap at half the viewport so the conversation column stays usable", () => {
+  assert.deepEqual(getSidebarWidthBounds(1514), { minWidth: SIDEBAR_MIN_WIDTH, maxWidth: SIDEBAR_MAX_WIDTH });
+  assert.deepEqual(getSidebarWidthBounds(700), { minWidth: SIDEBAR_MIN_WIDTH, maxWidth: 350 });
+  assert.deepEqual(getSidebarWidthBounds(0), { minWidth: SIDEBAR_MIN_WIDTH, maxWidth: SIDEBAR_MAX_WIDTH });
+
+  assert.equal(clampSidebarWidth(1_000, 1514), SIDEBAR_MAX_WIDTH);
+  assert.equal(clampSidebarWidth(100, 1514), SIDEBAR_MIN_WIDTH);
+  assert.equal(clampSidebarWidth(311.6, 1514), 312);
+  assert.equal(clampSidebarWidth(400, 700), 350);
+  assert.equal(clampSidebarWidth(Number.NaN, 1514), SIDEBAR_WIDTH);
 });

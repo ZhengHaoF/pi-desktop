@@ -1413,19 +1413,49 @@ span.linenumber {
       width 0.2s ease,
       min-width 0.2s ease;
   }
+  .sidebar-container.sidebar-resizing {
+    transition: none;
+  }
   .sidebar-container.sidebar-open {
-    width: 280px;
-    min-width: 280px;
+    width: var(--sidebar-width, 280px);
+    min-width: var(--sidebar-width, 280px);
   }
   .sidebar-container.sidebar-closed {
     width: 0;
     min-width: 0;
     border-right: none !important;
   }
+  .sidebar-container.sidebar-closed .sidebar-resizer {
+    display: none;
+  }
   /* keep inner content at fixed width so it doesn't reflow during animation */
-  .sidebar-container > * {
-    width: 280px;
-    min-width: 280px;
+  .sidebar-container > :not(.sidebar-resizer) {
+    width: var(--sidebar-width, 280px);
+    min-width: var(--sidebar-width, 280px);
+  }
+  .sidebar-resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    z-index: 10;
+    width: 10px;
+    min-width: 10px;
+    cursor: col-resize;
+    touch-action: none;
+    /* Invisible until hovered: the panel border already separates the columns. */
+    background: transparent;
+    transition: background 0.12s ease;
+  }
+  .sidebar-resizer:hover,
+  .sidebar-container.sidebar-resizing .sidebar-resizer {
+    background: linear-gradient(
+      90deg,
+      transparent 4px,
+      color-mix(in srgb, var(--accent) 72%, transparent) 4px,
+      color-mix(in srgb, var(--accent) 72%, transparent) 6px,
+      transparent 6px
+    );
   }
 }
 
@@ -1466,13 +1496,8 @@ span.linenumber {
     min-width: 10px;
     cursor: col-resize;
     touch-action: none;
-    background: linear-gradient(
-      90deg,
-      transparent 4px,
-      color-mix(in srgb, var(--border) 78%, transparent) 4px,
-      color-mix(in srgb, var(--border) 78%, transparent) 6px,
-      transparent 6px
-    );
+    /* Invisible until hovered: the panel border already separates the columns. */
+    background: transparent;
     transition: background 0.12s ease;
   }
   .right-panel-resizer:hover,
@@ -1520,6 +1545,9 @@ span.linenumber {
     flex-shrink: 0;
   }
   .right-panel-resizer {
+    display: none;
+  }
+  .sidebar-resizer {
     display: none;
   }
   .right-panel-container.right-panel-open {

@@ -50,6 +50,7 @@ import {
   shouldCollapseSidebarForRightPanel,
   type RightPanelResizeKey,
 } from "@/lib/layout-preferences";
+import { useSidebarWidth } from "@/hooks/useSidebarWidth";
 import type { SessionInfo } from "@/lib/types";
 import type { ChatInputHandle } from "./ChatInput";
 import type { ChannelsSnapshot } from "@shared/channel-types";
@@ -113,6 +114,7 @@ export function AppShell({
   const [modelsRefreshKey, setModelsRefreshKey] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarReady, setMobileSidebarReady] = useState(false);
+  const { sidebarWidth, sidebarResizing, startSidebarResize } = useSidebarWidth();
 
   // On mobile the sidebar is an overlay drawer; hide it by default so the chat
   // is visible on load. Runs once the breakpoint resolves after hydration.
@@ -874,16 +876,26 @@ export function AppShell({
 
         {/* Left sidebar */}
         <div
-          className={`sidebar-container${sidebarOpen ? " sidebar-open" : " sidebar-closed"}${mobileSidebarReady ? "" : " sidebar-mobile-pending"}`}
-          style={{
-            background: "var(--bg-panel)",
-            borderRight: "1px solid var(--border)",
-            display: "flex",
-            flexDirection: "column",
-            flexShrink: 0,
-            zIndex: 200,
-          }}
+          className={`sidebar-container${sidebarOpen ? " sidebar-open" : " sidebar-closed"}${sidebarResizing ? " sidebar-resizing" : ""}${mobileSidebarReady ? "" : " sidebar-mobile-pending"}`}
+          style={
+            {
+              background: "var(--bg-panel)",
+              borderRight: "1px solid var(--border)",
+              display: "flex",
+              flexDirection: "column",
+              flexShrink: 0,
+              zIndex: 200,
+              "--sidebar-width": `${sidebarWidth}px`,
+            } as CSSProperties
+          }
         >
+          <div
+            className="sidebar-resizer"
+            role="separator"
+            aria-label={t("resizeSidebar", "Resize sidebar")}
+            aria-orientation="vertical"
+            onPointerDown={startSidebarResize}
+          />
           {sidebarContent}
         </div>
 
