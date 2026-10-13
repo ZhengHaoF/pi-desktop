@@ -158,6 +158,16 @@ export interface ModelPreferencesResult {
    * null when unset or when the saved default is filtered out of the picker.
    */
   defaultModel: { provider: string; modelId: string } | null;
+  /**
+   * Persisted default thinking level for new conversations (Pi global settings).
+   * null when unset, in which case the agent keeps its built-in default.
+   */
+  defaultThinkingLevel: string | null;
+  /**
+   * Persisted per-model default thinking levels, keyed by "provider/modelId"
+   * (Pi global settings). An entry wins over defaultThinkingLevel.
+   */
+  modelThinkingLevels: Record<string, string>;
 }
 
 export interface ModelsConfig {

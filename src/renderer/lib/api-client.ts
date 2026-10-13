@@ -240,6 +240,18 @@ export async function setDefaultModel(cwd: string | undefined, provider: string,
   return call("models.default.set", { ...(cwd ? { cwd } : {}), provider, modelId });
 }
 
+export async function setThinkingLevelDefault(
+  cwd: string | undefined,
+  level: string | null,
+  target?: { provider: string; modelId: string },
+) {
+  return call("models.thinkingLevel.set", {
+    ...(cwd ? { cwd } : {}),
+    ...(target ? { provider: target.provider, modelId: target.modelId } : {}),
+    level,
+  });
+}
+
 export async function fileIndex(root: string, query?: string) {
   return call("files.index", { root, query });
 }

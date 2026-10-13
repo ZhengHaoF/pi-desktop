@@ -453,7 +453,7 @@ test("model config saves reject payloads the runtime would drop and keep the pre
 test("registerHandlers exposes every contract method exactly once", async () => {
   const { handlers } = await captureHandlers();
   // Keep in sync with src/contract/api.ts: one handler per contract method.
-  assert.equal(Object.keys(handlers).length, 107);
+  assert.equal(Object.keys(handlers).length, 108);
   for (const method of [
     "host.ping",
     "host.toolchain",
@@ -473,6 +473,7 @@ test("registerHandlers exposes every contract method exactly once", async () => 
     "models.preferences.get",
     "models.preferences.set",
     "models.default.set",
+    "models.thinkingLevel.set",
     "auth.providers",
     "skills.list",
     "plugins.list",
@@ -758,11 +759,19 @@ test("model preferences project the persisted default and keep it enabled", asyn
     getDefaultModel() {
       return "beta";
     },
+    getDefaultThinkingLevel() {
+      return "high";
+    },
+    getAllModelThinkingLevels() {
+      return { "fixture/alpha": "low" };
+    },
   };
 
   const unfiltered = projectModelPreferences(available, undefined, settings);
   assert.deepEqual(unfiltered.enabledModels, null);
   assert.deepEqual(unfiltered.defaultModel, { provider: "fixture", modelId: "beta" });
+  assert.equal(unfiltered.defaultThinkingLevel, "high");
+  assert.deepEqual(unfiltered.modelThinkingLevels, { "fixture/alpha": "low" });
 
   // A default filtered out of the picker never surfaces, so it must not be projected.
   const filteredOut = projectModelPreferences(available, ["fixture/alpha"], settings);
@@ -778,6 +787,63 @@ test("model preferences project the persisted default and keep it enabled", asyn
   assert.deepEqual(includeDefaultModelInEnabled(["fixture/beta:high"], "fixture", "beta"), ["fixture/beta:high"]);
   assert.equal(includeDefaultModelInEnabled(undefined, "fixture", "beta"), undefined);
   assert.deepEqual(includeDefaultModelInEnabled([], "fixture", "beta"), []);
+});
+
+test("default thinking levels persist per model and globally in Pi settings", async (t) => {
+  const { handlers } = await captureHandlers();
+  const base = mkdtempSync(path.join(tmpdir(), "pi-thinking-level-"));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const project = path.join(base, "project");
+  mkdirSync(project, { recursive: true });
+
+  await handlers["auth.setApiKey"]({ provider: "openai", key: "secret" });
+  const preferences = await handlers["models.preferences.get"]({ cwd: project });
+  assert.equal(preferences.defaultThinkingLevel, null);
+  assert.deepEqual(preferences.modelThinkingLevels, {});
+  const model = preferences.models.find((entry) => entry.provider === "openai");
+  assert.ok(model, "setting an OpenAI credential should expose OpenAI models");
+  const reference = `${model.provider}/${model.id}`;
+
+  const perModel = await handlers["models.thinkingLevel.set"]({
+    cwd: project,
+    provider: model.provider,
+    modelId: model.id,
+    level: "high",
+  });
+  assert.equal(perModel.modelThinkingLevels[reference], "high");
+  assert.equal(perModel.defaultThinkingLevel, null);
+  const reloadedPerModel = await handlers["models.preferences.get"]({ cwd: project });
+  assert.equal(reloadedPerModel.modelThinkingLevels[reference], "high");
+
+  const clearedModel = await handlers["models.thinkingLevel.set"]({
+    cwd: project,
+    provider: model.provider,
+    modelId: model.id,
+    level: null,
+  });
+  assert.deepEqual(clearedModel.modelThinkingLevels, {});
+
+  const global = await handlers["models.thinkingLevel.set"]({ cwd: project, level: "low" });
+  assert.equal(global.defaultThinkingLevel, "low");
+  const globalCleared = await handlers["models.thinkingLevel.set"]({ cwd: project, level: null });
+  assert.equal(globalCleared.defaultThinkingLevel, null);
+  const reloadedGlobal = await handlers["models.preferences.get"]({ cwd: project });
+  assert.equal(reloadedGlobal.defaultThinkingLevel, null);
+
+  await assert.rejects(
+    handlers["models.thinkingLevel.set"]({ cwd: project, level: "extreme" }),
+    (error) => error.code === "BAD_REQUEST",
+  );
+  await assert.rejects(
+    handlers["models.thinkingLevel.set"]({ cwd: project, provider: "openai", level: "high" }),
+    (error) => error.code === "BAD_REQUEST",
+  );
+  await assert.rejects(
+    handlers["models.thinkingLevel.set"]({ cwd: project, provider: "openai", modelId: "missing", level: "high" }),
+    (error) => error.code === "BAD_REQUEST",
+  );
+
+  await handlers["auth.deleteApiKey"]({ provider: "openai" });
 });
 
 test("file, git, worktree, skill, plugin, and system handlers return contract-shaped results", async (t) => {

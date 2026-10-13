@@ -391,6 +391,17 @@ export interface Api {
     params: { cwd?: string; provider: string; modelId: string };
     result: ModelPreferencesResult;
   };
+  "models.thinkingLevel.set": {
+    params: {
+      cwd?: string;
+      /** Omit both to set the global default; set both for a per-model override. */
+      provider?: string;
+      modelId?: string;
+      /** null clears the per-model override or the global default. */
+      level: string | null;
+    };
+    result: ModelPreferencesResult;
+  };
   "modelsConfig.get": { params: void; result: ModelsConfigSnapshot };
   "modelsConfig.set": {
     params: { config: ModelsConfig; expectedVersion: string };

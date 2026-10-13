@@ -39,15 +39,16 @@ const { ModelsConfig, useSessionModels, testApi } = await importTestBundle("mode
         export function useI18n() {return {t, language:'en'};}
       `
                 : `
-        export const state = {reads:0, catalogReads:0, writes:[], writeResult:null, requests:[], calls:[], sources:[], cancelQueue:[], startQueue:[], subscribeQueue:[], config:{providers:{}}, version:'one', configError:null};
+        export const state = {reads:0, catalogReads:0, writes:[], writeResult:null, requests:[], calls:[], sources:[], cancelQueue:[], startQueue:[], subscribeQueue:[], config:{providers:{}}, version:'one', configError:null, preferences:null};
         const model = {id:'fixture-model',name:'Fixture model',provider:'api-fixture',reasoning:false,input:['text'],contextWindow:4096,maxTokens:512};
-        export function reset() {state.reads=0;state.catalogReads=0;state.writes=[];state.writeResult=null;state.requests=[];state.calls=[];state.sources=[];state.cancelQueue=[];state.startQueue=[];state.subscribeQueue=[];state.config={providers:{}};state.version='one';state.configError=null;}
+        export function reset() {state.reads=0;state.catalogReads=0;state.writes=[];state.writeResult=null;state.requests=[];state.calls=[];state.sources=[];state.cancelQueue=[];state.startQueue=[];state.subscribeQueue=[];state.config={providers:{}};state.version='one';state.configError=null;state.preferences=null;}
         export async function listModels() {state.catalogReads++;return {models:[{...model,name:'Catalog '+state.catalogReads}],catalog:{source:'cache',refreshed:false,aborted:false,warnings:[]}};}
         export async function cancelModelsRefresh() {}
         export async function refreshModels() {throw new Error('Unexpected remote catalog refresh');}
-        export async function getModelPreferences() {state.reads++;return {models:[model],enabledModels:null};}
+        export async function getModelPreferences() {state.reads++;return state.preferences ?? {models:[model],enabledModels:null};}
         export async function setModelPreferences(cwd, enabledModels) {state.writes.push({cwd,enabledModels});return await state.writeResult;}
         export async function setDefaultModel(cwd, provider, modelId) {return await call('models.default.set', {...(cwd?{cwd}:{}), provider, modelId});}
+        export async function setThinkingLevelDefault(cwd, level, target) {return await call('models.thinkingLevel.set', {...(cwd?{cwd}:{}), ...(target??{}), level});}
         const take = (queue, fallback) => { const next=queue.shift(); return typeof next === 'function' ? next() : next ?? fallback; };
         export async function subscribeAuthLogin(provider,on) {
           const entry={provider,on,closed:0};state.sources.push(entry);
@@ -76,6 +77,7 @@ const text = (node) => (typeof node === "string" ? node : (node.children?.map(te
 async function mount(t, options = {}) {
   testApi.reset();
   if (options.config) testApi.state.config = options.config;
+  if (options.preferences) testApi.state.preferences = options.preferences;
   testApi.state.configError = options.configError ?? null;
   const requests = testApi.state.requests,
     sources = testApi.state.sources,
@@ -784,4 +786,62 @@ test("an already-profiled DeepSeek model keeps its extra compat keys when the sw
     supportsMidConvoSystemMessages: true,
   });
   await fixture.reply(0, { ok: true, version: "two" });
+});
+
+const thinkingLevelSelect = (fixture) =>
+  fixture
+    .detail("ModelDetail")
+    .findAll((node) => node.type === "select")
+    .find((node) => text(node).includes("Extra high"));
+
+const preferencesResult = (modelThinkingLevels) => ({
+  models: [{ id: "custom-model", name: "custom-model", provider: "custom" }],
+  enabledModels: null,
+  defaultThinkingLevel: null,
+  modelThinkingLevels,
+});
+
+test("the per-model default thinking level saves through the host and reflects the persisted value", async (t) => {
+  const fixture = await mount(t, { config: deepseekCompatibleConfig() });
+  await fixture.select("custom-model");
+  assert.equal(thinkingLevelSelect(fixture).props.value, "");
+
+  await act(async () => thinkingLevelSelect(fixture).props.onChange({ target: { value: "high" } }));
+  assert.equal(fixture.requests.length, 1);
+  assert.equal(fixture.requests[0].method, "models.thinkingLevel.set");
+  assert.deepEqual(fixture.requests[0].params, {
+    cwd: "/project",
+    provider: "custom",
+    modelId: "custom-model",
+    level: "high",
+  });
+
+  await fixture.reply(0, preferencesResult({ "custom/custom-model": "high" }));
+  assert.equal(fixture.changed, 1, "the session model catalog must refresh with the new default");
+  assert.equal(thinkingLevelSelect(fixture).props.value, "high");
+
+  // Clearing the override falls back to the global default.
+  await act(async () => thinkingLevelSelect(fixture).props.onChange({ target: { value: "" } }));
+  assert.deepEqual(fixture.requests[1].params, {
+    cwd: "/project",
+    provider: "custom",
+    modelId: "custom-model",
+    level: null,
+  });
+  await fixture.reply(1, preferencesResult({}));
+  assert.equal(thinkingLevelSelect(fixture).props.value, "");
+});
+
+test("a failed default thinking level save keeps the persisted value and reports the failure inline", async (t) => {
+  const fixture = await mount(t, {
+    config: deepseekCompatibleConfig(),
+    preferences: preferencesResult({ "custom/custom-model": "high" }),
+  });
+  await fixture.select("custom-model");
+  assert.equal(thinkingLevelSelect(fixture).props.value, "high");
+
+  await act(async () => thinkingLevelSelect(fixture).props.onChange({ target: { value: "low" } }));
+  await fixture.fail(0, "INTERNAL", "Global Pi settings could not be saved");
+  assert.equal(thinkingLevelSelect(fixture).props.value, "high", "the persisted value survives a failed save");
+  assert.match(JSON.stringify(fixture.renderer.toJSON()), /Global Pi settings could not be saved/);
 });

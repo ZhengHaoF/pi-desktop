@@ -19,6 +19,22 @@ import { modelCatalogRefreshCoordinator } from "../model-runtime";
 
 const THINKING_SUFFIXES = new Set(["off", "minimal", "low", "medium", "high", "xhigh"]);
 
+/** Thinking levels the desktop editor offers; the SDK also accepts "max". */
+const THINKING_LEVEL_VALUES = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+
+type PersistedThinkingLevel = Parameters<SettingsManager["setDefaultThinkingLevel"]>[0];
+
+function normalizeThinkingLevelInput(value: unknown): PersistedThinkingLevel | null {
+  if (value === null) return null;
+  if (typeof value !== "string" || !THINKING_LEVEL_VALUES.includes(value as (typeof THINKING_LEVEL_VALUES)[number])) {
+    throw new RpcError({
+      code: "BAD_REQUEST",
+      message: `level must be one of ${THINKING_LEVEL_VALUES.join(", ")}, or null`,
+    });
+  }
+  return value as PersistedThinkingLevel;
+}
+
 function stripThinkingSuffix(modelRef: string): string {
   const trimmed = modelRef.trim();
   const colonIndex = trimmed.lastIndexOf(":");
@@ -67,7 +83,10 @@ export function includeDefaultModelInEnabled(
 export function projectModelPreferences<T extends { id: string; name: string; provider: string }>(
   available: readonly T[],
   enabledModels: string[] | undefined,
-  settings: Pick<SettingsManager, "getDefaultProvider" | "getDefaultModel">,
+  settings: Pick<
+    SettingsManager,
+    "getDefaultProvider" | "getDefaultModel" | "getDefaultThinkingLevel" | "getAllModelThinkingLevels"
+  >,
 ): ModelPreferencesResult {
   const models: ModelInfo[] = available
     .map((model) => ({ id: model.id, name: model.name, provider: model.provider }))
@@ -79,6 +98,8 @@ export function projectModelPreferences<T extends { id: string; name: string; pr
     // The picker hides models filtered out by enabledModels, so a default that is
     // filtered out would never surface; project it against the same visible set.
     defaultModel: resolveDefaultModel(settings, filterByExactEnabledModels(available, enabledModels)),
+    defaultThinkingLevel: settings.getDefaultThinkingLevel() ?? null,
+    modelThinkingLevels: settings.getAllModelThinkingLevels(),
   };
 }
 
@@ -214,6 +235,7 @@ type ModelCatalogHandlers = {
   getPreferences: NonNullable<ApiHandler["models.preferences.get"]>;
   setPreferences: NonNullable<ApiHandler["models.preferences.set"]>;
   setDefaultModel: NonNullable<ApiHandler["models.default.set"]>;
+  setThinkingLevelDefault: NonNullable<ApiHandler["models.thinkingLevel.set"]>;
 };
 
 export const modelCatalogHandlers = {
@@ -290,6 +312,41 @@ export const modelCatalogHandlers = {
     settings.setDefaultModelAndProvider(provider, modelId);
     const enabledModels = includeDefaultModelInEnabled(settings.getEnabledModels(), provider, modelId);
     if (enabledModels) settings.setEnabledModels(enabledModels);
+    await settings.flush();
+    if (settings.drainErrors().some((error) => error.scope === "global")) {
+      throw new RpcError({ code: "INTERNAL", message: "Global Pi settings could not be saved" });
+    }
+    return projectModelPreferences(available, settings.getEnabledModels(), settings);
+  },
+
+  setThinkingLevelDefault: async (params) => {
+    const body = params as { cwd?: string; provider?: unknown; modelId?: unknown; level?: unknown };
+    const cwd = resolveModelsCwd(body);
+    const level = normalizeThinkingLevelInput(body.level);
+    const provider = typeof body.provider === "string" ? body.provider.trim() : "";
+    const modelId = typeof body.modelId === "string" ? body.modelId.trim() : "";
+    if (provider !== "" && modelId === "") {
+      throw new RpcError({ code: "BAD_REQUEST", message: "modelId is required when provider is set" });
+    }
+    if (provider === "" && modelId !== "") {
+      throw new RpcError({ code: "BAD_REQUEST", message: "provider is required when modelId is set" });
+    }
+    const services = await createAgentSessionServices({ cwd, agentDir: getAgentDir() });
+    const { models: available } = await resolveAvailableModels(services.modelRuntime);
+    const settings = services.settingsManager;
+    if (provider && modelId) {
+      if (!available.some((model) => model.provider === provider && model.id === modelId)) {
+        throw new RpcError({ code: "BAD_REQUEST", message: `Model is not available: ${provider}/${modelId}` });
+      }
+      if (level === null) settings.removeModelThinkingLevel(provider, modelId);
+      else settings.setModelThinkingLevel(provider, modelId, level);
+    } else if (level === null) {
+      // The SDK has no remove counterpart for the global default; assigning
+      // undefined drops the persisted key and restores the built-in fallback.
+      settings.setDefaultThinkingLevel(undefined as unknown as PersistedThinkingLevel);
+    } else {
+      settings.setDefaultThinkingLevel(level);
+    }
     await settings.flush();
     if (settings.drainErrors().some((error) => error.scope === "global")) {
       throw new RpcError({ code: "INTERNAL", message: "Global Pi settings could not be saved" });

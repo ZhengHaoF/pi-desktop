@@ -273,6 +273,8 @@ export function registerHandlers(server: RpcServer): () => Promise<void> {
 
     "models.default.set": guard(modelCatalogHandlers.setDefaultModel),
 
+    "models.thinkingLevel.set": guard(modelCatalogHandlers.setThinkingLevelDefault),
+
     "modelsConfig.get": guard(modelConfigHandlers.get),
     "modelsConfig.set": guard(modelConfigHandlers.set),
     "modelsConfig.test": guard(modelConfigHandlers.test),

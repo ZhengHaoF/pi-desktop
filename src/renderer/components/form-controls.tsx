@@ -196,11 +196,19 @@ export function Select({
   onChange,
   options,
   required,
+  labels,
+  emptyLabel,
+  disabled,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: readonly string[];
   required?: boolean;
+  /** Display text per option value; falls back to the raw value. */
+  labels?: Record<string, string>;
+  /** Text for the empty "inherit / none" option. */
+  emptyLabel?: string;
+  disabled?: boolean;
 }) {
   const controlId = useFieldControlId();
 
@@ -209,12 +217,13 @@ export function Select({
       id={controlId}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
       style={{ ...inputStyle, color: value ? "var(--text)" : "var(--text-dim)" }}
     >
-      {!required && <option value="">— inherit / none —</option>}
+      {!required && <option value="">{emptyLabel ?? "— inherit / none —"}</option>}
       {options.map((o) => (
         <option key={o} value={o}>
-          {o}
+          {labels?.[o] ?? o}
         </option>
       ))}
     </select>

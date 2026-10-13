@@ -19,6 +19,7 @@ import { isAutoSessionTitleEnabled, setAutoSessionTitleEnabled } from "../lib/au
 import { HerdrSettings } from "./herdr/HerdrSettings";
 import { SettingRow, selectStyle } from "./settings/settings-controls";
 import { CacheWarmingSettings } from "./settings/CacheWarmingSettings";
+import { DefaultThinkingLevelSettings } from "./settings/DefaultThinkingLevelSettings";
 import { SessionListSettings } from "./settings/SessionListSettings";
 
 export type SettingsTab =
@@ -1261,6 +1262,7 @@ function GeneralSettings({
             </label>
           </SettingRow>
           <CacheWarmingSettings />
+          <DefaultThinkingLevelSettings />
           <SettingRow label={t("chatFontSize", "Chat text size")} controlId={chatFontSizeControlId}>
             <select
               id={chatFontSizeControlId}

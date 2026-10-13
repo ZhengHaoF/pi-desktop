@@ -434,6 +434,8 @@ export function ModelDetail({
   isDefault = false,
   settingDefault = false,
   onSetDefault,
+  defaultThinkingLevel = null,
+  onDefaultThinkingLevelChange,
 }: {
   providerName: string;
   provider: ProviderEntry;
@@ -443,6 +445,9 @@ export function ModelDetail({
   isDefault?: boolean;
   settingDefault?: boolean;
   onSetDefault?: () => void | Promise<void>;
+  /** Persisted per-model default thinking level (Pi global settings), null when unset. */
+  defaultThinkingLevel?: string | null;
+  onDefaultThinkingLevelChange?: (level: string | null) => void | Promise<void>;
 }) {
   const { t } = useI18n();
   const [testState, setTestState] = useState<ModelTestState>({ phase: "idle" });
@@ -450,6 +455,10 @@ export function ModelDetail({
   const [defaultState, setDefaultState] = useState<{ phase: "idle" | "saving" | "error"; message?: string }>({
     phase: "idle",
   });
+  const [thinkingLevelState, setThinkingLevelState] = useState<{
+    phase: "idle" | "saving" | "error";
+    message?: string;
+  }>({ phase: "idle" });
   const fillSnapshot = useRef<ModelEntry | null>(null);
   const set = <K extends keyof ModelEntry>(k: K, v: ModelEntry[K]) => onChange({ ...model, [k]: v });
   const costVal = (k: keyof NonNullable<ModelEntry["cost"]>) =>
@@ -487,6 +496,7 @@ export function ModelDetail({
     setTestState({ phase: "idle" });
     setFillState({ phase: "idle" });
     setDefaultState({ phase: "idle" });
+    setThinkingLevelState({ phase: "idle" });
     fillSnapshot.current = null;
   }, [providerName, provider.baseUrl, provider.api, provider.apiKey, model.id, model.api]);
 
@@ -526,6 +536,21 @@ export function ModelDetail({
       setDefaultState({ phase: "error", message: e instanceof Error ? e.message : String(e) });
     }
   }, [isDefault, model.id, onSetDefault, savingDefault]);
+
+  const savingThinkingLevel = thinkingLevelState.phase === "saving";
+  const handleThinkingLevelDefaultChange = useCallback(
+    async (level: string | null) => {
+      if (!model.id.trim() || savingThinkingLevel) return;
+      setThinkingLevelState({ phase: "saving" });
+      try {
+        await onDefaultThinkingLevelChange?.(level);
+        setThinkingLevelState({ phase: "idle" });
+      } catch (e) {
+        setThinkingLevelState({ phase: "error", message: e instanceof Error ? e.message : String(e) });
+      }
+    },
+    [model.id, onDefaultThinkingLevelChange, savingThinkingLevel],
+  );
 
   const handleFillInfo = useCallback(async () => {
     if (!model.id.trim() || fillState.phase === "loading") return;
@@ -896,6 +921,38 @@ export function ModelDetail({
                 "Sends DeepSeek's request protocol: the thinking switch, the system (not developer) role, and reasoning_content on replayed assistant messages. Enable for DeepSeek models behind a relay or custom endpoint.",
               )}
             </div>
+          </div>
+          <div>
+            <Field label={t("modelDefaultThinkingLevel", "Default thinking level")}>
+              <Select
+                value={defaultThinkingLevel ?? ""}
+                onChange={(v) => void handleThinkingLevelDefaultChange(v || null)}
+                options={THINKING_LEVELS}
+                labels={Object.fromEntries(THINKING_LEVELS.map((level) => [level, thinkingLevelLabel(level, t)]))}
+                emptyLabel={t("modelDefaultThinkingLevelAuto", "Auto (global default)")}
+                disabled={!model.id.trim() || savingThinkingLevel}
+              />
+            </Field>
+            <div
+              style={{
+                fontSize: 11,
+                lineHeight: 1.5,
+                color: "var(--text-dim)",
+                marginTop: 2,
+                maxWidth: 520,
+              }}
+            >
+              {t(
+                "modelDefaultThinkingLevelHint",
+                "New conversations on this model resolve the composer's Auto level to this value, and switching to this model mid-session applies it too.",
+              )}
+            </div>
+            {thinkingLevelState.phase === "error" && (
+              <span style={{ fontSize: 11, color: "#f87171", lineHeight: 1.5, overflowWrap: "anywhere" }}>
+                {thinkingLevelState.message ||
+                  t("modelDefaultThinkingLevelFailed", "Failed to set the default thinking level.")}
+              </span>
+            )}
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>

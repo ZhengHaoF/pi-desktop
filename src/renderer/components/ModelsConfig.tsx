@@ -16,7 +16,13 @@ import {
   type ModelsJson,
   type ProviderEntry,
 } from "@/lib/models-config-state";
-import { call, getModelPreferences, setDefaultModel, setModelPreferences } from "@/lib/api-client";
+import {
+  call,
+  getModelPreferences,
+  setDefaultModel,
+  setModelPreferences,
+  setThinkingLevelDefault,
+} from "@/lib/api-client";
 import type {
   ModelPreferencesResult,
   ProviderStatus as OAuthProvider,
@@ -366,6 +372,18 @@ export function ModelsConfig({
         }
         settingDefault={defaultModelSaving}
         onSetDefault={() => setConversationDefaultModel(selection.providerName, model.id)}
+        defaultThinkingLevel={modelPreferences?.modelThinkingLevels?.[`${selection.providerName}/${model.id}`] ?? null}
+        onDefaultThinkingLevelChange={async (level) => {
+          // Persisted in Pi global settings like the default model, so it saves
+          // immediately instead of waiting for the models.json save button.
+          setModelPreferencesState(
+            await setThinkingLevelDefault(cwd ?? undefined, level, {
+              provider: selection.providerName,
+              modelId: model.id,
+            }),
+          );
+          onChanged?.();
+        }}
       />
     );
   })();
