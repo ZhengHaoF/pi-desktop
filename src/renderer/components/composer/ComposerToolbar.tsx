@@ -1,8 +1,14 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ModelCatalogStatus } from "@contract/types";
 import { useI18n } from "@/i18n";
 import { scaledChatFont } from "@/lib/chat-appearance";
+import type { ToolPreset, SelectableToolPreset } from "@shared/tool-presets";
+import {
+  THINKING_LEVELS as REASONING_LEVELS,
+  thinkingMenuLevels,
+  type ThinkingLevelOption,
+} from "@shared/thinking-levels";
 
 interface ModelOption {
   provider: string;
@@ -16,6 +22,7 @@ export interface ComposerToolbarOptions {
   model?: { provider: string; modelId: string } | null;
   isAutoModelSelection?: boolean;
   modelNames?: Record<string, string>;
+  modelStatus?: ReactNode;
   modelList?: { id: string; name: string; provider: string }[];
   modelCatalog?: ModelCatalogStatus;
   modelRefreshing?: boolean;
@@ -26,10 +33,10 @@ export interface ComposerToolbarOptions {
   onAbortCompaction?: () => void;
   isCompacting?: boolean;
   compactError?: string | null;
-  toolPreset?: "none" | "default" | "full";
-  onToolPresetChange?: (preset: "none" | "default" | "full") => void;
-  thinkingLevel?: "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
-  onThinkingLevelChange?: (level: "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh") => void;
+  toolPreset?: ToolPreset;
+  onToolPresetChange?: (preset: SelectableToolPreset) => void;
+  thinkingLevel?: ThinkingLevelOption;
+  onThinkingLevelChange?: (level: ThinkingLevelOption) => void;
   availableThinkingLevels?: string[] | null;
   thinkingLevelMap?: Record<string, string | null> | null;
   soundEnabled?: boolean;
@@ -52,7 +59,7 @@ function compareModelOptions(a: ModelOption, b: ModelOption): number {
   );
 }
 
-const THINKING_LEVELS = ["auto", "off", "minimal", "low", "medium", "high", "xhigh"] as const;
+const THINKING_LEVELS = ["auto", ...REASONING_LEVELS] as const;
 
 /** Local menu placement, dismissal and focus ownership for the composer controls. */
 function ComposerToolbarView({
@@ -73,6 +80,7 @@ function ComposerToolbarView({
     model,
     isAutoModelSelection,
     modelNames,
+    modelStatus,
     modelList,
     modelCatalog,
     modelRefreshing,
@@ -139,6 +147,7 @@ function ComposerToolbarView({
     medium: t("thinkingMedium", "Medium"),
     high: t("thinkingHigh", "High"),
     xhigh: t("thinkingXHigh", "Extra high"),
+    max: t("thinkingMax", "Maximum"),
   };
   const thinkingDescriptions: Record<(typeof THINKING_LEVELS)[number], string> = {
     auto: t("thinkingDefaultDescription", "Use Pi default"),
@@ -147,7 +156,8 @@ function ComposerToolbarView({
     low: t("thinkingLowDescription", "Low reasoning"),
     medium: t("thinkingMediumDescription", "Medium reasoning"),
     high: t("thinkingHighDescription", "High reasoning"),
-    xhigh: t("thinkingXHighDescription", "Max reasoning"),
+    xhigh: t("thinkingXHighDescription", "Extra-high reasoning"),
+    max: t("thinkingMaxDescription", "Maximum reasoning"),
   };
   const translateThinkingValue = (value: string): string => {
     return (THINKING_LEVELS as readonly string[]).includes(value)
@@ -160,12 +170,15 @@ function ComposerToolbarView({
     return translateThinkingValue(thinkingLevelMap[lvl] ?? lvl);
   })();
   const toolPresetKey =
-    (Object.entries(TOOL_PRESET_MAP).find(([, value]) => value === (toolPreset ?? "default"))?.[0] as
-      "off" | "default" | "full" | undefined) ?? "default";
-  const toolPresetLabels: Record<"off" | "default" | "full", string> = {
+    toolPreset === "custom"
+      ? "custom"
+      : ((Object.entries(TOOL_PRESET_MAP).find(([, value]) => value === (toolPreset ?? "default"))?.[0] as
+          "off" | "default" | "full" | undefined) ?? "default");
+  const toolPresetLabels: Record<"off" | "default" | "full" | "custom", string> = {
     off: t("permissionReadOnly", "Read only"),
     default: t("permissionStandard", "Standard"),
     full: t("permissionFull", "Full access"),
+    custom: t("permissionCustom", "Custom"),
   };
   const toolPresetLabel = toolPresetLabels[toolPresetKey];
   const closeControlDropdowns = useCallback(() => {
@@ -272,7 +285,7 @@ function ComposerToolbarView({
       {/* LEFT: attach + model selector (idle) or steer/followup toggle (streaming) */}
       <div
         style={{
-          flex: isMobile ? "1 1 auto" : "0 0 auto",
+          flex: isMobile ? "1 1 auto" : "0 1 auto",
           minWidth: 0,
           display: "flex",
           alignItems: "center",
@@ -548,6 +561,7 @@ function ComposerToolbarView({
               )}
           </div>
         )}
+        {modelStatus}
       </div>
 
       {/* spacer */}
@@ -683,11 +697,7 @@ function ComposerToolbarView({
                     minWidth: 180,
                   }}
                 >
-                  {THINKING_LEVELS.filter((lvl) => {
-                    if (!availableThinkingLevels) return true;
-                    if (lvl === "auto") return true;
-                    return availableThinkingLevels.includes(lvl);
-                  }).map((lvl) => {
+                  {thinkingMenuLevels(availableThinkingLevels).map((lvl) => {
                     const isActive = (thinkingLevel ?? "auto") === lvl;
                     const desc = thinkingDescriptions[lvl];
                     const mappedVal = lvl !== "auto" && thinkingLevelMap ? thinkingLevelMap[lvl] : undefined;
@@ -852,7 +862,10 @@ function ComposerToolbarView({
                         ? t("permissionReadOnlyDescription", "No tools, read-only")
                         : lvl === "default"
                           ? t("permissionStandardDescription", "4 built-in tools")
-                          : t("permissionFullDescription", "All built-in tools");
+                          : t(
+                              "permissionFullDescription",
+                              "All tools, code orchestration, image generation, classification and search",
+                            );
                     return (
                       <button
                         key={lvl}

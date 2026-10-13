@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { extractInterfaceProperties } from "../../scripts/check-contract-coverage.mjs";
 import path from "node:path";
 import test from "node:test";
 import { importTestBundle } from "#test-bundle";
@@ -18,7 +20,9 @@ const stubs = {
   "rpc-manager":
     "export const subscribeRunningSessions = listener => {state.running.add(listener); return () => {state.running.delete(listener); step('running-off');};}; export const disposeAllRpcSessions = () => step('sessions-stop'); export const syncDesktopToolsForAllSessions = () => {}; export const syncCacheWarmingForAllSessions = async () => 0; export const getRunningRpcSessionIds = () => []; export const getRpcSession = () => state.agent; export const startRpcSession = unexpected;",
   "model-runtime":
-    "export const modelCatalogRefreshCoordinator = {cancelAll: () => step('models-stop')}; export const getSharedModelRuntime = unexpected; export const reloadSharedModelRuntimeConfig = unexpected;",
+    "export const modelCatalogRefreshCoordinator = {cancelAll: () => step('models-stop'), settled: async () => step('models-settled')}; export const getSharedModelRuntime = unexpected; export const reloadSharedModelRuntimeConfig = unexpected;",
+  "model-credentials":
+    "export const beginModelCredentialShutdown = () => step('credentials-stop'); export const settleModelCredentials = async () => step('credentials-settled'); export const createDesktopModelRuntime = unexpected;",
 };
 const { registerHandlers, control } = await importTestBundle("host-lifecycle-composition", {
   packages: "external",
@@ -78,7 +82,12 @@ test("the actual registrar owns one service set and releases subscriptions and s
     emit: (...args) => events.push(args),
   });
   assert.deepEqual(control.state.created, ["files", "auth", "channels", "processes", "herdr"]);
-  assert.equal(Object.keys(methods).length, 108);
+  const expected = extractInterfaceProperties(
+    "api.ts",
+    readFileSync(path.join(hostRoot, "../contract/api.ts"), "utf8"),
+    "Api",
+  );
+  assert.deepEqual(Object.keys(methods).sort(), expected.sort());
   assert.equal(control.state.running.size, 1);
   await methods["agent.command"]({ sessionId: "fixture", command: { type: "get_state" } });
   const running = [...control.state.running][0];
@@ -105,6 +114,7 @@ test("the actual registrar owns one service set and releases subscriptions and s
     "running-off",
     "events-off",
     "destroy-off",
+    "credentials-stop",
     "auth-stop",
     "models-stop",
     "herdr-unsubscribe",
@@ -114,6 +124,8 @@ test("the actual registrar owns one service set and releases subscriptions and s
     "channels-stop",
     "files-stop",
     "sessions-stop",
+    "models-settled",
+    "credentials-settled",
   ]);
 });
 

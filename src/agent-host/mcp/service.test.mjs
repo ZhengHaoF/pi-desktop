@@ -1,0 +1,621 @@
+import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { tmpdir } from "node:os";
+import test from "node:test";
+import { createInMemoryTransportPair } from "@earendil-works/pi-mcp/testing";
+import { importTestBundle } from "#test-bundle";
+import { createDeferred } from "#test-timing";
+const { McpService } = await importTestBundle("mcp-service", {
+  packages: "external",
+  entryPoints: [path.join(import.meta.dirname, "service.ts")],
+});
+async function waitFor(read) {
+  const deadline = Date.now() + 3000;
+  while (!read()) {
+    if (Date.now() > deadline) throw new Error("MCP fixture did not settle");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+async function fixture(t, options = {}) {
+  const root = mkdtempSync(path.join(tmpdir(), "pi-mcp-session-")),
+    definitions = new Map(),
+    active = new Set(),
+    servers = [],
+    calledNames = [];
+  if (options.entryTools)
+    for (const name of ["codemode", "tool_search"])
+      definitions.set(name, { name, exposure: "direct", defaultActive: false });
+  let running = false,
+    empty = false,
+    executed = 0;
+  const service = new McpService(
+    {
+      changed() {},
+      oauth: { updated() {} },
+      connection: {
+        createTransport: async () => {
+          const { client, server } = createInMemoryTransportPair();
+          servers.push(server);
+          server.onMessage((request) => {
+            if (request.id === undefined) return;
+            let result;
+            if (request.method === "initialize")
+              result = {
+                protocolVersion: request.params.protocolVersion,
+                capabilities: { tools: {}, ...(options.resources ? { resources: {} } : {}) },
+                serverInfo: { name: "fixture", version: "1" },
+                instructions: options.instructions,
+              };
+            else if (request.method === "tools/list")
+              result = {
+                tools: options.catalog ?? [
+                  {
+                    name: "echo",
+                    description: "Fixture echo",
+                    inputSchema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
+                  },
+                ],
+              };
+            else {
+              executed++;
+              calledNames.push(request.params.name);
+              result = {
+                content: [{ type: "text", text: request.params.arguments.text }],
+                structuredContent: { original: request.params.arguments.text },
+              };
+            }
+            void server.send({ jsonrpc: "2.0", id: request.id, result });
+          });
+          await server.start();
+          return client;
+        },
+      },
+    },
+    root,
+  );
+  t.after(async () => {
+    await service.shutdown();
+    rmSync(root, { recursive: true, force: true });
+  });
+  const hooks = {
+    isEmpty: () => empty,
+    isRunning: () => running,
+    isAllowed: () => false,
+    ctx: { cwd: root, isProjectTrusted: () => true, sessionManager: { getSessionId: () => "session" } },
+    pi: {
+      getMcpServers: () => options.registered ?? [],
+      getSettings: () => options.settings ?? {},
+      getAllTools: () => [...definitions.values()],
+      getActiveTools: () => [...active],
+      setActiveTools: (names) => {
+        active.clear();
+        names.forEach((name) => active.add(name));
+      },
+      registerTool: (tool) => {
+        definitions.set(tool.name, tool);
+        if (tool.exposure === "hidden") active.delete(tool.name);
+        else if (tool.defaultActive) active.add(tool.name);
+      },
+    },
+  };
+  if (options.declarations) hooks.declarations = () => options.declarations;
+  hooks.orchestration = () => options.orchestration;
+  hooks.setDeclarations = (names) => {
+    options.declarations = names;
+  };
+  if (!options.noGlobal)
+    await service.config.upsert(
+      "global",
+      undefined,
+      "fixture",
+      options.config ?? { command: "fixture", exposure: "direct" },
+      "missing",
+    );
+  await service.attach(hooks);
+  await waitFor(() => service.snapshot("session")[0]?.state === "connected");
+  return {
+    root,
+    service,
+    definitions,
+    active,
+    hooks,
+    servers,
+    calledNames,
+    setRunning: (value) => {
+      running = value;
+    },
+    setEmpty: (value) => {
+      empty = value;
+    },
+    get executed() {
+      return executed;
+    },
+  };
+}
+
+test("sign-out reconnects only the named account even when another server uses the same URL", async (t) => {
+  const url = "http://127.0.0.1:12345/mcp",
+    f = await fixture(t, { config: { url, exposure: "direct" } });
+  const snapshot = await f.service.config.snapshot("global");
+  await f.service.config.upsert("global", undefined, "another", { url, exposure: "direct" }, snapshot.revision);
+  await f.service.changed("global");
+  await waitFor(
+    () =>
+      f.service.snapshot("session").length === 2 &&
+      f.service.snapshot("session").every((entry) => entry.state === "connected"),
+  );
+  const original = f.service.getConnection("session", "fixture"),
+    other = f.service.getConnection("session", "another");
+  await f.service.credentials
+    .forServer("fixture", url)
+    .save({ serverUrl: url, tokens: { access_token: "FIRST", token_type: "Bearer" } });
+  await f.service.credentials
+    .forServer("another", url)
+    .save({ serverUrl: url, tokens: { access_token: "SECOND", token_type: "Bearer" } });
+  await f.service.logout("fixture", url);
+  await waitFor(() => f.service.getConnection("session", "fixture").snapshot.state === "connected");
+  assert.notEqual(f.service.getConnection("session", "fixture"), original);
+  assert.equal(f.service.getConnection("session", "another"), other);
+  assert.equal(await f.service.credentials.forServer("fixture", url).load(), undefined);
+  assert.equal((await f.service.credentials.forServer("another", url).load()).tokens.access_token, "SECOND");
+});
+
+test("OAuth sign-out leaves a header-authenticated project connection at the same name and URL running", async (t) => {
+  const url = "http://127.0.0.1:12345/mcp",
+    f = await fixture(t, { config: { url, exposure: "direct" } });
+  const cwd = path.join(f.root, "project");
+  mkdirSync(cwd);
+  await f.service.config.upsert(
+    "project",
+    cwd,
+    "fixture",
+    { url, headers: { aUtHoRiZaTiOn: "PRIVATE_FIXTURE" }, exposure: "direct" },
+    (await f.service.config.snapshot("project", cwd)).revision,
+  );
+  const definitions = new Map(),
+    active = new Set();
+  await f.service.attach({
+    ...f.hooks,
+    ctx: { ...f.hooks.ctx, cwd, sessionManager: { getSessionId: () => "project-session" } },
+    pi: {
+      ...f.hooks.pi,
+      getAllTools: () => [...definitions.values()],
+      getActiveTools: () => [...active],
+      setActiveTools: (names) => {
+        active.clear();
+        names.forEach((name) => active.add(name));
+      },
+      registerTool: (tool) => {
+        definitions.set(tool.name, tool);
+        if (tool.defaultActive) active.add(tool.name);
+      },
+    },
+  });
+  await waitFor(() => f.service.snapshot("project-session")[0]?.state === "connected");
+  const projectConnection = f.service.getConnection("project-session", "fixture");
+  await f.service.logout("fixture", url);
+  assert.equal(f.service.getConnection("project-session", "fixture"), projectConnection);
+  assert.equal(projectConnection.snapshot.state, "connected");
+});
+
+test("Desktop MCP registrations expose real state and keep stable names across queued reconnects", async (t) => {
+  const f = await fixture(t),
+    tool = f.service.tools("session")[0],
+    original = f.definitions.get(tool.name);
+  assert.equal(tool.active, true);
+  assert.equal(tool.callable, true);
+  assert.equal(tool.executionAllowed, false);
+  const result = await original.execute("call", { text: "ORIGINAL_MCP_RESULT" });
+  assert.equal(result.structuredContent.structuredContent.original, "ORIGINAL_MCP_RESULT");
+  const generation = f.service.snapshot("session")[0].generation;
+  f.setRunning(true);
+  await f.service.reconnect("session", "fixture");
+  assert.equal(f.service.snapshot("session")[0].pendingApply, true);
+  assert.equal(f.service.snapshot("session")[0].generation, generation);
+  f.setRunning(false);
+  await f.service.reconcile("session");
+  await waitFor(() => f.service.snapshot("session")[0]?.state === "connected");
+  assert.ok(f.service.snapshot("session")[0].generation > generation);
+  assert.equal(f.service.tools("session")[0].name, tool.name);
+  await assert.rejects(original.execute("stale", { text: "DO_NOT_EXECUTE" }), /generation/);
+  assert.equal(f.executed, 1);
+});
+
+test("shutdown rejects a preview whose configuration lookup completes late and shares one close completion", async (t) => {
+  const f = await fixture(t),
+    entered = createDeferred(),
+    release = createDeferred();
+  const effective = f.service.config.effective.bind(f.service.config);
+  f.service.config.effective = async (cwd, trusted) => {
+    if (!trusted) {
+      entered.resolve();
+      await release.promise;
+    }
+    return effective(cwd, trusted);
+  };
+  const pending = f.service.preview({ name: "fixture", scope: "global", cwd: f.root }, async () => {
+    throw new Error("must not run");
+  });
+  const rejected = assert.rejects(pending, (error) => error.code === "CLOSED");
+  await entered.promise;
+  const closing = f.service.shutdown();
+  assert.equal(f.service.shutdown(), closing);
+  await closing;
+  release.resolve();
+  await rejected;
+  assert.equal(f.servers.length, 1);
+  await assert.rejects(f.service.attach(f.hooks), (error) => error.code === "CLOSED");
+});
+
+test("trusted project policy disables a live global server immediately and removal restores its origin", async (t) => {
+  const f = await fixture(t, {
+    config: { url: "https://mcp.example.invalid", auth: { provider: "radius" }, exposure: "direct" },
+  });
+  const name = f.service.tools("session")[0].name;
+  const original = f.service.getConnection("session", "fixture");
+  const initial = await f.service.config.snapshot("project", f.root);
+  f.setRunning(true);
+  const saved = await f.service.config.upsert("project", f.root, "fixture", { enabled: false }, initial.revision);
+  await f.service.changed("project", f.root);
+  const disabled = f.service.snapshot("session")[0];
+  assert.equal(disabled.state, "disabled");
+  assert.equal(disabled.scope, "global");
+  assert.equal(disabled.overrideSource, f.service.config.filename("project", f.root));
+  assert.equal(original.snapshot.state, "disconnected");
+  assert.equal(f.active.has(name), false);
+  assert.equal(f.service.tools("session").length, 0);
+  const target = await f.service.target({ name: "fixture", scope: "project", cwd: f.root });
+  assert.equal(target.scope, "global");
+  assert.equal(target.config.auth.provider, "radius");
+  await f.service.config.remove("project", f.root, "fixture", saved.revision);
+  f.setRunning(false);
+  await f.service.changed("project", f.root);
+  await waitFor(() => f.service.snapshot("session")[0]?.state === "connected");
+  const restored = f.service.snapshot("session")[0];
+  assert.equal(restored.scope, "global");
+  assert.equal(restored.overrideSource, undefined);
+  assert.equal(f.service.tools("session")[0].name, name);
+  assert.equal(f.service.tools("session")[0].executionAllowed, false);
+});
+
+test("malformed project policy withdraws existing tools and does not revive a same-name extension", async (t) => {
+  const f = await fixture(t, {
+    registered: [{ name: "fixture", config: { command: "extension" }, extensionPath: "fixture-extension" }],
+  });
+  mkdirSync(path.join(f.root, ".pi"), { recursive: true });
+  writeFileSync(
+    f.service.config.filename("project", f.root),
+    JSON.stringify({ mcpServers: { fixture: { enabled: "invalid" } } }),
+  );
+  f.setRunning(true);
+  await f.service.changed("project", f.root);
+  assert.equal(f.service.snapshot("session").length, 0);
+  assert.equal(f.service.tools("session").length, 0);
+  assert.match(f.service.panel("session").error, /enabled/);
+  f.hooks.ctx.isProjectTrusted = () => false;
+  await assert.rejects(f.service.target({ name: "fixture", scope: "project", cwd: f.root }), /not trusted/);
+  assert.equal((await f.service.target({ name: "fixture", scope: "global", cwd: f.root })).trusted, false);
+  f.setRunning(false);
+  await f.service.reconcile("session");
+  await waitFor(() => f.service.snapshot("session")[0]?.state === "connected");
+  assert.equal(f.service.snapshot("session")[0].scope, "global");
+  assert.equal(f.service.panel("session").error, undefined);
+});
+
+for (const exposure of ["direct", "deferred", "codemode", "codemode-deferred", "hidden"])
+  test(`MCP ${exposure} exposure declares only the appropriate model entry point`, async (t) => {
+    const f = await fixture(t, { config: { command: "fixture", exposure }, entryTools: true });
+    assert.equal(f.active.has("mcp__fixture__echo"), exposure === "direct");
+    assert.equal(f.active.has("codemode"), exposure === "codemode" || exposure === "codemode-deferred");
+    assert.equal(f.active.has("tool_search"), exposure === "deferred");
+    assert.equal(f.service.tools("session").length, exposure === "hidden" ? 0 : 1);
+    assert.equal(
+      f.definitions.get("mcp__fixture__echo").exposure,
+      exposure === "codemode-deferred" || exposure === "codemode" ? "deferred" : exposure,
+    );
+  });
+
+test("MCP caller activation respects shared defaults and independent session orchestration choices", async (t) => {
+  const f = await fixture(t, {
+    config: { command: "fixture", exposure: "codemode" },
+    entryTools: true,
+    settings: { defaultTools: ["-codemode", "-tool_search"] },
+  });
+  assert.equal(f.active.has("codemode"), false);
+  let selection = ["codemode"];
+  f.hooks.orchestration = () => selection;
+  await f.service.reconcile("session");
+  assert.equal(f.active.has("codemode"), true);
+  selection = [];
+  await f.service.reconnect("session", "fixture");
+  await waitFor(() => f.service.snapshot("session")[0]?.state === "connected");
+  assert.equal(f.active.has("codemode"), false);
+  await f.service.detach("session");
+  await f.service.attach(f.hooks);
+  await waitFor(() => f.service.snapshot("session")[0]?.state === "connected");
+  assert.equal(f.active.has("codemode"), false);
+});
+
+test("file MCP servers override extension registrations and removal restores the extension without duplicate instances", async (t) => {
+  const f = await fixture(t, {
+    registered: [
+      { name: "fixture", extensionPath: "builtin:fixture", config: { command: "extension", exposure: "deferred" } },
+    ],
+  });
+  assert.equal(f.service.snapshot("session").length, 1);
+  assert.equal(f.service.snapshot("session")[0].scope, "global");
+  const config = await f.service.config.snapshot("global");
+  await f.service.config.remove("global", undefined, "fixture", config.revision);
+  await f.service.changed("global");
+  await waitFor(() => f.service.snapshot("session")[0]?.state === "connected");
+  assert.equal(f.service.snapshot("session").length, 1);
+  assert.equal(f.service.snapshot("session")[0].scope, "extension");
+  assert.equal(f.service.getConnection("session", "fixture").config.command, "extension");
+  assert.equal(f.service.extensionEntries("session")[0].source, "builtin:fixture");
+  const extension = f.service.extensionEntries("session")[0];
+  await f.service.updateExtension("session", "fixture", { ...extension.config, timeout: 2 }, extension.revision);
+  await assert.rejects(
+    f.service.updateExtension("session", "fixture", extension.config, extension.revision),
+    (error) => error.code === "CONFLICT",
+  );
+});
+
+test("MCP catalog removal withdraws the missing tool and hides its old generation", async (t) => {
+  const options = { catalog: [{ name: "old", inputSchema: { type: "object" } }] };
+  const f = await fixture(t, options),
+    original = f.definitions.get("mcp__fixture__old");
+  options.catalog = [{ name: "new", inputSchema: { type: "object" } }];
+  await f.servers[0].send({ jsonrpc: "2.0", method: "notifications/tools/list_changed" });
+  await waitFor(() => f.service.tools("session")[0]?.originalName === "new");
+  assert.equal(f.active.has("mcp__fixture__old"), false);
+  assert.equal(f.definitions.get("mcp__fixture__old").exposure, "hidden");
+  await assert.rejects(original.execute("stale", {}), /generation/);
+  assert.equal(f.executed, 0);
+});
+
+test("Desktop registers distinct callable names for colliding tools and resources and preserves raw calls", async (t) => {
+  const f = await fixture(t, {
+    resources: true,
+    instructions: "Use the fixture carefully.",
+    config: { command: "fixture", description: "Fixture summary", exposure: "codemode" },
+    catalog: [
+      { name: "read-file", inputSchema: { type: "object" } },
+      { name: "read_file", inputSchema: { type: "object" } },
+      { name: "read_resource", inputSchema: { type: "object" } },
+      { name: "__read_resource", inputSchema: { type: "object" } },
+    ],
+  });
+  const tools = f.service.tools("session");
+  assert.equal(new Set(tools.map((tool) => tool.name)).size, 5);
+  for (const tool of tools) {
+    assert.match(tool.name, /^[A-Za-z0-9_]{1,64}$/);
+    const definition = f.definitions.get(tool.name);
+    assert.equal(definition.namespace.name, "mcp__fixture");
+    assert.equal(definition.namespace.description, "Fixture summary");
+    assert.equal(definition.namespace.instructions, "Use the fixture carefully.");
+    assert.equal(definition.exposure, "deferred");
+    if (!tool.resource) await definition.execute("raw", { text: "fixture" });
+  }
+  assert.deepEqual(f.calledNames, ["read-file", "read_file", "read_resource", "__read_resource"]);
+});
+
+test("adding a collision retires the previous alias; reordering and removal preserve the new owner names", async (t) => {
+  const options = { catalog: [{ name: "a-b", inputSchema: { type: "object" } }] };
+  const f = await fixture(t, options),
+    old = f.service.tools("session")[0].name;
+  const stale = f.definitions.get(old);
+  options.catalog.push({ name: "a_b", inputSchema: { type: "object" } });
+  await f.servers[0].send({ jsonrpc: "2.0", method: "notifications/tools/list_changed" });
+  await waitFor(() => f.service.tools("session").length === 2);
+  const before = Object.fromEntries(f.service.tools("session").map((tool) => [tool.originalName, tool.name]));
+  assert.notEqual(before["a-b"], old);
+  assert.notEqual(before.a_b, old);
+  await assert.rejects(stale.execute("stale", { text: "not sent" }), /generation/);
+  options.catalog.reverse();
+  await f.servers[0].send({ jsonrpc: "2.0", method: "notifications/tools/list_changed" });
+  await f.service.getConnection("session", "fixture").refreshTools();
+  assert.deepEqual(
+    Object.fromEntries(f.service.tools("session").map((tool) => [tool.originalName, tool.name])),
+    before,
+  );
+  options.catalog = options.catalog.filter((tool) => tool.name === "a_b");
+  await f.service.getConnection("session", "fixture").refreshTools();
+  assert.equal(f.service.tools("session")[0].name, before.a_b);
+  assert.equal(f.executed, 0);
+});
+
+test("an extension namespace collision is reported and withdraws live tools instead of retaining a conflicting registry", async (t) => {
+  const options = { registered: [] },
+    f = await fixture(t, options);
+  const snapshot = await f.service.config.snapshot("global");
+  await f.service.config.upsert("global", undefined, "dev-server", { command: "fixture" }, snapshot.revision);
+  await f.service.changed("global");
+  await waitFor(
+    () =>
+      f.service.snapshot("session").length === 2 &&
+      f.service.snapshot("session").every((item) => item.state === "connected"),
+  );
+  options.registered.push({ name: "dev_server", config: { command: "extension" }, extensionPath: "fixture-extension" });
+  await f.service.reconcile("session");
+  assert.equal(f.service.tools("session").length, 0);
+  assert.match(f.service.panel("session").error, /names conflict/);
+});
+
+test("MCP first-use approval coalesces concurrent requests and grants only the selected server", async (t) => {
+  const f = await fixture(t, { entryTools: true }),
+    grants = new Set();
+  f.hooks.isAllowed = (name) => grants.has(name);
+  f.hooks.setGrants = (names) => {
+    grants.clear();
+    names.forEach((name) => grants.add(name));
+  };
+  let finish,
+    prompts = 0,
+    copy;
+  const ctx = {
+    hasUI: true,
+    ui: {
+      confirmLocalized: async (_title, _message, localization) => {
+        prompts++;
+        copy = localization;
+        return new Promise((resolve) => {
+          finish = resolve;
+        });
+      },
+    },
+  };
+  const first = f.service.requestAuthorization("session", "mcp__fixture__echo", {}, ctx);
+  const second = f.service.requestAuthorization("session", "mcp__fixture__echo", {}, ctx);
+  await waitFor(() => prompts === 1);
+  assert.equal(copy.id, "mcp.authorize");
+  assert.equal(copy.servers, "fixture");
+  assert.match(copy.tools, /echo/);
+  finish(true);
+  assert.deepEqual(await Promise.all([first, second]), [true, true]);
+  assert.ok(grants.has("mcp__fixture__echo"));
+  assert.equal(grants.has("codemode"), false);
+  assert.equal(grants.has("tool_search"), false);
+  assert.equal(await f.service.requestAuthorization("session", "mcp__fixture__echo", {}, ctx), true);
+  assert.equal(prompts, 1);
+});
+
+test("MCP denied requests stay blocked for a run and stale reconnect approval never grants access", async (t) => {
+  const f = await fixture(t),
+    grants = new Set();
+  f.hooks.isAllowed = (name) => grants.has(name);
+  f.hooks.setGrants = (names) => names.forEach((name) => grants.add(name));
+  let prompts = 0;
+  const denied = {
+    hasUI: true,
+    ui: {
+      confirm: async () => {
+        prompts++;
+        return false;
+      },
+    },
+  };
+  assert.equal(await f.service.requestAuthorization("session", "mcp__fixture__echo", {}, denied), false);
+  assert.equal(await f.service.requestAuthorization("session", "mcp__fixture__echo", {}, denied), false);
+  assert.equal(prompts, 1);
+  f.service.resetPermissionRequests("session");
+  let finish;
+  const pending = f.service.requestAuthorization(
+    "session",
+    "mcp__fixture__echo",
+    {},
+    {
+      hasUI: true,
+      ui: {
+        confirm: () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      },
+    },
+  );
+  await waitFor(() => Boolean(finish));
+  await f.service.reconnect("session", "fixture");
+  await waitFor(() => f.service.snapshot("session")[0]?.state === "connected");
+  finish(true);
+  assert.equal(await pending, false);
+  assert.equal(grants.size, 0);
+});
+
+test("MCP pending approval cannot cross source changes, revocation or a cancelled run", async (t) => {
+  const f = await fixture(t),
+    grants = new Set();
+  f.hooks.setGrants = (names) => names.forEach((name) => grants.add(name));
+  let finish,
+    valid = true;
+  const pending = f.service.requestAuthorization(
+    "session",
+    "mcp__fixture__echo",
+    {},
+    {
+      hasUI: true,
+      ui: {
+        confirm: () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      },
+    },
+    () => valid,
+  );
+  await waitFor(() => Boolean(finish));
+  valid = false;
+  finish(true);
+  assert.equal(await pending, false);
+  assert.equal(grants.size, 0);
+  f.service.resetPermissionRequests("session");
+  const revoked = f.service.requestAuthorization(
+    "session",
+    "mcp__fixture__echo",
+    {},
+    {
+      hasUI: true,
+      ui: {
+        confirm: () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      },
+    },
+  );
+  await waitFor(() => Boolean(finish));
+  f.service.grant("session", []);
+  finish(true);
+  assert.equal(await revoked, false);
+  assert.equal(grants.size, 0);
+  f.service.resetPermissionRequests("session");
+  const controller = new globalThis.AbortController();
+  const cancelled = f.service.requestAuthorization(
+    "session",
+    "mcp__fixture__echo",
+    {},
+    {
+      hasUI: true,
+      signal: controller.signal,
+      ui: {
+        confirm: (_title, _message, { signal }) =>
+          new Promise((resolve) => signal.addEventListener("abort", () => resolve(false), { once: true })),
+      },
+    },
+  );
+  controller.abort();
+  assert.equal(await cancelled, false);
+  assert.equal(grants.size, 0);
+  assert.equal(await f.service.requestAuthorization("session", "mcp__fixture__echo", {}, { hasUI: false }), false);
+});
+
+test("disabling a server revokes its generation immediately even while a prompt is running", async (t) => {
+  const f = await fixture(t),
+    name = f.service.tools("session")[0].name,
+    original = f.definitions.get(name);
+  f.setRunning(true);
+  const config = await f.service.config.snapshot("global");
+  await f.service.config.upsert(
+    "global",
+    undefined,
+    "fixture",
+    { command: "fixture", enabled: false },
+    config.revision,
+  );
+  await f.service.changed("global");
+  assert.equal(f.service.snapshot("session")[0].state, "disabled");
+  assert.equal(f.active.has(name), false);
+  assert.equal(f.definitions.get(name).exposure, "hidden");
+  await assert.rejects(original.execute("stale", { text: "DO_NOT_EXECUTE" }), /generation/);
+  assert.equal(f.executed, 0);
+});
+
+test("MCP connection catalogs cannot activate tools in Desktop's empty-tool mode", async (t) => {
+  const f = await fixture(t);
+  f.setEmpty(true);
+  await f.service.reconnect("session", "fixture");
+  await waitFor(() => f.service.snapshot("session")[0]?.state === "connected");
+  assert.equal(f.active.size, 0);
+  assert.equal(f.service.tools("session")[0].active, false);
+});

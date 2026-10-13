@@ -133,6 +133,7 @@ function reduceAgentEvent(state: SessionTurnState, event: AgentEvent): SessionTu
       return reduceSessionTurnState(state, { type: "start" });
     // One prompt may contain several SDK runs; only confirmed prompt settlement ends it.
     case "agent_end":
+    case "agent_settled":
     case "prompt_done":
       return state;
     case "message_start":
@@ -156,6 +157,7 @@ function reduceAgentEvent(state: SessionTurnState, event: AgentEvent): SessionTu
         streamState: streamReducer(state.streamState, { type: "reset" }),
       };
     case "tool_execution_start": {
+      if (event.parentToolCallId) return state;
       const id = event.toolCallId as string;
       const name = event.toolName as string;
       const tools = state.agentPhase?.kind === "running_tools" ? [...state.agentPhase.tools] : [];
@@ -163,6 +165,7 @@ function reduceAgentEvent(state: SessionTurnState, event: AgentEvent): SessionTu
       return { ...state, agentPhase: { kind: "running_tools", tools } };
     }
     case "tool_execution_end": {
+      if (event.parentToolCallId) return state;
       if (state.agentPhase?.kind !== "running_tools") return state;
       const tools = state.agentPhase.tools.filter((tool) => tool.id !== event.toolCallId);
       return { ...state, agentPhase: tools.length ? { kind: "running_tools", tools } : { kind: "waiting_model" } };

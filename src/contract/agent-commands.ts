@@ -2,6 +2,7 @@ import type { SessionStatsInfo } from "../shared/pi-types";
 import type { ToolEntry } from "../shared/tool-presets";
 import type { ExtensionUiResponse } from "../shared/types";
 import type { AgentCommand, SessionRuntimeState } from "./types";
+import type { ThinkingLevel } from "../shared/thinking-levels";
 
 export interface SlashCommandInfo {
   name: string;
@@ -30,7 +31,7 @@ export interface BuiltinAgentCommands {
   set_model: Command<{ provider: string; modelId: string }, { id: string; provider: string }>;
   fork: Command<{ entryId: string }, { cancelled: true } | { cancelled: false; newSessionId: string }>;
   navigate_tree: Command<{ targetId: string }, { cancelled: boolean }>;
-  set_thinking_level: Command<{ level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" }, null>;
+  set_thinking_level: Command<{ level: ThinkingLevel }, null>;
   compact: Command<{ customInstructions?: string }, { tokensBefore?: number; estimatedTokensAfter?: number }>;
   set_session_name: Command<{ name: string }, null>;
   get_session_stats: Command<Empty, SessionStatsInfo>;
@@ -40,6 +41,7 @@ export interface BuiltinAgentCommands {
   get_tools: Command<Empty, ToolEntry[]>;
   get_commands: Command<Empty, { commands: SlashCommandInfo[] }>;
   set_tools: Command<{ toolNames: string[] }, null>;
+  set_orchestration_tools: Command<{ toolNames: string[] }, ToolEntry[]>;
   reload: Command<Empty, { success: boolean }>;
   abort_compaction: Command<Empty, null>;
   extension_ui_response: Command<ExtensionUiResponse, null>;

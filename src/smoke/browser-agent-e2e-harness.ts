@@ -9,7 +9,10 @@ import type { BrowserAgentAuthorizationRequest, BrowserEvent } from "../contract
 import { BrowserError } from "../main/browser/browser-error";
 import { BrowserService } from "../main/browser/browser-service";
 import { HostManager, type HostStatus } from "../main/host-manager";
-import { projectManagedProcessCapability } from "../main/managed-process/capability";
+import {
+  projectManagedProcessCapability,
+  projectProcessContainmentCapability,
+} from "../main/managed-process/capability";
 import { ManagedProcessReaper, secureWindowsReaperDirectory } from "../main/managed-process/reaper";
 import { resolveRuntimeCatalogPath } from "../main/toolchains/catalog";
 import { ToolchainManager } from "../main/toolchains/manager";
@@ -272,7 +275,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => server.clos
     if (method === "managedProcesses.getSettings") {
       const reaperStatus = managedProcessReaper!.status();
       const owner = hostManager?.getManagedProcessOwnerState();
-      const capability = projectManagedProcessCapability({
+      const capabilityInput = {
         platform: process.platform,
         arch: process.arch,
         reaperReady: reaperStatus.ready,
@@ -280,11 +283,13 @@ for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => server.clos
         ownerReady: owner?.ready === true && Boolean(owner.hostInstanceId),
         windowsRelease: os.release(),
         windowsVersion: os.version(),
-      });
+      };
+      const capability = projectManagedProcessCapability(capabilityInput);
       return {
         enabled: capability.ready,
         reaperReady: reaperStatus.ready,
         capability,
+        containmentCapability: projectProcessContainmentCapability(capabilityInput),
         ...(windowsManagedProcessHelper?.ok ? { windowsHelper: windowsManagedProcessHelper.descriptor } : {}),
       };
     }
@@ -564,10 +569,10 @@ for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => server.clos
 
   assert.ok(status.sessionFile && fs.existsSync(status.sessionFile), "Agent session file was unavailable");
   const persistedSession = fs.readFileSync(status.sessionFile!, "utf8");
-  assert.equal(persistedSession.includes("managed-e2e-fixture.mjs"), false, "raw process command entered JSONL");
-  assert.equal(persistedSession.includes("electron-input"), false, "managed stdin or output entered JSONL");
-  assert.match(persistedSession, /Sensitive managed process result was not saved/);
-  log("Agent managed process tools, UI control, Browser evidence, stop barrier and JSONL redaction passed");
+  assert.equal(persistedSession.includes("managed-e2e-fixture.mjs"), true, "raw process command entered JSONL");
+  assert.equal(persistedSession.includes("electron-input"), true, "managed stdin or output entered JSONL");
+  assert.doesNotMatch(persistedSession, /Sensitive managed process result was not saved/);
+  log("Agent managed process tools, UI control, Browser evidence, stop barrier and original JSONL history passed");
 
   browserService.revokeSession(sessionId);
   await waitFor(

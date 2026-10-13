@@ -39,6 +39,8 @@ export default defineConfig([
       "agent-host": "src/agent-host/index.ts",
       "plugin-worker": "src/agent-host/plugin-worker.ts",
       "managed-process-worker": "src/agent-host/managed-process/worker.ts",
+      "mcp-stdio-launcher": "src/agent-host/mcp/stdio-launcher.ts",
+      "mcp-runtime-fixture": "src/agent-host/mcp/runtime-fixture.ts",
     },
     format: ["esm"],
     platform: "node",
@@ -52,6 +54,7 @@ export default defineConfig([
       "@earendil-works/pi-ai",
       "@earendil-works/pi-agent-core",
       "@earendil-works/pi-tui",
+      "@earendil-works/pi-mcp",
       // Keep the adjacent silk.wasm asset resolvable from the packaged dependency.
       "silk-wasm",
     ],

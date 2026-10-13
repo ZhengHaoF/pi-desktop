@@ -1,3 +1,4 @@
+import type { AdvancedModelSettings, AutoRoutingConfig, CatalogModel, ModelSettingsSnapshot } from "./model-settings";
 import type {
   AgentCommand,
   AgentEvent,
@@ -68,9 +69,66 @@ import type {
   HerdrDiagnostics,
 } from "./herdr";
 
+import type { PiRuntimeProbeResult } from "./runtime";
+import type { CredentialMutationOptions } from "./auth";
+import type { ExecutionHistoryPage, ExecutionQuery, ExecutionContentChunk } from "./executions";
+import type {
+  McpConfigurationSnapshot,
+  McpScope,
+  McpServerConfig,
+  McpPanelSnapshot,
+  McpTarget,
+  McpOAuthSnapshot,
+  McpResourcePage,
+} from "./mcp";
+
 /** Request/response API surface (replaces HTTP routes). */
 export interface Api {
+  "mcp.config.get": { params: { scope: McpScope; cwd?: string }; result: McpConfigurationSnapshot };
+  "mcp.config.upsert": {
+    params: { scope: McpScope; cwd?: string; name: string; config: McpServerConfig; expectedRevision: string };
+    result: McpConfigurationSnapshot;
+  };
+  "mcp.config.remove": {
+    params: { scope: McpScope; cwd?: string; name: string; expectedRevision: string };
+    result: McpConfigurationSnapshot;
+  };
+  "mcp.import.preview": {
+    params: { scope: McpScope; cwd?: string; json: string };
+    result: { entries: string[]; conflicts: string[] };
+  };
+  "mcp.import.apply": {
+    params: { scope: McpScope; cwd?: string; json: string; expectedRevision: string };
+    result: McpConfigurationSnapshot;
+  };
+  "mcp.snapshot": { params: { sessionId: string }; result: McpPanelSnapshot };
+  "mcp.probe": { params: McpTarget & { requestId: string }; result: McpPanelSnapshot };
+  "mcp.probe.cancel": { params: { requestId: string }; result: { ok: true } };
+  "mcp.reconnect": { params: { sessionId: string; name: string }; result: McpPanelSnapshot };
+  "mcp.grants": { params: { sessionId: string; toolNames: string[] }; result: McpPanelSnapshot };
+  "mcp.declarations": { params: { sessionId: string; toolNames: string[] }; result: McpPanelSnapshot };
+  "mcp.extension.update": {
+    params: { sessionId: string; name: string; config: McpServerConfig; expectedRevision: string };
+    result: McpPanelSnapshot;
+  };
+  "mcp.resources": { params: McpTarget & { cursor?: string; templateCursor?: string }; result: McpResourcePage };
+  "mcp.resource.read": {
+    params: McpTarget & { uri: string };
+    result: { content?: unknown; preview?: string; hash?: string; bytes?: number };
+  };
+  "mcp.resource.content": { params: { hash: string; offset: number }; result: ExecutionContentChunk };
+  "mcp.oauth.start": { params: McpTarget; result: McpOAuthSnapshot };
+  "mcp.oauth.get": { params: { requestId: string }; result: McpOAuthSnapshot };
+  "mcp.oauth.submit": { params: { requestId: string; callbackUrl: string }; result: McpOAuthSnapshot };
+  "mcp.oauth.cancel": { params: { requestId: string }; result: McpOAuthSnapshot };
+  "mcp.oauth.logout": { params: McpTarget; result: { ok: true } };
+  "sessions.executions": { params: { id: string; leafId?: string } & ExecutionQuery; result: ExecutionHistoryPage };
+  "sessions.executionContent": {
+    params: { id: string; hash: string; maxBytes?: number; offset?: number };
+    result: { value?: unknown; chunk?: ExecutionContentChunk };
+  };
   "host.ping": { params: void; result: { ok: true; ts: number } };
+  "host.runtimeProbe": { params: void; result: PiRuntimeProbeResult };
   "host.toolchain": {
     params: { cwd: string };
     result: {
@@ -188,7 +246,7 @@ export interface Api {
     result: EntryContentResult;
   };
   "sessions.export": {
-    params: { id: string; format?: "md" | "json" };
+    params: { id: string; format?: "md" | "json" | "bundle" };
     result: { content: string; suggestedName: string };
   };
   "sessions.delete": { params: { id: string; force?: boolean }; result: { ok: true } };
@@ -228,6 +286,8 @@ export interface Api {
       message?: string;
       provider?: string;
       modelId?: string;
+      /** False for an automatically displayed default; it must not dismiss a restore warning. */
+      modelSelectionExplicit?: boolean;
       toolNames?: string[];
       thinkingLevel?: string;
       [key: string]: unknown;
@@ -402,6 +462,21 @@ export interface Api {
     };
     result: ModelPreferencesResult;
   };
+  "models.routing.get": { params: void; result: ModelSettingsSnapshot<AutoRoutingConfig> };
+  "models.routing.set": {
+    params: { config: AutoRoutingConfig; expectedVersion: string; cwd?: string };
+    result: ModelSettingsSnapshot<AutoRoutingConfig>;
+  };
+  "settings.advanced.get": { params: void; result: ModelSettingsSnapshot<AdvancedModelSettings> };
+  "settings.advanced.set": {
+    params: { config: AdvancedModelSettings; expectedVersion: string };
+    result: ModelSettingsSnapshot<AdvancedModelSettings>;
+  };
+  "models.catalog": { params: { cwd?: string } | void; result: { models: CatalogModel[] } };
+  "models.test": {
+    params: { provider: string; modelId: string; type: "chat" | "classifier" | "image"; cwd?: string };
+    result: TestResult;
+  };
   "modelsConfig.get": { params: void; result: ModelsConfigSnapshot };
   "modelsConfig.set": {
     params: { config: ModelsConfig; expectedVersion: string };
@@ -438,21 +513,21 @@ export interface Api {
   "auth.providers": { params: void; result: { providers: ProviderStatus[] } };
   "auth.allProviders": { params: void; result: { providers: ApiKeyProviderStatus[] } };
   "auth.setApiKey": {
-    params: { provider: string; key: string };
+    params: { provider: string; key: string } & CredentialMutationOptions;
     result: CredentialMutationResult;
   };
   "auth.deleteApiKey": {
-    params: { provider: string };
+    params: { provider: string; expectedVersion?: string };
     result: CredentialMutationResult;
   };
-  "auth.logout": { params: { provider: string }; result: CredentialMutationResult };
+  "auth.logout": { params: { provider: string; expectedVersion?: string }; result: CredentialMutationResult };
   "auth.loginSubmit": {
     params: { provider: string; token: string; code: string };
     result: { ok: true };
   };
   /** Kick off OAuth login; progress arrives on Streams["auth.login"]. */
   "auth.loginStart": {
-    params: { provider: string };
+    params: { provider: string; authType?: "oauth" | "api_key" } & CredentialMutationOptions;
     result: { ok: true; started: boolean };
   };
   "auth.loginCancel": {
@@ -503,6 +578,9 @@ export interface Api {
 
 /** Server-push streams delivered over MessagePort RPC. */
 export interface Streams {
+  "mcp.changed": { sessionId: string; instances: import("./mcp").McpInstanceSnapshot[] };
+  "mcp.oauth": McpOAuthSnapshot;
+  "mcp.settings": { sessionId: string };
   "agent.events": AgentEvent;
   "agent.running": RunningStateEvent;
   "auth.login": LoginProgressEvent;

@@ -4,6 +4,9 @@ import { useI18n } from "@/i18n";
 import { call, subscribeAuthLogin } from "@/lib/api-client";
 import type { ProviderStatus as OAuthProvider, LoginProgressEvent } from "@contract/types";
 import { type ModelSelectionControl, ManagedModelsControl } from "./ManagedModelsControl";
+import { AuthReplacementNotice } from "./AuthReplacementNotice";
+import type { CredentialMutationOptions } from "@contract/auth";
+import { oauthProviderName, authPromptLabel } from "./provider-display";
 
 type OAuthLoginState =
   | { phase: "idle" }
@@ -16,7 +19,7 @@ type OAuthLoginState =
       intervalSeconds: number | null;
       expiresInSeconds: number | null;
     }
-  | { phase: "prompt"; message: string; placeholder: string | null; token: string }
+  | { phase: "prompt"; message: string; placeholder: string | null; token: string; secret: boolean }
   | { phase: "select"; message: string; options: { id: string; label: string }[]; token: string }
   | { phase: "progress"; message: string }
   | { phase: "success"; message?: string; warning?: boolean }
@@ -24,16 +27,21 @@ type OAuthLoginState =
 
 export function OAuthDetail({
   provider,
+  authType = "oauth",
   onRefresh,
+  onReloadCredentials,
   modelSelection,
 }: {
   provider: OAuthProvider;
+  authType?: "oauth" | "api_key";
   onRefresh: () => void;
+  onReloadCredentials?: () => void;
   modelSelection: ModelSelectionControl;
 }) {
   const { t } = useI18n();
   const [loginState, setLoginState] = useState<OAuthLoginState>({ phase: "idle" });
   const [inputValue, setInputValue] = useState("");
+  const [replacement, setReplacement] = useState<{ version?: string } | null>(null);
   const progressUnsubRef = useRef<(() => void) | null>(null);
   const challengeRef = useRef<string | null>(null);
   const submissionRef = useRef<{ attempt: number; token: string } | null>(null);
@@ -59,6 +67,7 @@ export function OAuthDetail({
     loginAttemptRef.current += 1;
     setLoginState({ phase: "idle" });
     setInputValue("");
+    setReplacement(null);
     closeProgress();
     challengeRef.current = null;
     return () => {
@@ -67,114 +76,132 @@ export function OAuthDetail({
       challengeRef.current = null;
       void call("auth.loginCancel", { provider: providerId }).catch(() => {});
     };
-  }, [closeProgress, provider.id]);
+  }, [closeProgress, provider.id, authType]);
 
-  const handleLogin = useCallback(async () => {
-    const attempt = loginAttemptRef.current + 1;
-    loginAttemptRef.current = attempt;
-    closeProgress();
-    challengeRef.current = null;
-    setLoginState({ phase: "connecting" });
-    setInputValue("");
-
-    try {
-      // Do not race cancellation with startup: a late cancel would abort the
-      // brand-new OAuth flow and make the Login button appear unresponsive.
-      await call("auth.loginCancel", { provider: provider.id });
-    } catch (error) {
-      if (loginAttemptRef.current !== attempt) return;
-      setLoginState({
-        phase: "error",
-        message: error instanceof Error ? error.message : t("modelUnableResetLogin", "Unable to reset login"),
-      });
-      return;
-    }
-    if (loginAttemptRef.current !== attempt) return;
-
-    let startRequested = false;
-    const acceptChallenge = (token: string) => {
-      if (challengeRef.current !== token) setInputValue("");
-      challengeRef.current = token;
-    };
-    const finishProgress = () => {
-      loginAttemptRef.current += 1;
-      challengeRef.current = null;
+  const handleLogin = useCallback(
+    async (mutation: CredentialMutationOptions = {}) => {
+      const attempt = loginAttemptRef.current + 1;
+      loginAttemptRef.current = attempt;
       closeProgress();
-    };
-    try {
-      const unsubscribe = await subscribeAuthLogin(provider.id, (data: LoginProgressEvent) => {
-        if (loginAttemptRef.current !== attempt || !startRequested) return;
-        if (data.type === "auth") {
-          acceptChallenge(data.token);
-          setLoginState({ phase: "auth", url: data.url, instructions: data.instructions ?? null, token: data.token });
-          // Single open path (ISSUE-008): prefer desktop openExternal
-          if (data.url) {
-            void (
-              window.piBridge?.openExternal(data.url) ??
-              Promise.resolve(window.open(data.url, "_blank", "noopener,noreferrer"))
-            );
-          }
-        } else if (data.type === "device_code") {
-          setLoginState({
-            phase: "device_code",
-            userCode: data.userCode,
-            verificationUri: data.verificationUri,
-            intervalSeconds: data.intervalSeconds ?? null,
-            expiresInSeconds: data.expiresInSeconds ?? null,
-          });
-          if (data.verificationUri) {
-            void (
-              window.piBridge?.openExternal(data.verificationUri) ??
-              Promise.resolve(window.open(data.verificationUri, "_blank", "noopener,noreferrer"))
-            );
-          }
-        } else if (data.type === "prompt_request") {
-          acceptChallenge(data.token);
-          setLoginState({
-            phase: "prompt",
-            message: data.message,
-            placeholder: data.placeholder ?? null,
-            token: data.token,
-          });
-        } else if (data.type === "select_request") {
-          acceptChallenge(data.token);
-          setLoginState({ phase: "select", message: data.message, options: data.options ?? [], token: data.token });
-        } else if (data.type === "progress") {
-          setLoginState({ phase: "progress", message: data.message });
-        } else if (data.type === "success") {
-          finishProgress();
-          setInputValue("");
-          setLoginState({
-            phase: "success",
-            ...(data.warning ? { message: data.warning.message, warning: true } : {}),
-          });
-          onRefresh();
-        } else if (data.type === "error") {
-          finishProgress();
-          setLoginState({ phase: "error", message: data.message });
-        } else if (data.type === "cancelled") {
-          finishProgress();
-          setLoginState({ phase: "idle" });
-        }
-      });
-      if (loginAttemptRef.current !== attempt) {
-        unsubscribe();
+      challengeRef.current = null;
+      setLoginState({ phase: "connecting" });
+      setInputValue("");
+
+      try {
+        // Do not race cancellation with startup: a late cancel would abort the
+        // brand-new OAuth flow and make the Login button appear unresponsive.
+        await call("auth.loginCancel", { provider: provider.id });
+      } catch (error) {
+        if (loginAttemptRef.current !== attempt) return;
+        setLoginState({
+          phase: "error",
+          message: error instanceof Error ? error.message : t("modelUnableResetLogin", "Unable to reset login"),
+        });
         return;
       }
-      progressUnsubRef.current = unsubscribe;
-      startRequested = true;
-      const result = await call("auth.loginStart", { provider: provider.id });
       if (loginAttemptRef.current !== attempt) return;
-      if (!result.started) throw new Error("An OAuth login is already active. Cancel it and try again.");
-    } catch (error) {
-      if (loginAttemptRef.current !== attempt) return;
-      finishProgress();
-      setLoginState({
-        phase: "error",
-        message: error instanceof Error ? error.message : t("modelConnectionLost", "Connection lost"),
-      });
+
+      let startRequested = false;
+      const acceptChallenge = (token: string) => {
+        if (challengeRef.current !== token) setInputValue("");
+        challengeRef.current = token;
+      };
+      const finishProgress = () => {
+        loginAttemptRef.current += 1;
+        challengeRef.current = null;
+        closeProgress();
+      };
+      try {
+        const unsubscribe = await subscribeAuthLogin(provider.id, (data: LoginProgressEvent) => {
+          if (loginAttemptRef.current !== attempt || !startRequested) return;
+          if (data.type === "auth") {
+            acceptChallenge(data.token);
+            setLoginState({ phase: "auth", url: data.url, instructions: data.instructions ?? null, token: data.token });
+            // Single open path (ISSUE-008): prefer desktop openExternal
+            if (data.url) {
+              void (
+                window.piBridge?.openExternal(data.url) ??
+                Promise.resolve(window.open(data.url, "_blank", "noopener,noreferrer"))
+              );
+            }
+          } else if (data.type === "device_code") {
+            setLoginState({
+              phase: "device_code",
+              userCode: data.userCode,
+              verificationUri: data.verificationUri,
+              intervalSeconds: data.intervalSeconds ?? null,
+              expiresInSeconds: data.expiresInSeconds ?? null,
+            });
+            if (data.verificationUri) {
+              void (
+                window.piBridge?.openExternal(data.verificationUri) ??
+                Promise.resolve(window.open(data.verificationUri, "_blank", "noopener,noreferrer"))
+              );
+            }
+          } else if (data.type === "prompt_request") {
+            acceptChallenge(data.token);
+            setLoginState({
+              phase: "prompt",
+              message: data.message,
+              placeholder: data.placeholder ?? null,
+              token: data.token,
+              secret: data.secret,
+            });
+          } else if (data.type === "select_request") {
+            acceptChallenge(data.token);
+            setLoginState({ phase: "select", message: data.message, options: data.options ?? [], token: data.token });
+          } else if (data.type === "progress") {
+            setLoginState({ phase: "progress", message: data.message });
+          } else if (data.type === "success") {
+            finishProgress();
+            setInputValue("");
+            setLoginState({
+              phase: "success",
+              ...(data.warning ? { message: data.warning.message, warning: true } : {}),
+            });
+            onRefresh();
+          } else if (data.type === "error") {
+            finishProgress();
+            setLoginState({ phase: "error", message: data.message });
+            onReloadCredentials?.();
+          } else if (data.type === "cancelled") {
+            finishProgress();
+            setLoginState({ phase: "idle" });
+            onReloadCredentials?.();
+          }
+        });
+        if (loginAttemptRef.current !== attempt) {
+          unsubscribe();
+          return;
+        }
+        progressUnsubRef.current = unsubscribe;
+        startRequested = true;
+        const result = await call("auth.loginStart", {
+          provider: provider.id,
+          ...(authType === "api_key" ? { authType } : {}),
+          ...mutation,
+        });
+        if (loginAttemptRef.current !== attempt) return;
+        if (!result.started) throw new Error("A login is already active. Cancel it and try again.");
+      } catch (error) {
+        if (loginAttemptRef.current !== attempt) return;
+        finishProgress();
+        setLoginState({
+          phase: "error",
+          message: error instanceof Error ? error.message : t("modelConnectionLost", "Connection lost"),
+        });
+      }
+    },
+    [closeProgress, provider.id, authType, onRefresh, onReloadCredentials, t],
+  );
+
+  const requestLogin = useCallback(() => {
+    if (provider.storedAuthType && provider.storedAuthType !== authType) {
+      setReplacement({ version: provider.credentialVersion });
+      return;
     }
-  }, [closeProgress, provider.id, onRefresh, t]);
+    void handleLogin(provider.credentialVersion ? { expectedVersion: provider.credentialVersion } : {});
+  }, [provider.storedAuthType, provider.credentialVersion, authType, handleLogin]);
 
   const handleCancelLogin = useCallback(() => {
     loginAttemptRef.current += 1;
@@ -183,11 +210,15 @@ export function OAuthDetail({
     setLoginState({ phase: "idle" });
     setInputValue("");
     void call("auth.loginCancel", { provider: provider.id }).catch(() => {});
-  }, [closeProgress, provider.id]);
+    onReloadCredentials?.();
+  }, [closeProgress, provider.id, onReloadCredentials]);
 
   const handleLogout = useCallback(async () => {
     try {
-      const result = await call("auth.logout", { provider: provider.id });
+      const result = await call(authType === "oauth" ? "auth.logout" : "auth.deleteApiKey", {
+        provider: provider.id,
+        ...(provider.credentialVersion ? { expectedVersion: provider.credentialVersion } : {}),
+      });
       setLoginState(
         result.warning
           ? { phase: "success", message: result.warning.message, warning: true }
@@ -196,8 +227,9 @@ export function OAuthDetail({
       onRefresh();
     } catch (error) {
       setLoginState({ phase: "error", message: error instanceof Error ? error.message : String(error) });
+      onReloadCredentials?.();
     }
-  }, [provider.id, onRefresh, t]);
+  }, [provider.id, provider.credentialVersion, authType, onRefresh, onReloadCredentials, t]);
 
   const submitChallenge = useCallback(
     async (token: string, code: string, message: string, clearInput: boolean) => {
@@ -253,7 +285,11 @@ export function OAuthDetail({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <SectionTitle>{t("modelSubscription", "Subscription")}</SectionTitle>
+        <SectionTitle>
+          {authType === "oauth"
+            ? t("modelSubscription", "Subscription")
+            : t("modelGuidedLogin", "Guided API key setup")}
+        </SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span
             style={{
@@ -265,7 +301,13 @@ export function OAuthDetail({
             }}
           />
           <span style={{ fontSize: 11, color: provider.loggedIn ? "#4ade80" : "var(--text-dim)" }}>
-            {provider.loggedIn ? t("modelConnected", "connected") : t("modelNotConnected", "not connected")}
+            {authType === "api_key"
+              ? provider.loggedIn
+                ? t("modelCredentialsSaved", "Credentials saved")
+                : t("modelCredentialsNotSaved", "No saved credentials")
+              : provider.loggedIn
+                ? t("modelConnected", "connected")
+                : t("modelNotConnected", "not connected")}
           </span>
         </div>
       </div>
@@ -274,14 +316,21 @@ export function OAuthDetail({
       <div style={{ minHeight: 48 }}>
         {loginState.phase === "idle" && (
           <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
-            {provider.loggedIn
-              ? t("modelAlreadyConnected", "Already connected. You can re-login or disconnect.")
-              : t("modelConnectAccount", "Connect your {provider} account.").replace("{provider}", provider.name)}
+            {authType === "api_key"
+              ? t("modelKeyWizardHelp", "Follow the steps to enter this provider’s key and account identifiers.")
+              : provider.loggedIn
+                ? t("modelAlreadyConnected", "Already connected. You can re-login or disconnect.")
+                : t("modelConnectAccount", "Connect your {provider} account.").replace(
+                    "{provider}",
+                    oauthProviderName(provider.id, provider.name, t),
+                  )}
           </p>
         )}
         {loginState.phase === "connecting" && (
           <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>
-            {t("modelOpeningBrowser", "Opening browser…")}
+            {authType === "oauth"
+              ? t("modelOpeningBrowser", "Opening browser…")
+              : t("modelStartingLogin", "Starting sign-in…")}
           </p>
         )}
         {loginState.phase === "select" && (
@@ -317,7 +366,7 @@ export function OAuthDetail({
                     "modelCompleteSignIn",
                     "Complete sign-in in the browser, then copy the redirect URL from the address bar and paste it below.",
                   )
-                : loginState.message}
+                : authPromptLabel(loginState.message, t)}
             </p>
             {loginState.phase === "auth" && (
               <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
@@ -335,6 +384,9 @@ export function OAuthDetail({
             )}
             <div style={{ display: "flex", gap: 6 }}>
               <input
+                type={loginState.phase === "prompt" && loginState.secret ? "password" : "text"}
+                autoComplete="off"
+                spellCheck={false}
                 ref={inputRef}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
@@ -422,13 +474,30 @@ export function OAuthDetail({
         )}
         {loginState.phase === "success" && (
           <p style={{ margin: 0, fontSize: 12, color: loginState.warning ? "#d97706" : "#4ade80" }}>
-            {loginState.message ?? t("modelConnectedSuccessfully", "Connected successfully.")}
+            {loginState.message ??
+              (authType === "api_key"
+                ? t("modelCredentialsSaved", "Credentials saved")
+                : t("modelConnectedSuccessfully", "Connected successfully."))}
           </p>
         )}
         {loginState.phase === "error" && (
           <p style={{ margin: 0, fontSize: 12, color: "#f87171" }}>{loginState.message}</p>
         )}
       </div>
+
+      {replacement && (
+        <AuthReplacementNotice
+          onCancel={() => setReplacement(null)}
+          onConfirm={() => {
+            const mutation = {
+              replaceExisting: true,
+              ...(replacement.version ? { expectedVersion: replacement.version } : {}),
+            };
+            setReplacement(null);
+            void handleLogin(mutation);
+          }}
+        />
+      )}
 
       {/* Actions */}
       <div style={{ display: "flex", gap: 8 }}>
@@ -450,7 +519,7 @@ export function OAuthDetail({
         ) : (
           <>
             <button
-              onClick={handleLogin}
+              onClick={requestLogin}
               style={{
                 padding: "5px 14px",
                 background: "var(--accent)",
@@ -462,7 +531,11 @@ export function OAuthDetail({
                 fontWeight: 600,
               }}
             >
-              {provider.loggedIn ? t("modelRelogin", "Re-login") : t("modelLogin", "Login")}
+              {authType === "api_key"
+                ? t("modelConfigureCredentials", "Configure credentials")
+                : provider.loggedIn
+                  ? t("modelRelogin", "Re-login")
+                  : t("modelLogin", "Login")}
             </button>
             {provider.loggedIn && (
               <button

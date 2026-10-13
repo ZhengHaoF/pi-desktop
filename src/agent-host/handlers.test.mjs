@@ -1,4 +1,5 @@
 import { importTestBundle } from "#test-bundle";
+import { extractInterfaceProperties } from "../../scripts/check-contract-coverage.mjs";
 import assert from "node:assert/strict";
 import {
   existsSync,
@@ -35,7 +36,7 @@ async function loadHandlersModule() {
       absWorkingDir: root,
       stdin: {
         contents:
-          'export * from "./handlers.ts"; export { setDesktopSessionToolNames } from "./session-tool-store.ts"; export {createRpcServer, createRpcClient} from "../contract/rpc.ts";',
+          'export * from "./handlers.ts"; export { setDesktopSessionToolNames } from "./session-tool-store.ts"; export {createRpcServer, createRpcClient} from "../contract/rpc.ts"; export {ExecutionLogStore} from "./execution-log-store.ts";',
         resolveDir: import.meta.dirname,
         loader: "ts",
       },
@@ -452,10 +453,15 @@ test("model config saves reject payloads the runtime would drop and keep the pre
 
 test("registerHandlers exposes every contract method exactly once", async () => {
   const { handlers } = await captureHandlers();
-  // Keep in sync with src/contract/api.ts: one handler per contract method.
-  assert.equal(Object.keys(handlers).length, 108);
+  const expected = extractInterfaceProperties(
+    "api.ts",
+    readFileSync(path.join(root, "src/contract/api.ts"), "utf8"),
+    "Api",
+  );
+  assert.deepEqual(Object.keys(handlers).sort(), expected.sort());
   for (const method of [
     "host.ping",
+    "host.runtimeProbe",
     "host.toolchain",
     "sessions.list",
     "sessions.contextPage",
@@ -846,6 +852,54 @@ test("default thinking levels persist per model and globally in Pi settings", as
   await handlers["auth.deleteApiKey"]({ provider: "openai" });
 });
 
+test("model projection retains an unavailable default reference instead of authorizing a replacement implicitly", async () => {
+  const { projectModelsList } = await loadHandlersModule();
+  const model = { id: "other", name: "Other", provider: "other", reasoning: false };
+  const result = await projectModelsList(
+    { getProviders: () => [{ id: "other" }], getAvailableSnapshot: () => [model], getAvailable: async () => [model] },
+    {
+      getEnabledModels: () => undefined,
+      getDefaultProvider: () => "azure-openai-responses",
+      getDefaultModel: () => "legacy",
+    },
+    { source: "cache", refreshed: false, aborted: false, warnings: [] },
+  );
+  assert.deepEqual(result.defaultModel, { provider: "azure-openai-responses", modelId: "legacy" });
+  assert.deepEqual(
+    result.models.map((model) => model.provider),
+    ["other"],
+  );
+});
+
+test("automatic titles stay local when the selected provider/model cannot be resolved", async () => {
+  const { generateSessionTitleWithFallback } = await loadHandlersModule();
+  let requests = 0,
+    fallthrough = 0;
+  const title = await generateSessionTitleWithFallback(
+    async () => ({
+      modelRuntime: {
+        getModel: () => undefined,
+        getAvailableSnapshot() {
+          fallthrough++;
+          return [{ provider: "other", id: "other" }];
+        },
+        hasConfiguredAuth: () => true,
+        completeSimple: async () => {
+          requests++;
+          return { content: [{ type: "text", text: "OTHER_PROVIDER_TITLE" }] };
+        },
+      },
+      settingsManager: { getDefaultProvider: () => "azure-openai-responses", getDefaultModel: () => "legacy" },
+    }),
+    "Keep this message local",
+    "azure-openai-responses",
+    "legacy",
+  );
+  assert.equal(requests, 0);
+  assert.equal(fallthrough, 0);
+  assert.notEqual(title, "OTHER_PROVIDER_TITLE");
+});
+
 test("file, git, worktree, skill, plugin, and system handlers return contract-shaped results", async (t) => {
   const base = mkdtempSync(path.join(tmpdir(), "pi-handler-test-"));
   t.after(() => rmSync(base, { recursive: true, force: true }));
@@ -1037,6 +1091,48 @@ test("file routes retain canonical and exact-session-reference authorization aft
   );
 });
 
+test("execution RPC validates budgets, exports original history and removes owned content with the session", async () => {
+  const { handlers } = await captureHandlers();
+  const { ExecutionLogStore } = await loadHandlersModule();
+  for (const query of [{ limit: NaN }, { limit: 201 }, { maxContentBytes: -1 }, { includeContent: "yes" }])
+    await assert.rejects(
+      handlers["sessions.executions"]({ id: "missing", ...query }),
+      (error) => error.code === "BAD_REQUEST",
+    );
+  const manager = SessionManager.create(isolatedAgentDirectory, process.env.PI_CODING_AGENT_SESSION_DIR);
+  manager.appendMessage({ role: "user", content: "Original history fixture", timestamp: Date.now() });
+  const id = manager.getSessionId(),
+    store = new ExecutionLogStore(id);
+  const result = await store.payload({ text: "RPC_ORIGINAL_" + "x".repeat(64 * 1024) });
+  await store.append({
+    executionId: "rpc-fixture",
+    runId: "run",
+    toolCallId: "call",
+    rootToolCallId: "call",
+    anchorEntryId: manager.getLeafId(),
+    source: "local",
+    toolName: "fixture",
+    status: "succeeded",
+    requestedAt: 1,
+    result,
+  });
+  const page = await handlers["sessions.executions"]({ id, includeContent: true });
+  assert.match(page.records[0].result.value.text, /^RPC_ORIGINAL_/);
+  const content = await handlers["sessions.executionContent"]({ id, hash: result.ref.hash });
+  assert.equal(content.value.text, page.records[0].result.value.text);
+  await assert.rejects(
+    handlers["sessions.executionContent"]({ id, hash: result.ref.hash, maxBytes: NaN }),
+    (error) => error.code === "BAD_REQUEST",
+  );
+  const bundle = JSON.parse((await handlers["sessions.export"]({ id, format: "bundle" })).content);
+  assert.match(bundle.sessionJsonl, /Original history fixture/);
+  assert.equal(bundle.executionHistory.content[result.ref.hash].text, content.value.text);
+  await handlers["sessions.delete"]({ id });
+  assert.equal(existsSync(manager.getSessionFile()), false);
+  assert.deepEqual((await store.readLatest()).records, []);
+  await assert.rejects(store.readContent(result.ref.hash, 131072), /ENOENT/);
+});
+
 test("session, model configuration, and auth handlers isolate state and preserve error codes", async () => {
   const { handlers } = await captureHandlers();
 
@@ -1169,10 +1265,7 @@ test("session, model configuration, and auth handlers isolate state and preserve
 
   const modelsPath = path.join(isolatedAgentDirectory, "models.json");
   writeFileSync(modelsPath, "{broken json", "utf8");
-  assert.throws(
-    () => handlers["modelsConfig.get"](),
-    (error) => error.code === "PARSE_ERROR",
-  );
+  await assert.rejects(handlers["modelsConfig.get"](), (error) => error.code === "PARSE_ERROR");
   assert.equal(readFileSync(modelsPath, "utf8"), "{broken json");
 });
 

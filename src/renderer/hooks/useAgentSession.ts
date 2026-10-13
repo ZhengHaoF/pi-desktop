@@ -1,3 +1,5 @@
+import { sessionModelForDisplay, sessionStatsForDisplay } from "@shared/session-model-display";
+import type { ThinkingLevelOption } from "@shared/thinking-levels";
 import { useState, useCallback, useRef, useEffect, useReducer } from "react";
 import type { AgentMessage, ExtensionUiRequest, SessionInfo, SessionTreeNode } from "@/lib/types";
 import type { AgentEvent, SessionDetail, SessionRuntimeState } from "@contract/types";
@@ -7,6 +9,7 @@ import { normalizeToolCalls } from "@/lib/normalize";
 import { sendAgentCommand } from "@/lib/agent-client";
 import { agentState, newAgent } from "@/lib/api-client";
 import { getToolNamesForPreset, getPresetFromTools } from "@/lib/tool-presets";
+import type { ToolPreset } from "@shared/tool-presets";
 import type { SessionStatsInfo } from "@/lib/pi-types";
 import { useSessionEvents } from "./useSessionEvents";
 import { requestAutoSessionTitle, shouldAutoTitleMessage } from "../lib/auto-session-title";
@@ -56,7 +59,7 @@ export type BuiltinSlashCommandResult =
 export interface UseAgentSessionOptions {
   session: SessionInfo | null;
   newSessionCwd: string | null;
-  onAgentEnd?: () => void;
+  onAgentEnd?: (aborted: boolean) => void;
   onSessionCreated?: (session: SessionInfo) => void;
   onSessionForked?: (newSessionId: string) => void;
   modelsRefreshKey?: number;
@@ -69,10 +72,10 @@ export interface UseAgentSessionOptions {
   onSystemPromptChange?: (prompt: string | null) => void;
   presentationStore?: SessionPresentationStore;
   onSessionStatsPanelOpen?: () => void;
-  setToolPreset?: (preset: "none" | "default" | "full") => void;
+  setToolPreset?: (preset: ToolPreset) => void;
 }
 
-export type ThinkingLevelOption = "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type { ThinkingLevelOption } from "@shared/thinking-levels";
 
 const PROMPT_SETTLE_INITIAL_DELAY_MS = 800;
 const PROMPT_SETTLE_POLL_MS = 600;
@@ -159,6 +162,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const sessionIdRef = useRef<string | null>(session?.id ?? null);
   const [runtimeGate] = useState(() => new SessionRuntimeGate());
   const agentRunningRef = useRef(false);
+  const agentAbortedRef = useRef(false);
   const loadSessionRef = useRef<((sid: string) => Promise<unknown>) | null>(null);
   const {
     ensureEventsConnected,
@@ -210,7 +214,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     queuedMessages,
   } = turnState;
   const dispatch = useCallback((action: StreamAction) => dispatchTurn({ type: "stream", action }), []);
-  const [toolPreset, setToolPreset] = useState<"none" | "default" | "full">("default");
+  const [toolPreset, setToolPreset] = useState<ToolPreset>("default");
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevelOption>("auto");
   const [contextUsage, setContextUsage] = useState<{
     percent: number | null;
@@ -261,6 +265,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     (snapshot: SessionDetail["agentState"], ticket: RuntimeSnapshotTicket) => {
       const liveState = snapshot?.state;
       if (liveState) {
+        if (liveState.agentSettled && runtimeGate.isCurrent(ticket, "run"))
+          agentAbortedRef.current = liveState.agentSettled.aborted;
         if (liveState.contextUsage !== undefined && runtimeGate.accept(ticket, "usage"))
           setContextUsage(liveState.contextUsage ?? null);
         if (liveState.systemPrompt !== undefined && runtimeGate.accept(ticket, "systemPrompt"))
@@ -354,18 +360,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     initialScrollDoneRef,
   } = viewport;
 
-  const currentModel = currentModelOverride ?? data?.context.model ?? pendingModel ?? null;
+  const currentModel = sessionModelForDisplay(currentModelOverride, data, modelList, pendingModel);
   const displayModel = isNew ? (newSessionModel ?? newSessionDefaultModel) : currentModel;
 
-  const sessionStats = (() => {
-    const stats = sessionStatsOverride ?? data?.stats;
-    if (!stats) return null;
-    return {
-      ...stats,
-      sessionName: data?.info ? data.info.name : (stats.sessionName ?? session?.name),
-      ...(contextUsage ? { contextUsage } : {}),
-    };
-  })();
+  const sessionStats = sessionStatsForDisplay(sessionStatsOverride, data, session?.name, contextUsage);
   useSessionPresentation(opts.presentationStore, {
     sessionId: sessionIdRef.current,
     info: data?.info ?? session,
@@ -422,7 +420,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         cwd: newSessionCwd,
         type: "ensure_session",
         toolNames,
-        ...(selectedModel ? { provider: selectedModel.provider, modelId: selectedModel.modelId } : {}),
+        ...(selectedModel
+          ? {
+              provider: selectedModel.provider,
+              modelId: selectedModel.modelId,
+              modelSelectionExplicit: newSessionModel !== null,
+            }
+          : {}),
         ...(thinkingLevel !== "auto" ? { thinkingLevel } : {}),
       });
       const realId = result.sessionId;
@@ -487,7 +491,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         agentRunningRef.current = false;
         runtimeGate.beginRun();
         dispatchTurn({ type: "settled" });
-        onAgentEnd?.();
+        onAgentEnd?.(agentAbortedRef.current);
       }
     },
     [isActive, loadSession, onAgentEnd, runtimeGate, cancelPendingSessionRefresh],
@@ -528,11 +532,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     [finishPromptWithoutStream, getViewSignal, isActive, runtimeGate],
   );
 
-  // Reconcile client streaming state with the server. When stream events are
-  // missed (renderer suspension, backgrounded tab, or a restarted Host),
-  // agent_end never arrives and the UI stays in streaming state forever.
-  // If the server reports idle while we still think it's running, finish
-  // through the same path as prompt_done.
+  // Recover missed settlement events after suspension or a Host restart.
+  // Reconcile an idle server through the same path as prompt_done.
   const reconcileAgentState = useCallback(
     async (sid: string) => {
       if (!isActive() || !agentRunningRef.current) return;
@@ -619,6 +620,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       dispatchTurn({ type: "event", event });
       switch (event.type) {
         case "channel_turn_start": {
+          agentAbortedRef.current = false;
           ownedPromptRunIdRef.current = null;
           externalTurnRunIdRef.current = typeof event.runId === "string" ? event.runId : null;
           beginExternalTurn();
@@ -633,7 +635,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           break;
         }
         case "agent_start":
+          agentAbortedRef.current = false;
           agentRunningRef.current = true;
+          break;
+        case "agent_settled":
+          // Remember the outcome, but wait for the wrapper's prompt_done before enabling another prompt.
+          if (agentRunningRef.current && typeof event.aborted === "boolean") agentAbortedRef.current = event.aborted;
           break;
         case "agent_end":
           // One Desktop prompt may have several SDK runs (retry, boundary continuation).
@@ -649,6 +656,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           break;
         }
         case "prompt_error":
+          if (event.aborted === true || agentAbortedRef.current) break;
           addNotice({
             type: "error",
             message: (event.errorMessage as string | undefined) ?? t("commandFailed", "Command failed"),
@@ -720,6 +728,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       const ownsView = captureCommandView();
       const isSlashCommandPrompt = !images?.length && trimmedMessage.startsWith("/");
       const promptRunId = promptRunIdRef.current + 1;
+      agentAbortedRef.current = false;
       runtimeGate.beginRun();
 
       const imageBlocks = images?.map((img) => ({
@@ -1314,6 +1323,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
   return {
     // State
+    sessionId: sessionIdRef.current,
     data,
     loading,
     error,

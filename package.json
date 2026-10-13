@@ -1,8 +1,8 @@
 {
   "name": "@dlyzzt/pi-desktop",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
-  "description": "Pi Agent Desktop — pure Electron desktop app for the pi coding agent",
+  "description": "Pi Agent Desktop \u2014 pure Electron desktop app for the pi coding agent",
   "homepage": "https://github.com/DLYZZT/pi-desktop#readme",
   "license": "Apache-2.0",
   "productName": "Pi Agent Desktop",
@@ -46,6 +46,7 @@
     "check:architecture": "node scripts/check-architecture.mjs",
     "check:packaged-toolchains": "node scripts/verify-packaged-toolchains.mjs",
     "smoke": "node scripts/smoke-electron.mjs",
+    "test:execution-recovery": "node scripts/smoke-electron.mjs --execution-recovery",
     "test:browser-electron": "node scripts/test-browser-electron.mjs",
     "test:browser-agent-e2e": "node scripts/test-browser-agent-e2e.mjs",
     "test:build-watch": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/test-tsup-watch.mjs",
@@ -66,9 +67,10 @@
     "dist:mac:notarized": "node scripts/build-mac-release.mjs --notarize"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "0.87.1",
-    "@earendil-works/pi-coding-agent": "0.87.1",
-    "@earendil-works/pi-telemetry": "0.87.1",
+    "@earendil-works/pi-ai": "1.1.0",
+    "@earendil-works/pi-coding-agent": "1.1.0",
+    "@earendil-works/pi-mcp": "1.1.0",
+    "@earendil-works/pi-telemetry": "1.1.0",
     "@larksuiteoapi/node-sdk": "^1.71.1",
     "@lobehub/icons": "^5.6.0",
     "@rc-component/qrcode": "^2.0.0",
@@ -78,6 +80,7 @@
     "katex": "^0.16.47",
     "mammoth": "^1.12.3",
     "mermaid": "^11.17.2",
+    "proper-lockfile": "4.1.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",
@@ -95,7 +98,7 @@
     "yauzl": "3.4.0"
   },
   "overrides": {
-    "@earendil-works/pi-telemetry": "0.87.1",
+    "@earendil-works/pi-telemetry": "1.1.0",
     "@xmldom/xmldom": "0.8.15"
   },
   "devDependencies": {
@@ -104,6 +107,7 @@
     "@eslint/js": "^10.0.1",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "22.19.0",
+    "@types/proper-lockfile": "4.1.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-syntax-highlighter": "^15.5.13",
@@ -112,7 +116,7 @@
     "@types/yauzl": "3.4.0",
     "@vitejs/plugin-react": "^4.7.0",
     "electron": "43.1.1",
-    "electron-builder": "26.15.3",
+    "electron-builder": "26.15.6",
     "esbuild": "0.27.7",
     "eslint": "^10.7.0",
     "eslint-config-prettier": "^10.1.8",

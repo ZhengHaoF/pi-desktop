@@ -1,5 +1,7 @@
+import { validateModelEditorConfig } from "../model-editor-validation";
 import {
   existsSync,
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -11,7 +13,9 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { ModelRuntime, getAgentDir } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { createDesktopModelRuntime } from "../model-credentials";
+import { probeChatModel } from "../model-chat-probe";
 import type { ApiHandler } from "../../contract/rpc";
 import { RpcError, type ProviderModelInfo } from "../../contract/types";
 import { reloadSharedModelRuntimeConfig, getSharedModelRuntime } from "../model-runtime";
@@ -22,6 +26,8 @@ import {
   matchModelFacts,
   type CatalogLoadResult,
 } from "../models-dev-catalog";
+import { ensureAzureUpgrade } from "../azure-upgrade";
+import { withLockedJsonFile } from "../../shared/node/locked-json-file";
 
 function getModelsPath(): string {
   return path.join(getAgentDir(), "models.json");
@@ -76,7 +82,7 @@ async function validateModelsConfig(config: Record<string, unknown>): Promise<st
     tempDir = mkdtempSync(path.join(tmpdir(), "pi-desktop-model-validate-"));
     const modelsPath = path.join(tempDir, "models.json");
     writeFileSync(modelsPath, JSON.stringify(config, null, 2), "utf8");
-    const modelRuntime = await ModelRuntime.create({ modelsPath, allowModelNetwork: false });
+    const modelRuntime = await createDesktopModelRuntime({ modelsPath, allowModelNetwork: false });
     const rejected = providerIds.filter((providerId) => !modelRuntime.getProvider(providerId));
     if (rejected.length === 0) return undefined;
     const detail = modelRuntime.getError() ?? "";
@@ -99,36 +105,39 @@ async function validateModelsConfig(config: Record<string, unknown>): Promise<st
   }
 }
 
-function writeModelsJson(data: Record<string, unknown>, expectedVersion: string): string {
+async function writeModelsJson(data: Record<string, unknown>, expectedVersion: string): Promise<string> {
   const p = getModelsPath();
-  mkdirSync(path.dirname(p), { recursive: true });
-  const initial = readModelsFileSnapshot();
-  if (initial.version !== expectedVersion) throw modelsConfigConflict(expectedVersion, initial.version);
-  // ISSUE-009: atomic write via temp + rename; keep .bak of previous good file
-  const tmp = `${p}.${process.pid}.tmp`;
-  const bak = `${p}.bak`;
-  const serialized = JSON.stringify(data, null, 2);
-  writeFileSync(tmp, serialized, "utf8");
-  try {
-    const beforeCommit = readModelsFileSnapshot();
-    if (beforeCommit.version !== expectedVersion) throw modelsConfigConflict(expectedVersion, beforeCommit.version);
-    if (beforeCommit.raw !== null) {
-      try {
-        writeFileSync(bak, beforeCommit.raw, "utf8");
-      } catch {
-        /* ignore bak failure */
-      }
-    }
-    renameSync(tmp, p);
-  } catch (e) {
+  return withLockedJsonFile(p, async () => {
+    mkdirSync(path.dirname(p), { recursive: true, mode: 0o700 });
+    const initial = readModelsFileSnapshot();
+    if (initial.version !== expectedVersion) throw modelsConfigConflict(expectedVersion, initial.version);
+    // ISSUE-009: atomic write via temp + rename; keep .bak of previous good file
+    const tmp = `${p}.${process.pid}.tmp`;
+    const bak = `${p}.bak`;
+    const serialized = JSON.stringify(data, null, 2);
+    writeFileSync(tmp, serialized, { encoding: "utf8", mode: 0o600 });
     try {
-      unlinkSync(tmp);
-    } catch {
-      /* ignore */
+      const beforeCommit = readModelsFileSnapshot();
+      if (beforeCommit.version !== expectedVersion) throw modelsConfigConflict(expectedVersion, beforeCommit.version);
+      if (beforeCommit.raw !== null) {
+        try {
+          writeFileSync(bak, beforeCommit.raw, { encoding: "utf8", mode: 0o600 });
+          if (process.platform !== "win32") chmodSync(bak, 0o600);
+        } catch {
+          /* ignore bak failure */
+        }
+      }
+      renameSync(tmp, p);
+    } catch (e) {
+      try {
+        unlinkSync(tmp);
+      } catch {
+        /* ignore */
+      }
+      throw e;
     }
-    throw e;
-  }
-  return modelsContentVersion(serialized);
+    return modelsContentVersion(serialized);
+  });
 }
 
 type ModelConfigHandlers = {
@@ -212,7 +221,10 @@ function describeListModelsFailure(status: number | undefined, body: string): st
 }
 
 export const modelConfigHandlers = {
-  get: () => readModelsJsonSnapshot(),
+  get: async () => {
+    const azureUpgrade = await ensureAzureUpgrade();
+    return { ...readModelsJsonSnapshot(), azureUpgrade };
+  },
 
   set: async (params) => {
     const body = params as { config?: unknown; expectedVersion?: unknown };
@@ -224,13 +236,14 @@ export const modelConfigHandlers = {
     if (typeof body.expectedVersion !== "string" || !body.expectedVersion) {
       throw new RpcError({ code: "BAD_REQUEST", message: "expectedVersion is required" });
     }
+    validateModelEditorConfig(config);
     // A single invalid entry makes the SDK drop every provider, so refuse the save
     // with the exact schema complaint instead of writing a broken models.json.
     const validationError = await validateModelsConfig(config);
     if (validationError) {
       throw new RpcError({ code: "BAD_REQUEST", message: validationError });
     }
-    const version = writeModelsJson(config, body.expectedVersion);
+    const version = await writeModelsJson(config, body.expectedVersion);
     await reloadSharedModelRuntimeConfig();
     return { ok: true as const, version };
   },
@@ -269,7 +282,7 @@ export const modelConfigHandlers = {
         "utf8",
       );
 
-      const modelRuntime = await ModelRuntime.create({ modelsPath, allowModelNetwork: false });
+      const modelRuntime = await createDesktopModelRuntime({ modelsPath, allowModelNetwork: false });
       const loadError = modelRuntime.getError();
       if (loadError) return { ok: false, error: loadError };
 
@@ -279,53 +292,7 @@ export const modelConfigHandlers = {
       const auth = await modelRuntime.getAuth(model);
       if (!auth) return { ok: false, error: `No authentication found for "${providerName}"` };
 
-      const TEST_TIMEOUT_MS = 20_000;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), TEST_TIMEOUT_MS);
-      let status: number | undefined;
-      const startedAt = Date.now();
-      try {
-        const message = await modelRuntime.completeSimple(
-          model,
-          {
-            messages: [
-              {
-                role: "user",
-                content: "Reply with OK only.",
-                timestamp: Date.now(),
-              },
-            ],
-          },
-          {
-            maxTokens: 16,
-            timeoutMs: TEST_TIMEOUT_MS,
-            maxRetries: 0,
-            cacheRetention: "none",
-            signal: controller.signal,
-            onResponse: (response: { status: number }) => {
-              status = response.status;
-            },
-          },
-        );
-
-        const latencyMs = Date.now() - startedAt;
-        if (message.stopReason === "error" || message.stopReason === "aborted") {
-          return {
-            ok: false,
-            error: message.errorMessage ?? (controller.signal.aborted ? "Test timed out" : "Model returned an error"),
-            latencyMs,
-            status,
-          };
-        }
-        const responseText = message.content
-          .filter((b) => b.type === "text")
-          .map((b) => (b as { text: string }).text)
-          .join("")
-          .slice(0, 300);
-        return { ok: true, latencyMs, status, responseText };
-      } finally {
-        clearTimeout(timeout);
-      }
+      return await probeChatModel(modelRuntime, model, 20_000);
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     } finally {
@@ -363,7 +330,7 @@ export const modelConfigHandlers = {
       delete providerConfig.modelOverrides;
       writeFileSync(modelsPath, JSON.stringify({ providers: { [providerName]: providerConfig } }, null, 2), "utf8");
 
-      const modelRuntime = await ModelRuntime.create({ modelsPath, allowModelNetwork: false });
+      const modelRuntime = await createDesktopModelRuntime({ modelsPath, allowModelNetwork: false });
       const composedProvider = modelRuntime.getProvider(providerName);
       if (!composedProvider) {
         return { ok: false, error: modelRuntime.getError() ?? `Provider "${providerName}" failed to load.` };

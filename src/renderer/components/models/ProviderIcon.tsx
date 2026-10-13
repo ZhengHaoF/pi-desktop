@@ -31,6 +31,19 @@ import ZAIIcon from "@lobehub/icons/es/ZAI/components/Mono";
 
 type IconComponent = React.ComponentType<{ size?: number | string; style?: React.CSSProperties }>;
 
+// Unmodified favicon linked by https://typesafe.ai/; attribution is in THIRD_PARTY_NOTICES.md.
+const typesafeIconUrl = new URL("../../assets/providers/typesafe.png", import.meta.url).href;
+const TypeSafeIcon: IconComponent = ({ size = 24, style }) => (
+  <img
+    src={typesafeIconUrl}
+    alt="TypeSafe"
+    width={size}
+    height={size}
+    draggable={false}
+    style={{ display: "block", width: size, height: size, objectFit: "contain", flexShrink: 0, ...style }}
+  />
+);
+
 // Color icons supply their own fill; monochrome icons inherit the theme color.
 const PROVIDER_ICONS: Record<string, { Icon: IconComponent; hasColor: boolean }> = {
   anthropic: { Icon: AnthropicIcon, hasColor: false },
@@ -57,6 +70,7 @@ const PROVIDER_ICONS: Record<string, { Icon: IconComponent; hasColor: boolean }>
   "vercel-ai-gateway": { Icon: VercelIcon, hasColor: false },
   "github-copilot": { Icon: GithubCopilotIcon, hasColor: false },
   "amazon-bedrock": { Icon: AwsColorIcon, hasColor: true },
+  azure: { Icon: AzureColorIcon, hasColor: true },
   "azure-openai-responses": { Icon: AzureColorIcon, hasColor: true },
   "kimi-coding": { Icon: KimiColorIcon, hasColor: true },
   nvidia: { Icon: NvidiaColorIcon, hasColor: true },
@@ -73,6 +87,7 @@ const PROVIDER_ICONS: Record<string, { Icon: IconComponent; hasColor: boolean }>
   cohere: { Icon: CohereColorIcon, hasColor: true },
   perplexity: { Icon: PerplexityColorIcon, hasColor: true },
   together: { Icon: TogetherColorIcon, hasColor: true },
+  typesafe: { Icon: TypeSafeIcon, hasColor: true },
   grok: { Icon: GrokIcon, hasColor: false },
 };
 

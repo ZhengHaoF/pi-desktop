@@ -8,6 +8,7 @@ import { app, BrowserWindow, crashReporter, dialog, nativeTheme, nativeImage, ne
 import fs from "node:fs";
 import os from "node:os";
 import path from "path";
+import type { PiRuntimeProbeResult } from "../contract/runtime";
 import { HostManager, getUserDataPath, resolveHostEntry } from "./host-manager";
 import { appendMainLog } from "./logger";
 import { installAppMenu } from "./menu";
@@ -37,7 +38,7 @@ import {
   verifyWindowsManagedProcessHelperReplaceable,
 } from "../shared/windows-managed-process-helper";
 import type { ManagedProcessCapability } from "../contract/processes";
-import { projectManagedProcessCapability } from "./managed-process/capability";
+import { projectManagedProcessCapability, projectProcessContainmentCapability } from "./managed-process/capability";
 import { runPackagedCleanupFaultValidation } from "./packaged-cleanup-fault-validation";
 import { HerdrRuntimeManager } from "./herdr/runtime-manager";
 import { resolveBundledHerdrRoot, resolveHerdrCatalogPath } from "./herdr/catalog";
@@ -110,10 +111,10 @@ async function refreshHerdrAgentCliDiscovery(): Promise<void> {
   }
 }
 
-function getManagedProcessCapability(): ManagedProcessCapability {
+function getProcessCapabilityInput() {
   const status = managedProcessReaper?.status();
   const owner = hostManager?.getManagedProcessOwnerState();
-  return projectManagedProcessCapability({
+  return {
     platform: process.platform,
     arch: process.arch,
     reaperReady: status?.ready === true,
@@ -121,7 +122,11 @@ function getManagedProcessCapability(): ManagedProcessCapability {
     ownerReady: owner?.ready === true && Boolean(owner.hostInstanceId),
     windowsRelease: os.release(),
     windowsVersion: os.version(),
-  });
+  };
+}
+
+function getManagedProcessCapability(): ManagedProcessCapability {
+  return projectManagedProcessCapability(getProcessCapabilityInput());
 }
 
 async function cleanupManagedProcesses(deadline: number, requireConfirmedEmpty: boolean): Promise<void> {
@@ -139,6 +144,9 @@ async function cleanupManagedProcesses(deadline: number, requireConfirmedEmpty: 
   });
 }
 
+let startupPiRuntimeProbe: PiRuntimeProbeResult | undefined;
+let startupPiRuntimeProbeStarted = false;
+
 function finishPackagedStartupValidation(error?: string): void {
   if (!packagedStartupValidation || startupCheckFinished) return;
   if (!error) {
@@ -148,9 +156,35 @@ function finishPackagedStartupValidation(error?: string): void {
       error = `Agent Host Pi version mismatch: expected ${expectedPiVersion ?? "unknown"}, got ${hostManager?.getPiVersion() ?? "unknown"}`;
     }
     if ((hostManager?.getToolchainAckRevision() ?? -1) < snapshot.revision) return;
+    if (process.platform === "win32" && !hostManager?.getManagedProcessOwnerState().ready) return;
     for (const capability of ["search.rg", "search.fd"] as const) {
       const candidates = snapshot.publicState.capabilities[capability]?.candidates ?? [];
       if (!candidates.some((candidate) => candidate.provider === "bundled" && candidate.health === "healthy")) return;
+    }
+    if (!startupPiRuntimeProbe) {
+      if (!startupPiRuntimeProbeStarted && hostManager) {
+        startupPiRuntimeProbeStarted = true;
+        void hostManager
+          .call<PiRuntimeProbeResult>("host.runtimeProbe")
+          .then((probe) => {
+            if (
+              probe.piVersion !== expectedPiVersion ||
+              !probe.openaiOAuthLoaded ||
+              !probe.mcpLoaded ||
+              !probe.codemodeMcpRoundTrip ||
+              !probe.codemodeCancellation ||
+              !probe.mcpStdioRoundTrip
+            ) {
+              throw new Error("Packaged Pi lazy runtime modules did not load");
+            }
+            startupPiRuntimeProbe = probe;
+            finishPackagedStartupValidation();
+          })
+          .catch((failure: unknown) =>
+            finishPackagedStartupValidation(failure instanceof Error ? failure.message : "Pi runtime probe failed"),
+          );
+      }
+      return;
     }
   }
 
@@ -163,6 +197,7 @@ function finishPackagedStartupValidation(error?: string): void {
           ok: true,
           appVersion: app.getVersion(),
           piVersion: hostManager?.getPiVersion(),
+          runtimeModules: startupPiRuntimeProbe,
           platformArch: `${process.platform}-${process.arch}`,
           revision: startupToolchainSnapshot?.revision,
           rendererReady: startupRendererReady,
@@ -731,6 +766,7 @@ function startMainProcess(): void {
           enabled: capability.ready && loadUiState().managedProcessesEnabled === true,
           reaperReady: status?.ready === true,
           capability,
+          containmentCapability: projectProcessContainmentCapability(getProcessCapabilityInput()),
           ...(windowsManagedProcessHelper?.ok ? { windowsHelper: windowsManagedProcessHelper.descriptor } : {}),
         };
       }
@@ -837,7 +873,8 @@ function startMainProcess(): void {
     });
 
     hostManager.setMessageListener((msg) => {
-      if (packagedStartupValidation && msg.type === "toolchain:ack") finishPackagedStartupValidation();
+      if (packagedStartupValidation && (msg.type === "toolchain:ack" || msg.type === "managed-process-owner:ack"))
+        finishPackagedStartupValidation();
       if (msg.type === "running-sessions") {
         const ids = (msg.sessionIds as string[]) ?? [];
         runningAgentSessionCount = ids.length;
@@ -847,7 +884,7 @@ function startMainProcess(): void {
         const count = Number(msg.count);
         runningManagedProcessCount = Number.isSafeInteger(count) && count >= 0 ? count : 0;
         setTrayManagedProcessCount(runningManagedProcessCount, getMainWindow);
-      } else if (msg.type === "agent-end") {
+      } else if (msg.type === "agent-end" && msg.eventType === "agent_settled" && msg.aborted === false) {
         const sessionId = String(msg.sessionId ?? "");
         // Notify if no focused window or window is hidden (desktop value-add)
         const win = getMainWindow();

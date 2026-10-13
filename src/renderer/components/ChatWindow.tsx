@@ -1,3 +1,7 @@
+import { lastRoutedModel, ModelRoutingStatus } from "./models/ModelRoutingStatus";
+import { isVirtualSelection } from "@shared/session-model-display";
+import { ExtensionStatusBar } from "./ExtensionStatusBar";
+import { phaseLabel } from "@/lib/agent-phase-label";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type {
   AgentMessage,
@@ -13,6 +17,7 @@ import {
   countToolCallBlocks,
   getDisplayableAssistantBlocks,
   isAssistantFailure,
+  isAssistantAborted,
   splitFinalAssistantBlocks,
 } from "@/lib/message-display";
 import { MessageView } from "./MessageView";
@@ -20,7 +25,8 @@ import { ProcessDetailsGroup } from "./ProcessDetailsGroup";
 import { SessionProfiler } from "./SessionProfiler";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ChatMinimap, useMessageRefs, type ChatMinimapMessage } from "./ChatMinimap";
-import { useAgentSession, type AgentPhase, type NoticeItem } from "@/hooks/useAgentSession";
+import { useAgentSession, type NoticeItem } from "@/hooks/useAgentSession";
+import { useMcpSettingsCommand } from "@/hooks/useMcpSettingsRequests";
 import { useAudio } from "@/hooks/useAudio";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -28,6 +34,7 @@ import { useObservedElementHeight } from "@/hooks/useObservedElementHeight";
 import type { SessionPresentationStore } from "@/lib/session-presentation-store";
 import { MessageRenderKeyRegistry, type MessageRenderRole } from "@/lib/message-render-key";
 import { ToolMessageIndex } from "@/lib/tool-message-index";
+import { withGeneratedImageReply } from "@/lib/generated-image-reply";
 import { useI18n } from "@/i18n";
 import type { ThinkingExpansionStore } from "@/lib/thinking-expansion-store";
 import { skillInvocationCommandText } from "@shared/skill-invocation";
@@ -52,20 +59,6 @@ interface Props {
   onOpenFile?: (filePath: string) => void;
   thinkingExpansionStore: ThinkingExpansionStore;
   processDetailsExpansionStore: ThinkingExpansionStore;
-}
-
-function phaseLabel(phase: AgentPhase, t: (key: string, fallback: string) => string): string {
-  if (phase?.kind === "running_tools") {
-    const names = phase.tools.map((t) => t.name);
-    const running = t("runningTools", "Running");
-    if (names.length === 0) return t("runningTool", "Running tool…");
-    if (names.length === 1) return `${running} ${names[0]}…`;
-    if (names.length <= 3) return `${running} ${names.join(", ")}…`;
-    return `${running} ${names.slice(0, 2).join(", ")} (+${names.length - 2})…`;
-  }
-  if (phase?.kind === "waiting_model") return t("waitingForModel", "Waiting for model…");
-  if (phase?.kind === "running_command") return t("runningCommand", "Running command…");
-  return t("thinking", "Thinking…");
 }
 
 const CHAT_MINIMAP_WIDTH = 36;
@@ -97,7 +90,7 @@ function toMinimapMessage(message: AgentMessage | Partial<AgentMessage>): ChatMi
 
 function hasFinalAssistantAnswer(message: AgentMessage): boolean {
   if (message.role !== "assistant") return false;
-  if (isAssistantFailure(message as AssistantMessage)) return true;
+  if (isAssistantFailure(message as AssistantMessage) || isAssistantAborted(message as AssistantMessage)) return true;
   return splitFinalAssistantBlocks(message as AssistantMessage).answerBlocks.some(
     (block) => block.type === "image" || (block.type === "text" && block.text.trim().length > 0),
   );
@@ -166,7 +159,7 @@ function getAssistantRenderParts(
     answerMessage:
       split.answerBlocks.length > 0
         ? withAssistantBlocks(message, split.answerBlocks)
-        : isAssistantFailure(message)
+        : isAssistantFailure(message) || isAssistantAborted(message)
           ? withAssistantBlocks(message, [])
           : null,
   };
@@ -203,14 +196,18 @@ export function ChatWindow({
   playDoneSoundRef.current = playDoneSound;
   const soundEnabledRef = useRef(soundEnabled);
   soundEnabledRef.current = soundEnabled;
-  const wrappedOnAgentEnd = useCallback(() => {
-    if (soundEnabledRef.current) {
-      playDoneSoundRef.current();
-    }
-    onAgentEnd?.();
-  }, [onAgentEnd]);
+  const wrappedOnAgentEnd = useCallback(
+    (aborted: boolean) => {
+      if (!aborted && soundEnabledRef.current) {
+        playDoneSoundRef.current();
+      }
+      onAgentEnd?.();
+    },
+    [onAgentEnd],
+  );
 
   const {
+    sessionId: currentSessionId,
     loading,
     error,
     messages,
@@ -284,6 +281,11 @@ export function ChatWindow({
     presentationStore,
     onSessionStatsPanelOpen,
   });
+  useMcpSettingsCommand(currentSessionId);
+  const runningToolCallIds = useMemo(
+    () => new Set(agentPhase?.kind === "running_tools" ? agentPhase.tools.map((tool) => tool.id) : []),
+    [agentPhase],
+  );
 
   const onDrop = useCallback(
     (files: File[]) => {
@@ -343,6 +345,10 @@ export function ChatWindow({
     ? (modelThinkingLevelMaps[`${displayModelValue.provider}:${displayModelValue.modelId}`] ?? null)
     : null;
 
+  // Reduce to a string so new messages only re-render the composer when the routed model changes.
+  const routedModel = isVirtualSelection(modelList, displayModelValue) ? lastRoutedModel(messages) : null;
+  const modelStatus = useMemo(() => <ModelRoutingStatus route={routedModel} />, [routedModel]);
+
   const chatInputElement = (
     <ChatInput
       ref={chatInputRef}
@@ -353,6 +359,7 @@ export function ChatWindow({
       onPromptWithStreamingBehavior={agentRunning ? handlePromptWithStreamingBehavior : undefined}
       isStreaming={agentRunning}
       model={displayModelValue}
+      modelStatus={modelStatus}
       isAutoModelSelection={isAutoModelSelection}
       modelNames={modelNames}
       modelList={modelList}
@@ -664,6 +671,7 @@ export function ChatWindow({
                             message={msg}
                             toolResults={toolData?.results}
                             toolCallDurations={toolData?.durations}
+                            runningToolCallIds={runningToolCallIds}
                             modelNames={modelNames}
                             cwd={messageCwd}
                             onOpenFile={onOpenFile}
@@ -741,7 +749,13 @@ export function ChatWindow({
                       const finalAssistant = messages[finalAssistantIdx] as AssistantMessage;
                       const finalParts = getAssistantRenderParts(assistantRenderParts, finalAssistant);
                       const finalProcessMessage = finalParts.processMessage;
-                      const finalAnswerMessage = finalParts.answerMessage;
+                      const finalAnswerMessage = withGeneratedImageReply(
+                        finalParts.answerMessage,
+                        finalAssistant,
+                        messages,
+                        userIdx + 1,
+                        endIdx,
+                      );
 
                       const processCount = visibleProcessIndices.length + (finalProcessMessage ? 1 : 0);
                       if (processCount > 0) {
@@ -923,38 +937,6 @@ export function ChatWindow({
       </div>
 
       <div className="chat-input-bottom-spacer" data-expanded={isEmptyNew ? "true" : "false"} aria-hidden="true" />
-    </div>
-  );
-}
-
-function ExtensionStatusBar({ statuses }: { statuses: Array<{ key: string; text: string }> }) {
-  if (statuses.length === 0) return null;
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
-      {statuses.map((status) => (
-        <div
-          key={status.key}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            maxWidth: "100%",
-            padding: "4px 8px",
-            border: "1px solid color-mix(in srgb, var(--accent) 24%, var(--border))",
-            borderRadius: 6,
-            background: "color-mix(in srgb, var(--accent) 7%, var(--bg))",
-            color: "var(--text-muted)",
-            fontSize: scaledChatFont(12),
-          }}
-        >
-          <span style={{ color: "var(--accent)", fontFamily: "var(--font-mono)", fontSize: scaledChatFont(11) }}>
-            {status.key}
-          </span>
-          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {status.text}
-          </span>
-        </div>
-      ))}
     </div>
   );
 }
@@ -1153,11 +1135,11 @@ function ExtensionDialog({
               fontFamily: "var(--font-mono)",
             }}
           >
-            {t("extensionRequest", "Extension request")}
+            {confirmCopy?.subtitle ?? t("extensionRequest", "Extension request")}
           </div>
         </div>
 
-        <div style={{ padding: 14 }}>
+        <div style={{ padding: 14, maxHeight: "55vh", overflowY: "auto" }}>
           {request.method === "confirm" && (
             <div
               style={{
@@ -1277,7 +1259,7 @@ function ExtensionDialog({
                 cursor: "pointer",
               }}
             >
-              {t("confirm", "Confirm")}
+              {confirmCopy?.confirmLabel ?? t("confirm", "Confirm")}
             </button>
           ) : request.method !== "select" ? (
             <button

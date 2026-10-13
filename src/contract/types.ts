@@ -49,6 +49,7 @@ export interface ContextInfo {
   entryIds: string[];
   thinkingLevel: string;
   model: { provider: string; modelId: string } | null;
+  selectedModel?: { provider: string; modelId: string };
 }
 
 export interface HistoryWindow {
@@ -70,6 +71,9 @@ export interface EntryContentResult {
 }
 
 export interface SessionRuntimeState {
+  model?: { provider: string; id: string };
+  agentSettled?: { aborted: boolean };
+  modelSelectionNotice?: ModelSelectionNotice;
   contextUsage?: { percent: number | null; contextWindow: number; tokens: number | null } | null;
   systemPrompt?: string;
   thinkingLevel?: string;
@@ -122,6 +126,7 @@ export interface FuzzyMatch {
 }
 
 export interface ModelInfo {
+  virtual?: boolean;
   id: string;
   name: string;
   provider: string;
@@ -177,6 +182,21 @@ export interface ModelsConfig {
 export interface ModelsConfigSnapshot {
   config: ModelsConfig;
   version: string;
+  azureUpgrade?: AzureUpgradeReport;
+}
+
+export interface AzureUpgradeReport {
+  status: "unchanged" | "migrated" | "review";
+  files: string[];
+  backups: string[];
+  issues: string[];
+}
+
+export interface ModelSelectionNotice {
+  requiresChoice: boolean;
+  reason: "azure-renamed" | "restore-fallback" | "azure-review";
+  requested?: { provider: string; modelId: string };
+  actual?: { provider: string; modelId: string };
 }
 
 export interface TestResult {
@@ -236,6 +256,8 @@ export interface ProviderStatus {
   authenticated?: boolean;
   usesCallbackServer: boolean;
   loggedIn: boolean;
+  storedAuthType?: "api_key" | "oauth" | null;
+  credentialVersion?: string;
 }
 
 export interface ApiKeyProviderStatus {
@@ -244,6 +266,10 @@ export interface ApiKeyProviderStatus {
   configured: boolean;
   source?: string;
   modelCount: number;
+  chatModelCount?: number;
+  auxiliaryModels?: Array<{ id: string; name: string; type: "image" | "classifier" }>;
+  storedAuthType?: "api_key" | "oauth" | null;
+  credentialVersion?: string;
 }
 
 export interface SkillInfo {

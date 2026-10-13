@@ -41,7 +41,7 @@ const { ModelsConfig, useSessionModels, testApi } = await importTestBundle("mode
                 : `
         export const state = {reads:0, catalogReads:0, writes:[], writeResult:null, requests:[], calls:[], sources:[], cancelQueue:[], startQueue:[], subscribeQueue:[], config:{providers:{}}, version:'one', configError:null, preferences:null};
         const model = {id:'fixture-model',name:'Fixture model',provider:'api-fixture',reasoning:false,input:['text'],contextWindow:4096,maxTokens:512};
-        export function reset() {state.reads=0;state.catalogReads=0;state.writes=[];state.writeResult=null;state.requests=[];state.calls=[];state.sources=[];state.cancelQueue=[];state.startQueue=[];state.subscribeQueue=[];state.config={providers:{}};state.version='one';state.configError=null;state.preferences=null;}
+        export function reset() {state.reads=0;state.catalogReads=0;state.writes=[];state.writeResult=null;state.requests=[];state.calls=[];state.sources=[];state.cancelQueue=[];state.startQueue=[];state.subscribeQueue=[];state.config={providers:{}};state.version='one';state.configError=null;state.preferences=null;state.apiKeyProviders=null;}
         export async function listModels() {state.catalogReads++;return {models:[{...model,name:'Catalog '+state.catalogReads}],catalog:{source:'cache',refreshed:false,aborted:false,warnings:[]}};}
         export async function cancelModelsRefresh() {}
         export async function refreshModels() {throw new Error('Unexpected remote catalog refresh');}
@@ -59,9 +59,12 @@ const { ModelsConfig, useSessionModels, testApi } = await importTestBundle("mode
           state.calls.push({method,params});
           if(method === 'auth.loginCancel') return await take(state.cancelQueue,{ok:true});
           if(method === 'auth.loginStart') return await take(state.startQueue,{ok:true,started:true});
+          if(method === 'models.routing.get') return {config:{enabled:false,strategy:'thinking',fastThinking:'low',strongThinking:'high',retryFallback:false},version:'routing-v1'};
+          if(method === 'settings.advanced.get') return {config:{retry:{maxRetries:3}},version:'advanced-v1'};
+          if(method === 'models.catalog') return {models:[{provider:'fixture',modelId:'fast',name:'Fast',type:'chat',available:true,virtual:false},{provider:'fixture',modelId:'strong',name:'Strong',type:'chat',available:true,virtual:false},{provider:'typesafe',modelId:'jev-latest',name:'Jev',type:'classifier',available:true,virtual:false}]};
           if(method === 'modelsConfig.get') {if(state.configError)throw state.configError;return {config:structuredClone(state.config),version:state.version};}
           if(method === 'auth.providers')return {providers:[{id:'oauth-fixture',name:'OAuth fixture',usesCallbackServer:false,loggedIn:true}]};
-          if(method === 'auth.allProviders')return {providers:[{id:'api-fixture',displayName:'API fixture',configured:true,modelCount:1}]};
+          if(method === 'auth.allProviders')return {providers:state.apiKeyProviders??[{id:'api-fixture',displayName:'API fixture',configured:true,modelCount:1}]};
           let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});
           state.requests.push({method,params,resolve,reject});return promise;
         }
@@ -78,6 +81,7 @@ async function mount(t, options = {}) {
   testApi.reset();
   if (options.config) testApi.state.config = options.config;
   if (options.preferences) testApi.state.preferences = options.preferences;
+  if (options.apiKeyProviders) testApi.state.apiKeyProviders = options.apiKeyProviders;
   testApi.state.configError = options.configError ?? null;
   const requests = testApi.state.requests,
     sources = testApi.state.sources,
@@ -200,6 +204,67 @@ async function mount(t, options = {}) {
   };
 }
 
+test("Jev search finds TypeSafe and opens its existing API key settings with classifier details", async (t) => {
+  const fixture = await mount(t, {
+    apiKeyProviders: [
+      {
+        id: "typesafe",
+        displayName: "TypeSafe",
+        configured: false,
+        modelCount: 1,
+        chatModelCount: 0,
+        credentialVersion: "typesafe-empty",
+        auxiliaryModels: [{ id: "jev-latest", name: "Jev", type: "classifier" }],
+      },
+    ],
+  });
+  await fixture.click("+ Add provider");
+  const search = fixture.detail("AddProviderPicker").find((node) => node.type === "input");
+  await act(async () => search.props.onChange({ target: { value: "Jev" } }));
+  const provider = fixture
+    .detail("AddProviderPicker")
+    .find((node) => node.type === "button" && text(node).includes("TypeSafe"));
+  await act(async () => provider.props.onClick());
+  assert.match(JSON.stringify(fixture.renderer.toJSON()), /jev-latest/);
+  assert.match(JSON.stringify(fixture.renderer.toJSON()), /Decision/);
+  const detail = fixture.detail("ApiKeyDetail");
+  const secret = detail.find((node) => node.type === "input" && node.props.type === "password");
+  await act(async () => secret.props.onChange({ target: { value: "typesafe-fixture-key" } }));
+  await fixture.click("Save", detail);
+  assert.deepEqual(fixture.requests[0].params, {
+    provider: "typesafe",
+    key: "typesafe-fixture-key",
+    expectedVersion: "typesafe-empty",
+  });
+  await fixture.reply(0, { ok: true, synchronized: true });
+});
+
+test("a configured classifier-only provider shows Jev without an empty chat selection panel", async (t) => {
+  const fixture = await mount(t, {
+    apiKeyProviders: [
+      {
+        id: "typesafe",
+        displayName: "TypeSafe",
+        configured: true,
+        modelCount: 1,
+        chatModelCount: 0,
+        auxiliaryModels: [{ id: "jev-latest", name: "Jev", type: "classifier" }],
+      },
+    ],
+  });
+  await fixture.select("TypeSafe");
+  const rendered = JSON.stringify(fixture.renderer.toJSON());
+  assert.match(rendered, /jev-latest/);
+  assert.match(rendered, /Codemode/);
+  assert.doesNotMatch(rendered, /No models are currently available|Choose which models appear/);
+  assert.equal(
+    fixture
+      .detail("ApiKeyDetail")
+      .findAll((node) => typeof node.type === "function" && node.type.name === "ManagedModelsControl").length,
+    0,
+  );
+});
+
 test("provider picker owns its search and focus lifecycle, supports Escape, and returns a custom selection to the editor", async (t) => {
   const fixture = await mount(t, { captureFocus: true });
   const isPicker = (node) => typeof node.type === "function" && node.type.name === "AddProviderPicker";
@@ -292,6 +357,81 @@ test("failed credential mutations do not publish a model catalog change", async 
   assert.equal(fixture.changed, 0);
   assert.equal(testApi.state.reads, 1);
   assert.equal(testApi.state.catalogReads, 1);
+});
+
+test("switching account login to an API key requires confirmation of the original credential version", async (t) => {
+  const fixture = await mount(t);
+  await fixture.select("API fixture");
+  const detail = fixture.detail("ApiKeyDetail"),
+    Component = detail.type;
+  let reloaded = 0;
+  const props = {
+    ...detail.props,
+    onRefresh() {},
+    onReloadCredentials() {
+      reloaded++;
+    },
+    provider: {
+      ...detail.props.provider,
+      configured: false,
+      storedAuthType: "oauth",
+      credentialVersion: "confirmed-version",
+    },
+  };
+  await act(async () => fixture.renderer.update(createElement(Component, props)));
+  assert.match(text(fixture.renderer.root), /Account login active/);
+  assert.equal(
+    fixture.renderer.root.findAll((node) => node.type === "button" && text(node) === "Disconnect").length,
+    0,
+  );
+  const input = fixture.renderer.root.find((node) => node.type === "input" && node.props.type === "password");
+  await act(async () => input.props.onChange({ target: { value: "sk-ui-fixture" } }));
+  await fixture.click("Save");
+  assert.equal(fixture.requests.length, 0);
+  await act(async () =>
+    fixture.renderer.update(
+      createElement(Component, { ...props, provider: { ...props.provider, credentialVersion: "external-version" } }),
+    ),
+  );
+  await fixture.click("Switch authentication");
+  assert.deepEqual(fixture.requests[0].params, {
+    provider: "api-fixture",
+    key: "sk-ui-fixture",
+    replaceExisting: true,
+    expectedVersion: "confirmed-version",
+  });
+  await fixture.fail(0, "CONFLICT", "Credentials changed");
+  assert.equal(reloaded, 1);
+  assert.equal(fixture.changed, 0);
+});
+
+test("switching an API key to account login waits for confirmation before starting OAuth", async (t) => {
+  const fixture = await mount(t);
+  await fixture.select("OAuth fixture");
+  const detail = fixture.detail("OAuthDetail");
+  const props = {
+    ...detail.props,
+    onRefresh() {},
+    provider: {
+      ...detail.props.provider,
+      loggedIn: false,
+      storedAuthType: "api_key",
+      credentialVersion: "saved-key-version",
+    },
+  };
+  await act(async () => fixture.renderer.update(createElement(detail.type, props)));
+  await fixture.click("Login");
+  assert.equal(testApi.state.calls.filter((call) => call.method === "auth.loginStart").length, 0);
+  await fixture.click("Cancel");
+  assert.equal(testApi.state.calls.filter((call) => call.method === "auth.loginStart").length, 0);
+  await fixture.click("Login");
+  await fixture.click("Switch authentication");
+  const request = testApi.state.calls.find((call) => call.method === "auth.loginStart");
+  assert.deepEqual(request.params, {
+    provider: "oauth-fixture",
+    replaceExisting: true,
+    expectedVersion: "saved-key-version",
+  });
 });
 
 test("OAuth completion and logout notify after commit while progress and duplicate completion stay silent", async (t) => {
@@ -844,4 +984,99 @@ test("a failed default thinking level save keeps the persisted value and reports
   await fixture.fail(0, "INTERNAL", "Global Pi settings could not be saved");
   assert.equal(thinkingLevelSelect(fixture).props.value, "high", "the persisted value survives a failed save");
   assert.match(JSON.stringify(fixture.renderer.toJSON()), /Global Pi settings could not be saved/);
+});
+
+test("routing settings save selected models and strategy, preserving edits after a version conflict", async (t) => {
+  const fixture = await mount(t);
+  await fixture.click("Auto routing");
+  const detail = () => fixture.detail("RoutingSettings");
+  const select = async (index, value) =>
+    act(async () => detail().findAllByType("select")[index].props.onChange({ target: { value } }));
+  await act(async () =>
+    detail()
+      .findAllByType("input")[0]
+      .props.onChange({ target: { checked: true } }),
+  );
+  await select(0, "classifier");
+  await select(1, JSON.stringify(["fixture", "fast"]));
+  await select(3, JSON.stringify(["fixture", "strong"]));
+  await select(5, JSON.stringify(["typesafe", "jev-latest"]));
+  await fixture.click("Save", detail());
+  assert.equal(fixture.requests[0].method, "models.routing.set");
+  assert.deepEqual(fixture.requests[0].params.config.classifier, { provider: "typesafe", modelId: "jev-latest" });
+  assert.equal(fixture.requests[0].params.expectedVersion, "routing-v1");
+  await fixture.fail(0, "CONFLICT", "Settings changed");
+  assert.equal(detail().findAllByType("select")[5].props.value, JSON.stringify(["typesafe", "jev-latest"]));
+  assert.equal(fixture.changed, 0);
+  await fixture.click("Save", detail());
+  await fixture.reply(1, { config: fixture.requests[1].params.config, version: "routing-v2" });
+  assert.equal(fixture.changed, 1);
+});
+
+test("advanced configuration blocks malformed JSON and saves per-model overrides with a revision", async (t) => {
+  const fixture = await mount(t);
+  await fixture.click("Advanced model settings");
+  const detail = () => fixture.detail("AdvancedSettings");
+  const input = () => detail().findByType("textarea");
+  await act(async () => input().props.onChange({ target: { value: "{broken" } }));
+  assert.equal(detail().find((node) => node.type === "button" && text(node) === "Save").props.disabled, true);
+  await act(async () => input().props.onChange({ target: { value: '{"fixture/fast":{"reserveTokens":512}}' } }));
+  await fixture.click("Save", detail());
+  assert.equal(fixture.requests[0].method, "settings.advanced.set");
+  assert.equal(fixture.requests[0].params.config.compaction.modelOverrides["fixture/fast"].reserveTokens, 512);
+  assert.equal(fixture.requests[0].params.config.retry.maxRetries, 3);
+  assert.equal(fixture.requests[0].params.expectedVersion, "advanced-v1");
+  await fixture.reply(0, { config: fixture.requests[0].params.config, version: "advanced-v2" });
+  assert.equal(fixture.changed, 1);
+});
+
+test("guided API-key setup masks secrets and clears them before displaying the next field", async (t) => {
+  const fixture = await mount(t, {
+    apiKeyProviders: [
+      {
+        id: "cloudflare-workers-ai",
+        displayName: "Cloudflare fixture",
+        configured: true,
+        storedAuthType: "api_key",
+        credentialVersion: "key-v1",
+        modelCount: 1,
+      },
+    ],
+  });
+  await fixture.select("Cloudflare fixture");
+  await fixture.click("Configure credentials", fixture.detail("OAuthDetail"));
+  assert.equal(testApi.state.calls.find((call) => call.method === "auth.loginStart").params.authType, "api_key");
+  await fixture.event(0, { type: "prompt_request", message: "Key", token: "secret", secret: true, placeholder: null });
+  const input = () => fixture.detail("OAuthDetail").findByType("input");
+  assert.equal(input().props.type, "password");
+  await act(async () => input().props.onChange({ target: { value: "fixture-secret" } }));
+  await fixture.event(0, {
+    type: "prompt_request",
+    message: "Account ID",
+    token: "account",
+    secret: false,
+    placeholder: null,
+  });
+  assert.equal(input().props.type, "text");
+  assert.equal(input().props.value, "");
+  await fixture.click("Cancel", fixture.detail("OAuthDetail"));
+  assert.equal(fixture.changed, 0);
+});
+
+test("explicit disk reload replaces an invalid JSON draft even when the stored object is unchanged", async (t) => {
+  const overrides = { fixture: { samplingParams: { temperature: 0.2 } } };
+  const fixture = await mount(t, {
+    config: { providers: { custom: { api: "openai-completions", modelOverrides: overrides } } },
+  });
+  await fixture.click("Save");
+  await fixture.fail(0, "CONFLICT", "External update");
+  const input = () => fixture.detail("ProviderDetail").findByType("textarea");
+  await act(async () => input().props.onChange({ target: { value: "{invalid" } }));
+  testApi.state.version = "new-disk-version";
+  await fixture.click("Reload disk version");
+  assert.deepEqual(JSON.parse(input().props.value), overrides);
+  assert.equal(
+    fixture.renderer.root.find((node) => node.type === "button" && text(node) === "Save").props.disabled,
+    false,
+  );
 });

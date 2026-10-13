@@ -23,6 +23,8 @@ const channelMediaStore = read("src/agent-host/channels/media-store.ts");
 const channelOutboundFiles = read("src/agent-host/channels/outbound-files.ts");
 const channelPiBridge = read("src/agent-host/channels/pi-session-bridge.ts");
 const rpcManager = read("src/agent-host/rpc-manager.ts");
+const desktopSessionTools = read("src/agent-host/desktop-session-tools.ts");
+const sessionExtensions = read("src/agent-host/desktop-session-extensions.ts");
 const legacyChannelContext = read("src/agent-host/legacy-channel-context.ts");
 const weixinMedia = read("src/agent-host/channels/adapters/weixin/media.ts");
 const channelContract = read("src/contract/api.ts");
@@ -71,6 +73,10 @@ const browserVault = read("src/main/browser/browser-secret-vault.ts");
 const browserAgentRuntime = read("src/agent-host/browser-agent-runtime.ts");
 const toolchainBash = read("src/agent-host/toolchain-bash.ts");
 const toolchainRuntime = read("src/agent-host/toolchain-runtime.ts");
+const mcpOAuthLogin = read("src/agent-host/mcp/oauth-login.ts");
+const mcpOAuthCallback = read("src/agent-host/mcp/oauth-callback.ts");
+const mcpConfig = read("src/agent-host/mcp/config-store.ts");
+const mcpService = read("src/agent-host/mcp/service.ts");
 const toolEnvironment = read("src/agent-host/tool-environment.ts");
 const packageJson = read("package.json");
 const windowsHelperCargo = read("native/windows-managed-process-helper/Cargo.toml");
@@ -125,6 +131,26 @@ const windowsHelperUnsafeCount = windowsHelperWin32.match(windowsHelperUnsafePat
 
 const checks = [
   [
+    mcpOAuthCallback.includes("OAuthCallbackServer.listen") &&
+      mcpOAuthCallback.includes('validateMcpConfig("callback"') &&
+      mcpOAuthCallback.includes("timeoutMs: 300000") &&
+      mcpOAuthLogin.includes("listenMcpCallback(") &&
+      mcpOAuthLogin.includes("pending.callback?.close()") &&
+      mcpOAuthLogin.includes("300000"),
+    "MCP OAuth loopback exception must be explicit, time-bounded and close on completion",
+  ],
+  [
+    mcpConfig.includes('"127.0.0.1"') && mcpConfig.includes('"localhost"') && mcpConfig.includes('"[::1]"'),
+    "MCP OAuth callbacks must be restricted to loopback hosts",
+  ],
+  [
+    mcpService.includes("createHostShutdown([") &&
+      mcpService.includes("this.login.shutdown()") &&
+      mcpService.includes("this.stopping = true") &&
+      mcpService.includes("[...this.previews].map((connection) => connection.close())"),
+    "MCP shutdown must retire settings-only OAuth and temporary preview connections",
+  ],
+  [
     windowsHelperCargo.includes('windows-sys = { version = "=0.61.2"') &&
       windowsHelperCargo.includes('panic = "abort"') &&
       windowsHelperCargo.includes('unsafe_op_in_unsafe_fn = "deny"') &&
@@ -138,7 +164,8 @@ const checks = [
       windowsHelperMain + windowsHelperState + windowsHelperProtocol + windowsHelperJson + windowsHelperError,
     ) &&
       documentedWindowsHelperUnsafe &&
-      windowsHelperUnsafeCount === 99,
+      // Includes three test-only calls for the current-process/short-path identity regression.
+      windowsHelperUnsafeCount === 102,
     "the Windows helper safe parser/state machine must contain no unsafe code and every allowlisted Win32 unsafe operation must retain a SAFETY invariant",
   ],
   [
@@ -365,7 +392,8 @@ const checks = [
     "tag releases must verify managed runtime checksums and sizes against official upstream metadata",
   ],
   [
-    rpcManager.includes("createDesktopSearchToolDefinitions") &&
+    rpcManager.includes("createDesktopSessionTools(") &&
+      desktopSessionTools.includes("createDesktopSearchToolDefinitions") &&
       toolchainSearch.includes("allowUpstreamDownload: false") &&
       !toolchainSearch.includes("ensureTool") &&
       !toolchainSearch.includes("releases/latest") &&
@@ -520,7 +548,8 @@ const checks = [
   ],
   [
     rpcManager.includes("expandPromptTemplates: false") &&
-      rpcManager.includes("createLegacyChannelContextExtension()") &&
+      rpcManager.includes("desktopSessionExtensions(") &&
+      sessionExtensions.includes("createLegacyChannelContextExtension()") &&
       legacyChannelContext.includes('pi.on("context"') &&
       legacyChannelContext.includes("stripLegacyChannelPrompts(event.messages)") &&
       !rpcManager.includes("agent.state!.messages ="),
@@ -749,7 +778,8 @@ const checks = [
       browserAgentRuntime.includes("BROWSER_CALL_BUDGET_EXCEEDED") &&
       browserAgentRuntime.includes("const REPLAN_CALLS = 30") &&
       browserAgentRuntime.includes("const MAX_CALLS = 60") &&
-      rpcManager.includes("browserAgentRuntime.guardBash") &&
+      rpcManager.includes("createDesktopSessionTools(") &&
+      desktopSessionTools.includes("browserAgentRuntime.guardBash") &&
       toolchainBash.includes("await beforeExec?.(command)"),
     "Browser attempt/workflow state must remain hashed, budgeted, and enforced before Bash execution",
   ],

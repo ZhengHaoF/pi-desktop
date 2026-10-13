@@ -1,6 +1,8 @@
-import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import type { ModelsRefreshResult } from "@earendil-works/pi-ai";
 import type { ModelCatalogStatus, ModelCatalogWarning } from "../contract/types";
+import { ensureAzureUpgrade, azureUpgradeRevision } from "./azure-upgrade";
+import { createDesktopModelRuntime } from "./model-credentials";
 
 export const MODEL_CATALOG_REFRESH_TIMEOUT_MS = 12_000;
 
@@ -49,6 +51,7 @@ function providerWarnings(errors: ReadonlyMap<string, Error>): ModelCatalogWarni
 export class ModelCatalogRefreshCoordinator {
   private readonly byRequestId = new Map<string, ActiveRefresh>();
   private readonly byCwd = new Map<string, ActiveRefresh>();
+  private readonly settling = new Set<Promise<unknown>>();
 
   constructor(
     private readonly timeoutMs = MODEL_CATALOG_REFRESH_TIMEOUT_MS,
@@ -120,6 +123,11 @@ export class ModelCatalogRefreshCoordinator {
           } satisfies ModelCatalogStatus,
         });
       })();
+      this.settling.add(operation);
+      void operation.then(
+        () => this.settling.delete(operation),
+        () => this.settling.delete(operation),
+      );
       const outcome = await Promise.race([operation, aborted]);
       if (outcome !== abortedMarker) return outcome;
       if (!services) throw new ModelCatalogRefreshAbortedError(active.abortKind ?? "cancelled");
@@ -160,6 +168,9 @@ export class ModelCatalogRefreshCoordinator {
     this.byRequestId.clear();
     this.byCwd.clear();
   }
+  async settled(): Promise<void> {
+    while (this.settling.size) await Promise.allSettled([...this.settling]);
+  }
 
   private abort(active: ActiveRefresh | undefined, kind: NonNullable<ActiveRefresh["abortKind"]>): void {
     if (!active || active.controller.signal.aborted) return;
@@ -171,6 +182,8 @@ export class ModelCatalogRefreshCoordinator {
 export const modelCatalogRefreshCoordinator = new ModelCatalogRefreshCoordinator();
 
 let sharedRuntimePromise: Promise<ModelRuntime> | undefined;
+let sharedUpgradeRevision = 0;
+let sharedUpgradeRefresh: Promise<void> = Promise.resolve();
 
 /**
  * Shared runtime for host-level model and credential management.
@@ -178,14 +191,28 @@ let sharedRuntimePromise: Promise<ModelRuntime> | undefined;
  * Agent sessions keep their own cwd-bound runtimes so project extensions
  * cannot leak provider registrations into unrelated sessions.
  */
-export function getSharedModelRuntime(): Promise<ModelRuntime> {
+export async function getSharedModelRuntime(): Promise<ModelRuntime> {
+  await ensureAzureUpgrade();
   if (!sharedRuntimePromise) {
-    sharedRuntimePromise = ModelRuntime.create().catch((error) => {
+    sharedUpgradeRevision = azureUpgradeRevision();
+    sharedRuntimePromise = createDesktopModelRuntime().catch((error) => {
       sharedRuntimePromise = undefined;
       throw error;
     });
   }
-  return sharedRuntimePromise;
+  const runtime = await sharedRuntimePromise;
+  const revision = azureUpgradeRevision();
+  if (revision !== sharedUpgradeRevision) {
+    sharedUpgradeRefresh = sharedUpgradeRefresh
+      .catch(() => undefined)
+      .then(async () => {
+        if (revision === sharedUpgradeRevision) return;
+        await runtime.refresh({ allowNetwork: false });
+        sharedUpgradeRevision = revision;
+      });
+    await sharedUpgradeRefresh;
+  }
+  return runtime;
 }
 
 /** Refresh local model configuration/cache only when the shared runtime already exists. */

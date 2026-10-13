@@ -18,6 +18,7 @@ import {
 } from "./process-utils.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const executionRecovery = process.argv.includes("--execution-recovery");
 const main = path.join(root, ".artifacts", "smoke", "main.js");
 
 const tsupCli = resolvePackageFile(root, "tsup", "dist/cli-default.js");
@@ -50,17 +51,24 @@ const child = spawn(electronBin, [main], {
     ELECTRON_DISABLE_SECURITY_WARNINGS: "1",
     PI_DESKTOP_SMOKE_USER_DATA: smokeUserData,
     PI_CODING_AGENT_DIR: smokeAgentDir,
+    PI_DESKTOP_RUNTIME_PROBE_NODE: process.execPath,
+    PI_DESKTOP_EXECUTION_RECOVERY: executionRecovery ? "1" : undefined,
   },
   stdio: "inherit",
   detached: process.platform !== "win32",
 });
 
-const timer = setTimeout(() => {
-  console.error("smoke timeout");
-  terminateProcessTree(child);
-  removeSmokeUserData();
-  process.exit(1);
-}, 45_000);
+const timer = setTimeout(
+  () => {
+    console.error("smoke timeout");
+    terminateProcessTree(child);
+    removeSmokeUserData();
+    process.exit(1);
+  },
+  // The MCP presentation matrix covers 12 language/theme/width combinations;
+  // hidden-window animation frames on Windows alone can take over 45 seconds.
+  executionRecovery ? 150_000 : 120_000,
+);
 
 child.on("error", (error) => {
   clearTimeout(timer);

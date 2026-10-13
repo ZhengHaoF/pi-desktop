@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useI18n } from "@/i18n";
+import { oauthProviderName } from "./provider-display";
 import type { ProviderStatus as OAuthProvider, ApiKeyProviderStatus as ApiKeyProvider } from "@contract/types";
 import { ProviderIcon } from "./ProviderIcon";
 
@@ -32,7 +33,12 @@ export function AddProviderPicker({
 
   const availableOAuth = oauthProviders.filter((p) => !p.loggedIn && (!q || p.name.toLowerCase().includes(q)));
   const availableApiKey = apiKeyProviders.filter(
-    (p) => !p.configured && (!q || p.displayName.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)),
+    (p) =>
+      !p.configured &&
+      (!q ||
+        p.displayName.toLowerCase().includes(q) ||
+        p.id.toLowerCase().includes(q) ||
+        p.auxiliaryModels?.some((model) => `${model.name} ${model.id}`.toLowerCase().includes(q))),
   );
   const customSearchTerms = [
     "custom",
@@ -281,7 +287,7 @@ export function AddProviderPicker({
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {p.name}
+                      {oauthProviderName(p.id, p.name, t)}
                     </div>
                     <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>OAuth</div>
                   </div>

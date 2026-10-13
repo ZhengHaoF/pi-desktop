@@ -1,11 +1,13 @@
 /**
- * OAuth login progress service for Streams["auth.login"].
+ * Provider login progress service for Streams["auth.login"].
  */
-import type { AuthEvent, AuthInteraction, AuthPrompt } from "@earendil-works/pi-ai";
+import type { AuthEvent, AuthInteraction, AuthPrompt, LoginOptions } from "@earendil-works/pi-ai";
 import { CredentialSynchronizationError } from "@earendil-works/pi-coding-agent";
 import type { RpcServer } from "../contract/rpc";
 import { RpcError } from "../contract/types";
-import { getSharedModelRuntime } from "./model-runtime";
+import { createGuardedOAuthRuntime } from "./auth-runtime";
+import { ensureInstallationDeviceId } from "./installation-device-id";
+import type { CredentialMutationOptions } from "../contract/auth";
 import { recoverCommittedCredential } from "./credential-sync";
 
 type Pending = {
@@ -40,8 +42,14 @@ export function cancelLogin(provider: string): void {
 }
 
 type OAuthRuntime = {
-  getProvider(provider: string): { auth: { oauth?: unknown } } | undefined;
-  login(provider: string, type: "oauth", interaction: AuthInteraction): Promise<unknown>;
+  getProvider(provider: string): { auth: { oauth?: unknown; apiKey?: unknown } } | undefined;
+  login(
+    provider: string,
+    type: "oauth" | "api_key",
+    interaction: AuthInteraction,
+    options?: LoginOptions,
+    mutation?: CredentialMutationOptions,
+  ): Promise<unknown>;
   listCredentials(): ReturnType<import("@earendil-works/pi-coding-agent").ModelRuntime["listCredentials"]>;
   refresh: import("@earendil-works/pi-coding-agent").ModelRuntime["refresh"];
 };
@@ -50,18 +58,26 @@ type ModelRuntimeFactory = () => OAuthRuntime | Promise<OAuthRuntime>;
 
 export function createAuthLoginService(
   server: RpcServer,
-  createModelRuntime: ModelRuntimeFactory = getSharedModelRuntime,
+  createModelRuntime: ModelRuntimeFactory = createGuardedOAuthRuntime,
+  createDeviceId: (signal: AbortSignal) => Promise<string> = (signal) => ensureInstallationDeviceId(undefined, signal),
 ) {
   let closed = false;
   const ownedLogins = new Map<string, AbortController>();
+  const pendingLogins = new Set<Promise<void>>();
   function emit(provider: string, data: Record<string, unknown>) {
     if (closed) return;
     server.emit("auth.login", provider, data as never);
   }
 
   return {
-    async start(provider: string): Promise<{ started: boolean }> {
+    async start(
+      provider: string,
+      mutation: CredentialMutationOptions = {},
+      authType: "oauth" | "api_key" = "oauth",
+    ): Promise<{ started: boolean }> {
       if (closed) throw new RpcError({ code: "CLOSED", message: "Login service is closed" });
+      if (authType !== "oauth" && authType !== "api_key")
+        throw new RpcError({ code: "BAD_REQUEST", message: "Invalid authentication type" });
       if (activeLogins.has(provider)) {
         return { started: false };
       }
@@ -85,16 +101,23 @@ export function createAuthLoginService(
         if (ownedLogins.get(provider) === abort) ownedLogins.delete(provider);
       };
       let modelRuntime: OAuthRuntime;
+      let deviceId: string;
       try {
         modelRuntime = await createModelRuntime();
         if (closed || abort.signal.aborted) {
           releaseSlot();
           return { started: false };
         }
-        if (!modelRuntime.getProvider(provider)?.auth.oauth)
+        if (!modelRuntime.getProvider(provider)?.auth[authType === "oauth" ? "oauth" : "apiKey"])
           throw new RpcError({ code: "NOT_FOUND", message: `Unknown provider: ${provider}` });
+        deviceId = authType === "oauth" ? await createDeviceId(abort.signal) : "";
+        if (closed || abort.signal.aborted) {
+          releaseSlot();
+          return { started: false };
+        }
       } catch (error) {
         releaseSlot();
+        if (closed || abort.signal.aborted) return { started: false };
         throw error;
       }
       const activeTokens = new Set<string>();
@@ -215,20 +238,26 @@ export function createAuthLoginService(
       };
 
       // Fire-and-forget; stream progress via auth.login
-      void (async () => {
+      const operation = (async () => {
         try {
-          await modelRuntime.login(provider, "oauth", {
-            signal: abort.signal,
-            notify,
-            prompt,
-          });
+          await modelRuntime.login(
+            provider,
+            authType,
+            {
+              signal: abort.signal,
+              notify,
+              prompt,
+            },
+            { getDeviceId: () => deviceId },
+            mutation,
+          );
 
           emitTerminal({ type: "success" });
         } catch (err) {
           if (err instanceof CredentialSynchronizationError) {
             const recovered = await recoverCommittedCredential(modelRuntime, provider, {
               present: true,
-              type: "oauth",
+              type: authType,
             });
             if (recovered) {
               emitTerminal({ type: "success", ...(recovered.warning ? { warning: recovered.warning } : {}) });
@@ -246,6 +275,11 @@ export function createAuthLoginService(
           abort.signal.removeEventListener("abort", cleanup);
         }
       })();
+      pendingLogins.add(operation);
+      void operation.then(
+        () => pendingLogins.delete(operation),
+        () => pendingLogins.delete(operation),
+      );
 
       return { started: true };
     },
@@ -253,14 +287,18 @@ export function createAuthLoginService(
     cancel(provider: string) {
       cancelLogin(provider);
     },
-    dispose() {
-      if (closed) return;
+    async dispose() {
+      if (closed) {
+        await Promise.allSettled([...pendingLogins]);
+        return;
+      }
       closed = true;
       for (const [provider, abort] of ownedLogins) {
         abort.abort();
         if (activeLogins.get(provider) === abort) activeLogins.delete(provider);
       }
       ownedLogins.clear();
+      await Promise.allSettled([...pendingLogins]);
     },
   };
 }

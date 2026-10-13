@@ -202,7 +202,7 @@ export function Select({
 }: {
   value: string;
   onChange: (v: string) => void;
-  options: readonly string[];
+  options: readonly (string | { value: string; label: string })[];
   required?: boolean;
   /** Display text per option value; falls back to the raw value. */
   labels?: Record<string, string>;
@@ -221,11 +221,15 @@ export function Select({
       style={{ ...inputStyle, color: value ? "var(--text)" : "var(--text-dim)" }}
     >
       {!required && <option value="">{emptyLabel ?? "— inherit / none —"}</option>}
-      {options.map((o) => (
-        <option key={o} value={o}>
-          {labels?.[o] ?? o}
-        </option>
-      ))}
+      {options.map((o) => {
+        const value = typeof o === "string" ? o : o.value;
+        const label = typeof o === "string" ? o : o.label;
+        return (
+          <option key={value} value={value}>
+            {labels?.[value] ?? label}
+          </option>
+        );
+      })}
     </select>
   );
 }

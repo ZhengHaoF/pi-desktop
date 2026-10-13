@@ -1,5 +1,28 @@
 // Translation entries owned by the models domain.
 export const enUS: Record<string, string> = {
+  modelAuxiliaryModels: "Image and decision models",
+  modelAuxiliaryDescription:
+    "These catalog models are used through Codemode with supported provider credentials. Enable Codemode in the session tools menu. They do not appear in the chat model picker.",
+  modelDecision: "Decision",
+  modelImageGeneration: "Image generation",
+
+  modelSelectionNone: "No model",
+  modelSelectionRequired:
+    "Could not safely restore {requested}. Current model: {actual}. Choose a model explicitly before sending.",
+  modelAzureSelectionRenamed:
+    "Azure provider ID updated: {requested} → {actual}. Original conversation history is preserved.",
+  modelAzureUpgradeReview:
+    "Azure configuration needs review. Existing entries were preserved. Resolve conflicting provider entries in Models, then choose the intended model explicitly.",
+  modelAzureUpgradeDone:
+    "Azure configuration was upgraded and original files were backed up. The provider ID is azure; the Responses API type remains azure-openai-responses.",
+  modelAzureUpgradeDetails: "Migration details and backups",
+  modelAuthReplacementNotice: "Switching authentication replaces the credential currently saved for this provider.",
+  modelConfirmAuthSwitch: "Switch authentication",
+  modelOAuthActive: "Account login active",
+  modelOAuthInsteadOfKey: "This provider uses account login. Saving an API key switches its authentication method.",
+  modelChatGPTLogin: "OpenAI / ChatGPT subscription",
+  modelCodexLegacy: "OpenAI Codex (legacy)",
+
   addProvider: "Add provider",
   configured: "configured",
   model: "Model",
@@ -140,6 +163,27 @@ export const enUS: Record<string, string> = {
 };
 
 export const zhCN: Record<string, string> = {
+  modelAuxiliaryModels: "图片与决策模型",
+  modelAuxiliaryDescription:
+    "这些目录模型通过 Codemode 使用，需要服务商支持的认证方式。在会话工具菜单中启用 Codemode 后即可调用，不会出现在聊天主模型选择器中。",
+  modelDecision: "决策",
+  modelImageGeneration: "图片生成",
+
+  modelSelectionNone: "未选择模型",
+  modelSelectionRequired: "无法可靠恢复 {requested}。当前模型：{actual}。请明确选择模型后再发送。",
+  modelAzureSelectionRenamed: "Azure 服务商标识已更新：{requested} → {actual}。原始会话历史保留不变。",
+  modelAzureUpgradeReview:
+    "Azure 配置需要检查。已有条目均已保留，请在模型设置中处理冲突的服务商配置，并明确选择要使用的模型。",
+  modelAzureUpgradeDone:
+    "Azure 配置已升级，原始文件已备份。服务商标识为 azure；Responses 的 API 类型仍为 azure-openai-responses。",
+  modelAzureUpgradeDetails: "迁移详情与备份",
+  modelAuthReplacementNotice: "切换认证方式会替换此服务商当前保存的凭据。",
+  modelConfirmAuthSwitch: "切换认证方式",
+  modelOAuthActive: "已通过账号登录",
+  modelOAuthInsteadOfKey: "此服务商已通过账号登录。保存 API Key 将切换其认证方式。",
+  modelChatGPTLogin: "OpenAI / ChatGPT 订阅登录",
+  modelCodexLegacy: "OpenAI Codex（旧版）",
+
   addProvider: "添加服务商",
   configured: "已配置",
   model: "模型",
@@ -275,6 +319,27 @@ export const zhCN: Record<string, string> = {
 };
 
 export const zhTW: Record<string, string> = {
+  modelAuxiliaryModels: "圖片與決策模型",
+  modelAuxiliaryDescription:
+    "這些目錄模型透過 Codemode 使用，需要服務商支援的驗證方式。在對話工具選單中啟用 Codemode 後即可呼叫，不會出現在聊天主模型選擇器中。",
+  modelDecision: "決策",
+  modelImageGeneration: "圖片生成",
+
+  modelSelectionNone: "尚未選擇模型",
+  modelSelectionRequired: "無法可靠恢復 {requested}。目前模型：{actual}。請明確選擇模型後再傳送。",
+  modelAzureSelectionRenamed: "Azure 服務商識別碼已更新：{requested} → {actual}。原始對話歷史保持不變。",
+  modelAzureUpgradeReview:
+    "Azure 設定需要檢查。既有項目均已保留，請在模型設定中處理衝突的服務商設定，並明確選擇要使用的模型。",
+  modelAzureUpgradeDone:
+    "Azure 設定已升級，原始檔案已備份。服務商識別碼為 azure；Responses 的 API 類型仍為 azure-openai-responses。",
+  modelAzureUpgradeDetails: "遷移詳情與備份",
+  modelAuthReplacementNotice: "切換驗證方式會取代此服務商目前儲存的憑據。",
+  modelConfirmAuthSwitch: "切換驗證方式",
+  modelOAuthActive: "已透過帳號登入",
+  modelOAuthInsteadOfKey: "此服務商已透過帳號登入。儲存 API Key 將切換其驗證方式。",
+  modelChatGPTLogin: "OpenAI / ChatGPT 訂閱登入",
+  modelCodexLegacy: "OpenAI Codex（舊版）",
+
   addProvider: "新增模型服務商",
   configured: "已設定",
   model: "模型",

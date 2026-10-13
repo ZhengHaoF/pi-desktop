@@ -1,10 +1,9 @@
+import { buildLiveSessionStats } from "./session-stats";
+import { AUTO_ROUTING_PROVIDER } from "../contract/model-settings";
 import {
   createAgentSessionFromServices,
-  createAgentSessionServices,
-  createBashToolDefinition,
   getAgentDir,
   SessionManager,
-  type CreateAgentSessionFromServicesOptions,
   type AgentSessionRuntimeDiagnostic,
 } from "@earendil-works/pi-coding-agent";
 import { randomUUID } from "crypto";
@@ -12,7 +11,7 @@ import { EXCLUDED_PI_TOOLS, filterDesktopToolNames, validateDesktopToolNames } f
 import { assertSessionWritable } from "./session-readonly.ts";
 import { cacheSessionPath } from "./session-reader";
 import type { SlashCommandInfo } from "@earendil-works/pi-coding-agent";
-import type { AgentSessionLike, ExtensionUiContextLike, ToolInfo } from "../shared/pi-types";
+import type { AgentSessionLike, ExtensionUiContextLike } from "../shared/pi-types";
 import type { ChannelId } from "../shared/channel-types";
 import type {
   ChannelMessageAttachment,
@@ -20,29 +19,35 @@ import type {
   ExtensionUiResponse,
   ExtensionWidgetItem,
 } from "../shared/types";
-import { toolchainRuntime } from "./toolchain-runtime";
-import { createToolchainBashOptions } from "./toolchain-bash";
-import { createDesktopSearchToolDefinitions } from "./toolchain-search";
-import {
-  browserToolNamesForSnapshot,
-  createBrowserToolDefinitions,
-  isBrowserToolName,
-  setBrowserSessionSource,
-} from "./browser-tools";
+import { browserToolNamesForSnapshot, isBrowserToolName, setBrowserSessionSource } from "./browser-tools";
 import { browserCapabilityRuntime } from "./browser-capability-runtime";
 import { browserAgentRuntime } from "./browser-agent-runtime";
 import { projectExtensionDiagnostics } from "./extension-diagnostics";
-import { getDesktopSessionToolNames, setDesktopSessionToolNames } from "./session-tool-store";
-import { peekManagedProcessService } from "./managed-process/runtime";
-import { createManagedProcessToolDefinitions } from "./managed-process/tools";
-import { installManagedProcessSessionRedaction } from "./managed-process/session-redaction";
+import {
+  getDesktopSessionToolNames,
+  setDesktopSessionToolNames,
+  getDesktopSessionExecutionTools,
+  setDesktopSessionExecutionTools,
+  getDefaultStore,
+} from "./session-tool-store";
+import { withExtensionTools } from "./tool-activation";
+export { withExtensionTools } from "./tool-activation";
+import { SessionToolPolicy } from "./session-tool-policy";
+import { applySessionToolCommand } from "./session-tool-settings";
+import { withSessionOrchestration } from "./session-orchestration";
+import { getLegacySessionToolNames } from "./legacy-session-tools";
+export { getLegacySessionToolNames } from "./legacy-session-tools";
 import { peekHerdrBridge } from "./herdr/runtime";
-import { createHerdrToolDefinitions, herdrToolNamesForRuntime, isHerdrToolName } from "./herdr/tools";
-import { installHerdrSessionRedaction } from "./herdr/session-redaction";
-import { createDesktopPromptExtension, SessionPromptPolicy } from "./session-prompt-policy";
-import { createEphemeralContextExtension, SessionEphemeralContext } from "./session-ephemeral-context";
-import { createLegacyChannelContextExtension } from "./legacy-channel-context";
+import { herdrToolNamesForRuntime, isHerdrToolName } from "./herdr/tools";
+import { SessionPromptPolicy } from "./session-prompt-policy";
 import { scheduleAbortedTurnOmission } from "./aborted-turn-omission";
+import { desktopSessionExtensions } from "./desktop-session-extensions";
+import { peekMcpService } from "./mcp/runtime";
+import { getDesktopSessionMcpExecutionTools, copyDesktopMcpTools } from "./session-tool-store";
+import { SessionExecutionHistory } from "./session-execution-history";
+import { createDesktopAgentSessionServices as createAgentSessionServices } from "./desktop-session-services";
+import { createDesktopSessionTools } from "./desktop-session-tools";
+import { SessionModelSelection } from "./session-model-selection";
 
 // ============================================================================
 // Types
@@ -95,50 +100,6 @@ type ExtensionBindingOptions = {
 
 export type ExternalSessionCommand = "compact" | "reload";
 
-const CODING_TOOL_NAMES = ["read", "bash", "powershell", "edit", "write", "grep", "find", "ls"];
-const SESSION_TOOLS_ENTRY = "pi-desktop-session-tools";
-
-type PersistedSessionTools = {
-  version: 1;
-  toolNames: string[];
-};
-
-function parsePersistedSessionTools(value: unknown): string[] | undefined {
-  if (!value || typeof value !== "object") return undefined;
-  const state = value as Partial<PersistedSessionTools>;
-  if (
-    state.version !== 1 ||
-    !Array.isArray(state.toolNames) ||
-    !state.toolNames.every((name) => typeof name === "string")
-  ) {
-    return undefined;
-  }
-  return filterDesktopToolNames(state.toolNames);
-}
-
-export function getLegacySessionToolNames(sessionManager: Pick<SessionManager, "getEntries">): string[] | undefined {
-  const entries = sessionManager.getEntries();
-  for (let index = entries.length - 1; index >= 0; index -= 1) {
-    const entry = entries[index];
-    if (entry.type !== "custom" || entry.customType !== SESSION_TOOLS_ENTRY) continue;
-    const toolNames = parsePersistedSessionTools(entry.data);
-    if (toolNames !== undefined) return toolNames;
-  }
-  return undefined;
-}
-
-export function withExtensionTools(session: AgentSessionLike, toolNames: string[]): string[] {
-  if (toolNames.length === 0) return [];
-
-  const codingToolNames = new Set(CODING_TOOL_NAMES);
-  const extensionToolNames = session
-    .getAllTools()
-    .map((t) => t.name)
-    .filter((name) => !codingToolNames.has(name) && !isBrowserToolName(name));
-
-  return filterDesktopToolNames([...toolNames, ...extensionToolNames]);
-}
-
 // ============================================================================
 // AgentSessionWrapper
 // Wraps AgentSession with the same interface the rest of the app expects
@@ -159,6 +120,7 @@ export class AgentSessionWrapper {
   private extensionEditorText = "";
   private unsupportedExtensionFeatures = new Set<string>();
   private promptRunning = false;
+  private agentSettled: { aborted: boolean } | undefined;
   private queuedTurnCount = 0;
   private turnTail: Promise<void> = Promise.resolve();
   private externalTurnActive = false;
@@ -184,7 +146,10 @@ export class AgentSessionWrapper {
     requestedToolNames?: string[],
     persistToolNames: (sessionId: string, toolNames: string[]) => void = setDesktopSessionToolNames,
     promptPolicy?: SessionPromptPolicy,
-    private readonly ephemeralContext?: SessionEphemeralContext,
+    private readonly executionHistory?: SessionExecutionHistory,
+    private readonly toolPolicy?: SessionToolPolicy,
+    private readonly disposeMcp?: () => Promise<void>,
+    readonly modelSelection = new SessionModelSelection(),
   ) {
     this.inner = inner;
     this.persistToolNames = persistToolNames;
@@ -221,7 +186,11 @@ export class AgentSessionWrapper {
     this.unsubscribe = this.inner.subscribe((event: AgentEvent) => {
       this.resetIdleTimer();
       if (event.type === "message_end") scheduleAbortedTurnOmission(this.inner, event.message, () => this._alive);
-      const displayEvent = this.withExternalChannelSource(event);
+      if (event.type === "agent_start") this.agentSettled = undefined;
+      if (event.type === "agent_settled" && typeof event.aborted === "boolean")
+        this.agentSettled = { aborted: event.aborted };
+      const sourceEvent = this.withExternalChannelSource(event);
+      const displayEvent = this.executionHistory?.projectEvent(sourceEvent) ?? sourceEvent;
       this.emit(displayEvent);
       try {
         this.externalTurnProgress?.(displayEvent);
@@ -241,9 +210,11 @@ export class AgentSessionWrapper {
       this.inner.setActiveToolsByName([]);
       return;
     }
-    const current = this.inner
-      .getActiveToolNames()
-      .filter((name) => !isBrowserToolName(name) && !isHerdrToolName(name));
+    const current = withSessionOrchestration(
+      this.inner,
+      this.inner.getActiveToolNames(),
+      getDefaultStore().getOrchestration(this.sessionId),
+    ).filter((name) => !isBrowserToolName(name) && !isHerdrToolName(name));
     const browserTools = browserToolNamesForSnapshot(browserCapabilityRuntime.getSnapshot());
     const herdrTools = herdrToolNamesForRuntime(peekHerdrBridge());
     this.inner.setActiveToolsByName(filterDesktopToolNames([...current, ...browserTools, ...herdrTools]));
@@ -381,6 +352,7 @@ export class AgentSessionWrapper {
 
   private applyRequestedTools(toolNames: string[]): void {
     this.requestedToolNames = [...toolNames];
+    this.toolPolicy?.setRequested(toolNames);
     this.forceEmptySystemPrompt = toolNames.length === 0;
     this.promptPolicy.setForceEmpty(this.forceEmptySystemPrompt);
     this.inner.setActiveToolsByName(withExtensionTools(this.inner, toolNames));
@@ -399,6 +371,7 @@ export class AgentSessionWrapper {
       .then(async () => {
         if (!this._alive) throw new Error("Agent session is no longer available");
         this.promptRunning = true;
+        this.agentSettled = undefined;
         notifyRunningChange();
         try {
           return await task();
@@ -425,12 +398,12 @@ export class AgentSessionWrapper {
     onProgress?: (event: AgentEvent) => void;
   }): Promise<{ runId: string; finalText: string }> {
     return this.enqueueTurn(async () => {
+      this.modelSelection.assertReady(this.inner);
       this.emit({ type: "channel_turn_start", runId: params.runId });
       this.externalTurnActive = true;
       this.externalTurnChannel = params.channel;
       this.externalTurnAttachments = params.channelAttachments ?? null;
       setBrowserSessionSource(this.inner.sessionManager, "channel");
-      this.ephemeralContext?.beginChannelTurn(params.runId);
       browserAgentRuntime.beginTurn(this.sessionId, "channel");
       this.externalTurnProgress = params.onProgress ?? null;
       try {
@@ -474,7 +447,6 @@ export class AgentSessionWrapper {
         this.externalTurnActive = false;
         this.externalTurnChannel = null;
         this.externalTurnAttachments = null;
-        this.ephemeralContext?.endChannelTurn();
         setBrowserSessionSource(this.inner.sessionManager, "local");
       }
     });
@@ -493,7 +465,6 @@ export class AgentSessionWrapper {
     this.extensionBindingError = null;
     this.extensionStatuses.clear();
     this.extensionWidgets.clear();
-    this.ephemeralContext?.clear();
     await this.inner.reload();
     await this.ensureExtensionsBound();
     if (this.requestedToolNames !== undefined) this.applyRequestedTools(this.requestedToolNames);
@@ -502,6 +473,7 @@ export class AgentSessionWrapper {
   async runExternalCommand(params: { command: ExternalSessionCommand; customInstructions?: string }): Promise<void> {
     await this.enqueueTurn(async () => {
       if (params.command === "compact") {
+        this.modelSelection.assertReady(this.inner);
         await this.inner.compact(params.customInstructions);
         return;
       }
@@ -547,6 +519,7 @@ export class AgentSessionWrapper {
     const type = command.type as string;
     if (this.shouldWaitForExtensions(type)) await this.waitForExtensionsBound();
     if (this.forceEmptySystemPrompt && this.shouldWaitForExtensions(type)) this.syncDesktopToolActivation();
+    if (["prompt", "steer", "follow_up", "compact"].includes(type)) this.modelSelection.assertReady(this.inner);
 
     switch (type) {
       case "prompt": {
@@ -559,7 +532,7 @@ export class AgentSessionWrapper {
         const streamingBehavior = command.streamingBehavior as "steer" | "followUp" | undefined;
         if (!streamingBehavior) browserAgentRuntime.beginTurn(this.sessionId, "local");
         const invokePrompt = () => {
-          if (!streamingBehavior) this.ephemeralContext?.beginLocalTurn();
+          this.modelSelection.assertReady(this.inner);
           return this.inner.prompt(command.message as string, {
             ...(promptImages?.length ? { images: promptImages } : {}),
             ...(streamingBehavior ? { streamingBehavior } : {}),
@@ -575,6 +548,7 @@ export class AgentSessionWrapper {
             this.emit({
               type: "prompt_error",
               clientRunId,
+              ...(this.agentSettled ? { aborted: this.agentSettled.aborted } : {}),
               errorMessage: error instanceof Error ? error.message : String(error),
             });
             if (!streamingBehavior) this.emit({ type: "prompt_done", clientRunId });
@@ -583,7 +557,6 @@ export class AgentSessionWrapper {
       }
 
       case "abort":
-        this.ephemeralContext?.suspendAfterAbort();
         await this.withFinalRunningNotification(() => this.inner.abort());
         return null;
 
@@ -595,10 +568,12 @@ export class AgentSessionWrapper {
           sessionFile: this.inner.sessionFile ?? "",
           isStreaming: this.inner.isStreaming,
           isPromptRunning: this.promptRunning,
+          ...(this.agentSettled ? { agentSettled: this.agentSettled } : {}),
           isCompacting: this.inner.isCompacting,
           autoCompactionEnabled: this.inner.autoCompactionEnabled,
           autoRetryEnabled: this.inner.autoRetryEnabled,
           model: model ? { id: model.id, provider: model.provider } : undefined,
+          modelSelectionNotice: this.modelSelection.snapshot(this.inner),
           messageCount: 0,
           pendingMessageCount: this.inner.pendingMessageCount,
           queuedMessages: {
@@ -619,9 +594,15 @@ export class AgentSessionWrapper {
 
       case "set_model": {
         const { provider, modelId } = command as { provider: string; modelId: string };
+        if (provider === AUTO_ROUTING_PROVIDER) {
+          if (this.isRunning()) throw new Error("Wait for the current turn before changing Auto routing");
+          await this.reloadSessionResources();
+        }
+        await this.inner.modelRuntime.refresh?.({ allowNetwork: false });
         const model = this.inner.modelRuntime.getModel(provider, modelId);
         if (!model) throw new Error(`Model not found: ${provider}/${modelId}`);
         await this.inner.setModel(model);
+        this.modelSelection.selected(model);
         return { id: model.id, provider: model.provider };
       }
 
@@ -652,11 +633,19 @@ export class AgentSessionWrapper {
           newSessionFile = forkedPath;
         }
 
-        const newSessionId = SessionManager.open(newSessionFile, sessionDir).getSessionId();
+        const forkManager = SessionManager.open(newSessionFile, sessionDir);
+        const newSessionId = forkManager.getSessionId();
+        await this.executionHistory?.store.copyBranch(
+          newSessionId,
+          new Set(forkManager.getBranch().map((entry) => entry.id)),
+        );
         this.persistToolNames(
           newSessionId,
           filterDesktopToolNames(this.requestedToolNames ?? this.inner.getActiveToolNames()),
         );
+        const execution = this.toolPolicy?.getExecution();
+        if (execution) setDesktopSessionExecutionTools(newSessionId, execution);
+        copyDesktopMcpTools(this.sessionId, newSessionId);
         cacheSessionPath(newSessionId, newSessionFile);
         await this.dispose({ abort: true, reason: "fork" });
         return { cancelled: false, newSessionId };
@@ -664,7 +653,6 @@ export class AgentSessionWrapper {
 
       case "navigate_tree": {
         const result = await this.inner.navigateTree(command.targetId as string, {});
-        if (!result.cancelled) this.ephemeralContext?.clear();
         return { cancelled: result.cancelled };
       }
 
@@ -687,7 +675,10 @@ export class AgentSessionWrapper {
 
       case "compact": {
         const result = await this.withFinalRunningNotification(() =>
-          this.enqueueTurn(() => this.inner.compact(command.customInstructions as string | undefined)),
+          this.enqueueTurn(() => {
+            this.modelSelection.assertReady(this.inner);
+            return this.inner.compact(command.customInstructions as string | undefined);
+          }),
         );
         return result;
       }
@@ -699,14 +690,8 @@ export class AgentSessionWrapper {
         return null;
       }
 
-      case "get_session_stats": {
-        const stats = this.inner.getSessionStats();
-        return {
-          ...stats,
-          totalMessages: stats.userMessages + stats.assistantMessages + stats.toolResults,
-          sessionName: this.inner.sessionManager.getSessionName(),
-        };
-      }
+      case "get_session_stats":
+        return buildLiveSessionStats(this.inner);
 
       case "get_last_assistant_text": {
         return { text: this.inner.getLastAssistantText() ?? "" };
@@ -736,7 +721,8 @@ export class AgentSessionWrapper {
       }
 
       case "get_tools": {
-        const all: ToolInfo[] = this.inner.getAllTools();
+        if (this.toolPolicy) return this.toolPolicy.describe();
+        const all = this.inner.getAllTools();
         const active = new Set<string>(this.inner.getActiveToolNames());
         return all.map((t) => ({
           name: t.name,
@@ -774,13 +760,20 @@ export class AgentSessionWrapper {
         return { commands };
       }
 
-      case "set_tools": {
-        validateDesktopToolNames(command.toolNames);
-        const toolNames = filterDesktopToolNames(command.toolNames);
-        this.applyRequestedTools(toolNames);
-        this.persistToolNames(this.sessionId, toolNames);
-        return null;
-      }
+      case "set_execution_tools":
+      case "set_orchestration_tools":
+      case "set_tools":
+        return applySessionToolCommand(
+          {
+            sessionId: this.sessionId,
+            session: this.inner,
+            policy: this.toolPolicy,
+            requested: this.requestedToolNames,
+            apply: (names) => this.applyRequestedTools(names),
+            persist: (id, names) => this.persistToolNames(id, names),
+          },
+          command,
+        );
 
       case "reload": {
         await this.enqueueTurn(() => this.reloadSessionResources());
@@ -844,7 +837,9 @@ export class AgentSessionWrapper {
           );
         }
         try {
+          await this.disposeMcp?.();
           await agent.dispose?.();
+          await this.executionHistory?.flush();
         } catch (error) {
           console.warn(
             `[pi-desktop] session dispose failed during ${reason} for ${this.sessionId}: ${error instanceof Error ? error.name : "UnknownError"}`,
@@ -877,7 +872,6 @@ export class AgentSessionWrapper {
   destroy(): void {
     if (!this._alive) return;
     this._alive = false;
-    this.ephemeralContext?.dispose();
     browserAgentRuntime.clearSession(this.sessionId);
     if (this.idleTimer) clearTimeout(this.idleTimer);
     this.unsubscribe?.();
@@ -1296,7 +1290,6 @@ export class AgentSessionWrapper {
       },
       navigateTree: async (targetId, options) => {
         const result = await this.inner.navigateTree(targetId, { summarize: options?.summarize });
-        if (!result.cancelled) this.ephemeralContext?.clear();
         return { cancelled: result.cancelled };
       },
       switchSession: async () => {
@@ -1306,7 +1299,6 @@ export class AgentSessionWrapper {
       reload: async () => {
         this.extensionStatuses.clear();
         this.extensionWidgets.clear();
-        this.ephemeralContext?.clear();
         await this.inner.reload({
           beforeSessionStart: () => {
             this.inner.extensionRunner.setUIContext?.(this.createExtensionUiContext(), "rpc");
@@ -1456,10 +1448,8 @@ export async function startRpcSession(
     // Unknown provenance is fail-closed for desktop tools. A session becomes
     // local only at this explicit desktop-owned construction boundary.
     setBrowserSessionSource(sessionManager, "local");
-    installManagedProcessSessionRedaction(sessionManager);
-    installHerdrSessionRedaction(sessionManager);
-    const ephemeralContext = new SessionEphemeralContext(sessionManager);
-    ephemeralContext.install();
+    const executionHistory = new SessionExecutionHistory(sessionManager);
+    await executionHistory.recover();
 
     // Desktop-owned session choices live outside Pi's shared JSONL so the CLI
     // remains unaffected. Read the old custom entry only for one-way migration.
@@ -1468,52 +1458,52 @@ export async function startRpcSession(
     const legacyToolNames = desktopToolNames === undefined ? getLegacySessionToolNames(sessionManager) : undefined;
     const persistedToolNames = desktopToolNames ?? legacyToolNames;
     const sessionToolNames = persistedToolNames ?? toolNames;
+    const toolPolicy = new SessionToolPolicy(
+      sessionManager,
+      sessionToolNames,
+      getDesktopSessionExecutionTools(sessionId),
+      getDesktopSessionMcpExecutionTools(managerSessionId),
+    );
 
     // Build services first so extension-registered providers are available
     // before the SDK restores the saved model from the session file.
     const promptPolicy = new SessionPromptPolicy(sessionToolNames?.length === 0);
-    const services = await createAgentSessionServices({
-      cwd,
-      agentDir,
-      resourceLoaderOptions: {
-        extensionFactories: [
-          createLegacyChannelContextExtension(),
-          createEphemeralContextExtension(ephemeralContext),
-          createDesktopPromptExtension(promptPolicy),
-        ],
+    const modelSelection = new SessionModelSelection();
+    const services = await createAgentSessionServices(
+      {
+        cwd,
+        agentDir,
+        resourceLoaderOptions: {
+          extensionFactories: [
+            modelSelection.extension(),
+            ...desktopSessionExtensions(
+              toolPolicy,
+              executionHistory,
+              promptPolicy,
+              () => getRpcSession(managerSessionId)?.isRunning() ?? false,
+            ),
+          ],
+        },
       },
-    });
-    const executionContext = await toolchainRuntime.createExecutionContext({
-      cwd,
-      intent: "agent-shell",
-      trusted: services.settingsManager.isProjectTrusted(),
-    });
-    const bashOptions = createToolchainBashOptions(
-      executionContext,
-      toolchainRuntime,
-      services.settingsManager.getShellCommandPrefix(),
-      (command) => browserAgentRuntime.guardBash(sessionManager.getSessionId(), command),
+      { project: true, sessionManager },
     );
-    const customTools = [
-      createBashToolDefinition(cwd, bashOptions),
-      ...createDesktopSearchToolDefinitions(cwd, executionContext, toolchainRuntime),
-      ...createBrowserToolDefinitions(),
-      ...(peekHerdrBridge() ? createHerdrToolDefinitions(cwd, peekHerdrBridge()!) : []),
-      ...(peekManagedProcessService()
-        ? createManagedProcessToolDefinitions(
-            cwd,
-            services.settingsManager.isProjectTrusted(),
-            peekManagedProcessService()!,
-          )
-        : []),
-    ] as unknown as NonNullable<CreateAgentSessionFromServicesOptions["customTools"]>;
-    const { session: inner } = await createAgentSessionFromServices({
+    const { executionContext, customTools } = await createDesktopSessionTools(
+      cwd,
+      sessionManager,
+      services.settingsManager,
+      executionHistory,
+    );
+    const model = modelSelection.prepare(services, sessionManager);
+    const { session: inner, modelFallbackMessage } = await createAgentSessionFromServices({
       services,
       sessionManager,
       customTools,
       excludeTools: [...EXCLUDED_PI_TOOLS],
+      ...(model ? { model } : {}),
     });
+    modelSelection.finish(inner, modelFallbackMessage);
     const realSessionId = inner.sessionId as string;
+    toolPolicy.bind(inner);
 
     // Keep every tool registered so a session initialized with no tools can enable
     // them later. Narrow only the active set, never the registry allow-list.
@@ -1522,7 +1512,16 @@ export async function startRpcSession(
       if (desktopToolNames === undefined) setDesktopSessionToolNames(realSessionId, sessionToolNames);
     }
 
-    const wrapper = new AgentSessionWrapper(inner, sessionToolNames, undefined, promptPolicy, ephemeralContext);
+    const wrapper = new AgentSessionWrapper(
+      inner,
+      sessionToolNames,
+      undefined,
+      promptPolicy,
+      executionHistory,
+      toolPolicy,
+      () => peekMcpService()?.detach(realSessionId) ?? Promise.resolve(),
+      modelSelection,
+    );
     wrapper.setRuntimeDiagnostics(services.diagnostics);
     wrapper.setToolchainSummary(executionContext.inventoryRevision, executionContext.summary);
     wrapper.start();

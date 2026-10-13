@@ -1,8 +1,10 @@
 import type {
+  AgentSession,
   AgentSessionEvent,
   SessionManager,
   SettingsManager,
   SlashCommandInfo,
+  ToolInfo as SdkToolInfo,
 } from "@earendil-works/pi-coding-agent";
 import type { ExtensionUiConfirmLocalization } from "./types";
 
@@ -15,11 +17,18 @@ export interface ContextUsage {
 export interface ModelLike {
   id: string;
   provider: string;
+  api?: string;
 }
 
 export interface ToolInfo {
   name: string;
   description: string;
+  exposure?: SdkToolInfo["exposure"];
+  namespace?: SdkToolInfo["namespace"];
+  annotations?: SdkToolInfo["annotations"];
+  active?: boolean;
+  callable?: boolean;
+  executionAllowed?: boolean;
 }
 
 export interface NavigateTreeResult {
@@ -45,6 +54,7 @@ export interface SessionStatsInfo {
     total: number;
   };
   cost: number;
+  modelUsage?: Array<{ provider: string; model: string; tokens: number; cost: number }>;
   contextUsage?: ContextUsage;
 }
 
@@ -133,7 +143,10 @@ export interface AgentSessionLike {
   readonly model: ModelLike | undefined;
   readonly sessionName: string | undefined;
   readonly systemPrompt?: string;
-  readonly modelRuntime: { getModel: (provider: string, modelId: string) => ModelLike | undefined };
+  readonly modelRuntime: {
+    getModel: (provider: string, modelId: string) => ModelLike | undefined;
+    refresh?: (options: { allowNetwork: boolean }) => Promise<unknown>;
+  };
   readonly sessionManager: SessionManager;
   readonly settingsManager: SettingsManager;
   readonly agent: { state?: { readonly systemPrompt?: string; thinkingLevel?: string; messages?: unknown[] } };
@@ -173,13 +186,15 @@ export interface AgentSessionLike {
   setAutoCompactionEnabled(enabled: boolean): void;
   setAutoRetryEnabled(enabled: boolean): void;
   setCacheWarmingMode(mode: "off" | "streaming" | "idle"): void;
-  steer(text: string, images?: Array<{ type: "image"; data: string; mimeType: string }>): Promise<void>;
-  followUp(text: string, images?: Array<{ type: "image"; data: string; mimeType: string }>): Promise<void>;
+  steer: AgentSession["steer"];
+  followUp: AgentSession["followUp"];
   readonly pendingMessageCount: number;
   getSteeringMessages(): readonly string[];
   getFollowUpMessages(): readonly string[];
   clearQueue(): { steering: string[]; followUp: string[] };
   getAllTools(): ToolInfo[];
+  getToolDefinition?: AgentSession["getToolDefinition"];
+  getCallableToolNames?: AgentSession["getCallableToolNames"];
   getActiveToolNames(): string[];
   setActiveToolsByName(names: string[]): void;
   abortCompaction(): void;

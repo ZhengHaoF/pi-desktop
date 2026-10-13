@@ -1,3 +1,5 @@
+import { JsonObjectField } from "./JsonObjectField";
+import { THINKING_LEVELS, type ThinkingLevel } from "@shared/thinking-levels";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Check, Field, NumInput, SecretTextInput, Select, SectionTitle, TextInput } from "../form-controls";
 import { applyStrictOptionalPositiveInteger } from "@/lib/strict-integer";
@@ -31,6 +33,7 @@ export function ProviderDetail({
   onRename,
   onDelete,
   onImportModels,
+  onValidityChange,
 }: {
   name: string;
   provider: ProviderEntry;
@@ -38,6 +41,7 @@ export function ProviderDetail({
   onRename: (n: string) => void;
   onDelete: () => void;
   onImportModels: (models: ModelEntry[]) => void;
+  onValidityChange?: (valid: boolean) => void;
 }) {
   const { t } = useI18n();
   const [editingName, setEditingName] = useState(name);
@@ -179,13 +183,30 @@ export function ProviderDetail({
           />
         )}
       </div>
+
+      <ModelOverridesField
+        value={provider.modelOverrides}
+        onValidityChange={onValidityChange}
+        onChange={(modelOverrides) => set("modelOverrides", modelOverrides)}
+      />
     </div>
   );
 }
 
-const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
-
-type ThinkingLevel = (typeof THINKING_LEVELS)[number];
+export function ModelOverridesField(props: {
+  value: ProviderEntry["modelOverrides"];
+  onValidityChange?: (valid: boolean) => void;
+  onChange: (value: ProviderEntry["modelOverrides"]) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <JsonObjectField
+      {...props}
+      label={t("modelProviderOverrides", "Chat model overrides by model ID (JSON)")}
+      example={JSON.stringify({ "model-id": { samplingParams: { temperature: 0.2 } } }, null, 2)}
+    />
+  );
+}
 
 function thinkingLevelLabel(level: ThinkingLevel, t: (key: string, fallback: string) => string): string {
   switch (level) {
@@ -201,6 +222,8 @@ function thinkingLevelLabel(level: ThinkingLevel, t: (key: string, fallback: str
       return t("thinkingHigh", "High");
     case "xhigh":
       return t("thinkingXHigh", "Extra high");
+    case "max":
+      return t("thinkingMax", "Maximum");
   }
 }
 
@@ -227,6 +250,7 @@ const LEVEL_COLORS: Record<ThinkingLevel, string> = {
   medium: "#ea580c",
   high: "#c2410c",
   xhigh: "#9a3412",
+  max: "#7c2d12",
 };
 
 function ThinkingLevelMapEditor({
@@ -436,6 +460,7 @@ export function ModelDetail({
   onSetDefault,
   defaultThinkingLevel = null,
   onDefaultThinkingLevelChange,
+  onValidityChange,
 }: {
   providerName: string;
   provider: ProviderEntry;
@@ -448,8 +473,15 @@ export function ModelDetail({
   /** Persisted per-model default thinking level (Pi global settings), null when unset. */
   defaultThinkingLevel?: string | null;
   onDefaultThinkingLevelChange?: (level: string | null) => void | Promise<void>;
+  onValidityChange?: (valid: boolean) => void;
 }) {
   const { t } = useI18n();
+  const [invalidFields, setInvalidFields] = useState<string[]>([]);
+  const validField = (key: string, valid: boolean) => {
+    const next = valid ? invalidFields.filter((field) => field !== key) : [...new Set([...invalidFields, key])];
+    setInvalidFields(next);
+    onValidityChange?.(next.length === 0);
+  };
   const [testState, setTestState] = useState<ModelTestState>({ phase: "idle" });
   const [fillState, setFillState] = useState<ModelFillState>({ phase: "idle" });
   const [defaultState, setDefaultState] = useState<{ phase: "idle" | "saving" | "error"; message?: string }>({
@@ -1008,6 +1040,28 @@ export function ModelDetail({
           ))}
         </div>
       </div>
+      <SectionTitle>{t("modelAdvancedParameters", "Advanced model parameters")}</SectionTitle>
+      <JsonObjectField
+        label={t("modelSamplingParams", "Sampling parameters (JSON)")}
+        example={JSON.stringify({ temperature: 0.2, top_p: 0.9 }, null, 2)}
+        value={model.samplingParams}
+        onValidityChange={(valid) => validField("samplingParams", valid)}
+        onChange={(value) => set("samplingParams", value)}
+      />
+      <JsonObjectField
+        label={t("modelSamplingByThinking", "Sampling parameters by thinking level (JSON)")}
+        example={JSON.stringify({ high: { temperature: 0.2 }, low: { temperature: 0.7 } }, null, 2)}
+        value={model.samplingParamsByThinkingLevel as Record<string, unknown> | undefined}
+        onValidityChange={(valid) => validField("samplingParamsByThinkingLevel", valid)}
+        onChange={(value) => set("samplingParamsByThinkingLevel", value)}
+      />
+      <JsonObjectField
+        label={t("modelInputLimits", "Image and request input limits (JSON)")}
+        example={JSON.stringify({ images: { resize: { maxWidth: 2000, maxHeight: 2000 } } }, null, 2)}
+        value={model.inputLimits as Record<string, unknown> | undefined}
+        onValidityChange={(valid) => validField("inputLimits", valid)}
+        onChange={(value) => set("inputLimits", value)}
+      />
     </div>
   );
 }

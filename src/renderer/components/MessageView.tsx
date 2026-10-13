@@ -1,16 +1,15 @@
+import { formatTime } from "@/lib/message-metadata";
 import { memo, useState, useRef, useEffect, useMemo, useSyncExternalStore } from "react";
 import { MarkdownBody } from "./MarkdownBody";
+import { ToolResultImages } from "./ToolResultImages";
+import { ReplyImage } from "./ReplyImage";
+import { DeferredContentActions } from "./DeferredContentActions";
+import { AssistantOutcome } from "./AssistantOutcome";
 import { scaledChatFont } from "@/lib/chat-appearance";
 import { getToolResultDisplayText } from "@/lib/tool-result-display";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 import { parseCompactionSummary } from "@/lib/compaction-summary";
-import {
-  getAssistantFailureDetail,
-  hasRenderableAssistantMessage,
-  isAssistantFailure,
-  isEmptyTextBlock,
-  isEmptyThinkingBlock,
-} from "@/lib/message-display";
+import { hasRenderableAssistantMessage, isEmptyTextBlock, isEmptyThinkingBlock } from "@/lib/message-display";
 import { getUserBubbleStyle } from "@/lib/channel-message-style";
 import { CHANNEL_ATTACHMENT_PROMPT_PLACEHOLDER, channelAttachmentCopyText } from "@shared/channel-message";
 import { parseSkillInvocation, skillInvocationCommandText, type SkillInvocation } from "@shared/skill-invocation";
@@ -36,6 +35,7 @@ interface Props {
   isStreaming?: boolean;
   toolResults?: ReadonlyMap<string, ToolResultMessage>;
   toolCallDurations?: ReadonlyMap<string, number>;
+  runningToolCallIds?: ReadonlySet<string>;
   modelNames?: Record<string, string>;
   cwd?: string;
   onOpenFile?: (filePath: string) => void;
@@ -51,87 +51,12 @@ interface Props {
   thinkingExpansionStore?: ThinkingExpansionStore;
 }
 
-function formatTime(ts?: number): string | null {
-  if (!ts) return null;
-  const d = new Date(ts);
-  const now = new Date();
-  const isToday =
-    d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  if (isToday) return time;
-  const date = d.toLocaleDateString([], {
-    month: "short",
-    day: "numeric",
-    year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
-  });
-  return `${date} ${time}`;
-}
-
-function formatByteSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 102.4) / 10} KB`;
-  return `${Math.round(bytes / 1024 / 102.4) / 10} MB`;
-}
-
-function DeferredContentActions({
-  content,
-  onLoad,
-}: {
-  content: unknown;
-  onLoad?: (entryId: string, blockIndex?: number) => Promise<void>;
-}) {
-  const [loadingKey, setLoadingKey] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState(false);
-  if (!onLoad || !Array.isArray(content)) return null;
-  const references = content.flatMap((block) => {
-    if (!block || typeof block !== "object") return [];
-    const deferred = (block as AssistantContentBlock | TextContent | ImageContent).deferredContent;
-    return deferred ? [deferred] : [];
-  });
-  if (references.length === 0) return null;
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-      {references.map((reference) => {
-        const key = `${reference.entryId}:${reference.blockIndex ?? 0}`;
-        const loading = loadingKey === key;
-        return (
-          <button
-            key={key}
-            type="button"
-            disabled={loading}
-            onClick={() => {
-              setLoadingKey(key);
-              setLoadError(false);
-              void onLoad(reference.entryId, reference.blockIndex)
-                .catch(() => setLoadError(true))
-                .finally(() => setLoadingKey(null));
-            }}
-            style={{
-              border: "1px solid var(--border)",
-              borderRadius: 6,
-              background: "var(--bg-panel)",
-              color: "var(--accent)",
-              cursor: loading ? "default" : "pointer",
-              fontSize: scaledChatFont(11),
-              padding: "4px 8px",
-            }}
-          >
-            {loading ? "Loading full content…" : `Load full content (${formatByteSize(reference.originalBytes)})`}
-          </button>
-        );
-      })}
-      {loadError && (
-        <span style={{ color: "var(--danger)", fontSize: scaledChatFont(11) }}>Failed to load full content</span>
-      )}
-    </div>
-  );
-}
-
 export const MessageView = memo(function MessageView({
   message,
   isStreaming,
   toolResults,
   toolCallDurations,
+  runningToolCallIds,
   modelNames,
   cwd,
   onOpenFile,
@@ -169,6 +94,7 @@ export const MessageView = memo(function MessageView({
         isStreaming={isStreaming}
         toolResults={toolResults}
         toolCallDurations={toolCallDurations}
+        runningToolCallIds={runningToolCallIds}
         modelNames={modelNames}
         cwd={cwd}
         onOpenFile={onOpenFile}
@@ -648,6 +574,7 @@ function AssistantMessageView({
   isStreaming,
   toolResults,
   toolCallDurations,
+  runningToolCallIds,
   modelNames,
   cwd,
   onOpenFile,
@@ -661,6 +588,7 @@ function AssistantMessageView({
   isStreaming?: boolean;
   toolResults?: ReadonlyMap<string, ToolResultMessage>;
   toolCallDurations?: ReadonlyMap<string, number>;
+  runningToolCallIds?: ReadonlySet<string>;
   modelNames?: Record<string, string>;
   cwd?: string;
   onOpenFile?: (filePath: string) => void;
@@ -670,7 +598,6 @@ function AssistantMessageView({
   entryId?: string;
   thinkingExpansionStore?: ThinkingExpansionStore;
 }) {
-  const { t } = useI18n();
   const time = showTimestamp ? formatTime(message.timestamp) : null;
   const blockItems = (message.content ?? [])
     .map((block, originalIndex) => ({ block, originalIndex }))
@@ -682,13 +609,6 @@ function AssistantMessageView({
   const [tps, setTps] = useState<number | null>(null);
   const blockItemsRef = useRef(blockItems);
   blockItemsRef.current = blockItems;
-  const failureDetail = isAssistantFailure(message)
-    ? (getAssistantFailureDetail(message) ??
-      t(
-        "modelRequestFailedFallback",
-        "The model service did not return error details. Check the API key, service URL, and model configuration.",
-      ))
-    : null;
 
   // Streaming-based timing for thinking blocks
   const blockStartTimesRef = useRef<Map<number, number>>(new Map());
@@ -869,6 +789,7 @@ function AssistantMessageView({
               (block.type === "thinking" ? thinkingDurationFromFile : undefined)
             }
             toolCallDurations={toolCallDurations}
+            runningToolCallIds={runningToolCallIds}
             cwd={cwd}
             onOpenFile={onOpenFile}
             onLoadDeferredContent={onLoadDeferredContent}
@@ -876,27 +797,11 @@ function AssistantMessageView({
             thinkingExpansionStore={thinkingExpansionStore}
           />
         ))}
-        <DeferredContentActions content={message.content} onLoad={onLoadDeferredContent} />
-        {failureDetail && !isStreaming && (
-          <div
-            role="alert"
-            data-testid="assistant-error-message"
-            style={{
-              border: "1px solid color-mix(in srgb, var(--danger) 45%, var(--border))",
-              borderRadius: 9,
-              background: "color-mix(in srgb, var(--danger) 8%, var(--assistant-bg))",
-              color: "var(--danger)",
-              padding: "10px 12px",
-              fontSize: scaledChatFont(13),
-              lineHeight: 1.55,
-              overflowWrap: "anywhere",
-              whiteSpace: "pre-wrap",
-            }}
-          >
-            <div style={{ fontWeight: 600, marginBottom: 3 }}>{t("modelRequestFailed", "Model request failed")}</div>
-            <div>{failureDetail}</div>
-          </div>
-        )}
+        <DeferredContentActions
+          content={message.content.filter((block) => block.type !== "image")}
+          onLoad={onLoadDeferredContent}
+        />
+        <AssistantOutcome message={message} isStreaming={isStreaming} />
       </div>
 
       <div
@@ -986,6 +891,7 @@ function BlockView({
   isStreaming,
   streamingDuration,
   toolCallDurations,
+  runningToolCallIds,
   cwd,
   onOpenFile,
   onLoadDeferredContent,
@@ -997,6 +903,7 @@ function BlockView({
   isStreaming?: boolean;
   streamingDuration?: number;
   toolCallDurations?: ReadonlyMap<string, number>;
+  runningToolCallIds?: ReadonlySet<string>;
   cwd?: string;
   onOpenFile?: (filePath: string) => void;
   onLoadDeferredContent?: (entryId: string, blockIndex?: number) => Promise<void>;
@@ -1006,6 +913,7 @@ function BlockView({
   if (block.type === "text") {
     return <TextBlock block={block as TextContent} isStreaming={isStreaming} cwd={cwd} onOpenFile={onOpenFile} />;
   }
+  if (block.type === "image") return <ReplyImage image={block} onLoad={onLoadDeferredContent} />;
   if (block.type === "thinking") {
     return (
       <>
@@ -1025,7 +933,13 @@ function BlockView({
     const duration = toolCallDurations?.get(tc.toolCallId);
     return (
       <>
-        <ToolCallBlock block={tc} result={result} duration={duration} onLoadDeferredContent={onLoadDeferredContent} />
+        <ToolCallBlock
+          block={tc}
+          result={result}
+          duration={duration}
+          running={runningToolCallIds?.has(tc.toolCallId)}
+          onLoadDeferredContent={onLoadDeferredContent}
+        />
         <DeferredContentActions content={[block]} onLoad={onLoadDeferredContent} />
       </>
     );
@@ -1150,11 +1064,13 @@ function ToolCallBlock({
   block,
   result,
   duration,
+  running,
   onLoadDeferredContent,
 }: {
   block: ToolCallContent;
   result?: ToolResultMessage;
   duration?: number;
+  running?: boolean;
   onLoadDeferredContent?: (entryId: string, blockIndex?: number) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -1167,7 +1083,7 @@ function ToolCallBlock({
   const resultText = getToolResultDisplayText(block.toolName, result, t);
   const resultIsEmpty = resultText === null ? false : resultText.trim() === "(no output)" || resultText.trim() === "";
   const isError = result?.isError ?? false;
-  const isRunning = !result;
+  const isRunning = !result && running !== false;
   const preview = getToolPreview(block);
   const browserTabId = isBrowserToolName(block.toolName) ? browserTabIdFromResult(resultText) : null;
   const browserSummary =
@@ -1269,6 +1185,11 @@ function ToolCallBlock({
           <span className="stream-caret" aria-hidden="true" />
         </div>
       )}
+      {!result && running === false && (
+        <p style={{ padding: "8px 12px", color: "var(--text-dim)", margin: 0 }}>
+          {t("executionResultMissing", "Result was not recorded in the conversation.")}
+        </p>
+      )}
 
       {/* ── Paired result — only while expanded ──
           A collapsed card keeps just its header, so long outputs never form a
@@ -1280,6 +1201,7 @@ function ToolCallBlock({
         ) : (
           <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
         ))}
+      {expanded && result && <ToolResultImages content={result.content} />}
       {expanded && result && <DeferredContentActions content={result.content} onLoad={onLoadDeferredContent} />}
       {expanded && browserTabId && (
         <button

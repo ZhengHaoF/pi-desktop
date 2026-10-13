@@ -1,3 +1,4 @@
+import { modelSettingsHandlers } from "./handlers/model-settings";
 /**
  * Register all Api handlers on the RPC server.
  * Implements the desktop RPC contract in the Agent Host process.
@@ -8,6 +9,7 @@ import { createAuthHandlers } from "./handlers/auth";
 import { createFileHandlers } from "./handlers/files";
 import { createWorktreeHandlers } from "./handlers/worktrees";
 import { systemHandlers } from "./handlers/system";
+import { probePiRuntimeModules } from "./pi-runtime-probe";
 import { createSessionHandlers } from "./handlers/sessions";
 import { createTitleHandlers } from "./handlers/agent-title";
 import { createAgentHandlers } from "./handlers/agent";
@@ -15,6 +17,8 @@ import { resourceHandlers } from "./handlers/resources";
 import { createChannelHandlers, initializeChannels } from "./handlers/channels";
 import { createHerdrHandlers } from "./handlers/herdr";
 import { createProcessHandlers } from "./handlers/processes";
+import { createMcpHandlers } from "./handlers/mcp";
+import { initializeMcpService } from "./mcp/runtime";
 export { generateSessionTitleWithFallback, applySessionNameIfEmpty } from "./handlers/agent-title";
 export { createAgentNewLockKey } from "./handlers/agent";
 export { initializeChannels } from "./handlers/channels";
@@ -35,6 +39,7 @@ import { disposeAllRpcSessions, subscribeRunningSessions, syncDesktopToolsForAll
 import { createFileWatchService, stopAllFileWatches } from "./file-watch";
 import { createAuthLoginService } from "./auth-login";
 import { modelCatalogRefreshCoordinator } from "./model-runtime";
+import { beginModelCredentialShutdown, settleModelCredentials } from "./model-credentials";
 
 import { ChannelManager } from "./channels/channel-manager";
 
@@ -47,6 +52,7 @@ import { clearHerdrBridge, initializeHerdrBridge } from "./herdr/runtime";
 export function registerHandlers(server: RpcServer): () => Promise<void> {
   const bindings = createSessionEventBindings(server);
   let closing = false;
+  const pendingCalls = new Set<Promise<unknown>>();
   const fileWatch = createFileWatchService(server);
   const fileHandlers = createFileHandlers(fileWatch);
   const authLogin = createAuthLoginService(server);
@@ -54,6 +60,8 @@ export function registerHandlers(server: RpcServer): () => Promise<void> {
   const channelManager = new ChannelManager(server, (session, sessionId) => bindings.ensure(session, sessionId));
   initializeChannels(channelManager);
   const managedProcesses = initializeManagedProcessService(server);
+  const mcp = initializeMcpService(server),
+    mcpHandlers = createMcpHandlers(mcp);
   const worktreeHandlers = createWorktreeHandlers(managedProcesses);
   const sessionHandlers = createSessionHandlers({ server, managedProcesses, clearSessionEventBinding: bindings.clear });
   const herdr = initializeHerdrBridge(server, { assertAllowedPath: (target) => assertPathAllowed(target) });
@@ -109,11 +117,41 @@ export function registerHandlers(server: RpcServer): () => Promise<void> {
     <P, R>(handler: (params: P, context: RpcRequestContext) => R) =>
     (params: P, context: RpcRequestContext): R => {
       if (closing) throw new RpcError({ code: "CLOSED", message: "Agent Host is shutting down" });
-      return handler(params, context);
+      const result = handler(params, context);
+      if (result && typeof result === "object" && "then" in result && typeof result.then === "function") {
+        const pending = Promise.resolve(result);
+        pendingCalls.add(pending);
+        void pending.then(
+          () => pendingCalls.delete(pending),
+          () => pendingCalls.delete(pending),
+        );
+      }
+      return result;
     };
 
   server.handle({
+    "mcp.config.get": guard(mcpHandlers["mcp.config.get"]),
+    "mcp.config.upsert": guard(mcpHandlers["mcp.config.upsert"]),
+    "mcp.config.remove": guard(mcpHandlers["mcp.config.remove"]),
+    "mcp.import.preview": guard(mcpHandlers["mcp.import.preview"]),
+    "mcp.import.apply": guard(mcpHandlers["mcp.import.apply"]),
+    "mcp.snapshot": guard(mcpHandlers["mcp.snapshot"]),
+    "mcp.probe": guard(mcpHandlers["mcp.probe"]),
+    "mcp.probe.cancel": guard(mcpHandlers["mcp.probe.cancel"]),
+    "mcp.reconnect": guard(mcpHandlers["mcp.reconnect"]),
+    "mcp.grants": guard(mcpHandlers["mcp.grants"]),
+    "mcp.declarations": guard(mcpHandlers["mcp.declarations"]),
+    "mcp.extension.update": guard(mcpHandlers["mcp.extension.update"]),
+    "mcp.resources": guard(mcpHandlers["mcp.resources"]),
+    "mcp.resource.read": guard(mcpHandlers["mcp.resource.read"]),
+    "mcp.resource.content": guard(mcpHandlers["mcp.resource.content"]),
+    "mcp.oauth.start": guard(mcpHandlers["mcp.oauth.start"]),
+    "mcp.oauth.get": guard(mcpHandlers["mcp.oauth.get"]),
+    "mcp.oauth.submit": guard(mcpHandlers["mcp.oauth.submit"]),
+    "mcp.oauth.cancel": guard(mcpHandlers["mcp.oauth.cancel"]),
+    "mcp.oauth.logout": guard(mcpHandlers["mcp.oauth.logout"]),
     "host.ping": guard(() => ({ ok: true as const, ts: Date.now() })),
+    "host.runtimeProbe": guard(() => probePiRuntimeModules(true)),
 
     "herdr.runtime.get": guard(herdrHandlers.runtimeGet),
 
@@ -188,6 +226,8 @@ export function registerHandlers(server: RpcServer): () => Promise<void> {
     "sessions.contextPage": guard(sessionHandlers.contextPage),
 
     "sessions.entryContent": guard(sessionHandlers.entryContent),
+    "sessions.executions": guard(sessionHandlers.executions),
+    "sessions.executionContent": guard(sessionHandlers.executionContent),
 
     "sessions.export": guard(sessionHandlers.export),
 
@@ -275,6 +315,12 @@ export function registerHandlers(server: RpcServer): () => Promise<void> {
 
     "models.thinkingLevel.set": guard(modelCatalogHandlers.setThinkingLevelDefault),
 
+    "models.routing.get": guard(modelSettingsHandlers.routingGet),
+    "models.routing.set": guard(modelSettingsHandlers.routingSet),
+    "settings.advanced.get": guard(modelSettingsHandlers.advancedGet),
+    "settings.advanced.set": guard(modelSettingsHandlers.advancedSet),
+    "models.catalog": guard(modelSettingsHandlers.catalog),
+    "models.test": guard(modelSettingsHandlers.test),
     "modelsConfig.get": guard(modelConfigHandlers.get),
     "modelsConfig.set": guard(modelConfigHandlers.set),
     "modelsConfig.test": guard(modelConfigHandlers.test),
@@ -329,6 +375,7 @@ export function registerHandlers(server: RpcServer): () => Promise<void> {
   const shutdown = createHostShutdown([
     { name: "running subscription", stop: stopRunning },
     { name: "session event bindings", stop: bindings.close },
+    { name: "credential lock waits", stop: beginModelCredentialShutdown },
     { name: "authentication flows", stop: () => authLogin.dispose() },
     { name: "model refreshes", stop: () => modelCatalogRefreshCoordinator.cancelAll() },
     { name: "Herdr tool sync", stop: stopHerdrToolSync },
@@ -338,6 +385,15 @@ export function registerHandlers(server: RpcServer): () => Promise<void> {
     { name: "channels", stop: () => channelManager.shutdown() },
     { name: "file watches", stop: stopAllFileWatches },
     { name: "Agent sessions", stop: disposeAllRpcSessions },
+    { name: "MCP", stop: () => mcp.shutdown() },
+    {
+      name: "pending requests",
+      stop: async () => {
+        while (pendingCalls.size) await Promise.allSettled([...pendingCalls]);
+      },
+    },
+    { name: "model refresh completion", stop: () => modelCatalogRefreshCoordinator.settled() },
+    { name: "credential persistence", stop: settleModelCredentials },
   ]);
   return () => {
     closing = true;

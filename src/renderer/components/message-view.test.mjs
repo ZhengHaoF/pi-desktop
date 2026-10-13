@@ -5,11 +5,11 @@ import test, { after } from "node:test";
 import { createElement } from "react";
 import { act, create } from "react-test-renderer";
 import { renderToStaticMarkup } from "react-dom/server";
-import { redactHerdrPersistedMessage } from "../../agent-host/herdr/session-redaction.ts";
 
-const { MessageView } = await importTestBundle("src/renderer/components/message-view", {
+const { MessageView, withGeneratedImageReply } = await importTestBundle("src/renderer/components/message-view", {
   stdin: {
-    contents: 'export { MessageView } from "./MessageView.tsx";',
+    contents:
+      'export { MessageView } from "./MessageView.tsx"; export { withGeneratedImageReply } from "../lib/generated-image-reply.ts";',
     resolveDir: import.meta.dirname,
     sourcefile: "message-view-test-entry.tsx",
     loader: "tsx",
@@ -43,6 +43,20 @@ after(() => {
 
 test("MessageView is memoized to preserve unchanged historical messages", () => {
   assert.equal(MessageView.$$typeof, Symbol.for("react.memo"));
+});
+
+test("a historical tool without a canonical result is not displayed as still running", () => {
+  const html = renderToStaticMarkup(
+    createElement(MessageView, {
+      message: {
+        role: "assistant",
+        content: [{ type: "toolCall", toolCallId: "interrupted", toolName: "fixture", input: {} }],
+      },
+      runningToolCallIds: new Set(),
+    }),
+  );
+  assert.match(html, /Result was not recorded in the conversation/);
+  assert.doesNotMatch(html, /stream-caret/);
 });
 
 test("keeps the user copy action without timestamp or branch actions", () => {
@@ -141,6 +155,24 @@ test("renders actionable fallback text when a failed response has no provider de
   assert.match(html, /Check the API key, service URL, and model configuration/);
 });
 
+test("an aborted response keeps partial text and shows a neutral stopped status instead of a provider error", () => {
+  const html = renderToStaticMarkup(
+    createElement(MessageView, {
+      message: assistant({
+        stopReason: "aborted",
+        errorMessage: "This operation was aborted",
+        content: [{ type: "text", text: "Partial reply" }],
+      }),
+    }),
+  );
+  assert.match(html, /Partial reply/);
+  assert.match(html, /Response stopped/);
+  assert.match(html, /role="status"/);
+  assert.doesNotMatch(html, /Model request failed|Check the API key|role="alert"/);
+  const empty = renderToStaticMarkup(createElement(MessageView, { message: assistant({ stopReason: "aborted" }) }));
+  assert.match(empty, /Response stopped/);
+});
+
 test("continues to hide a completed empty non-error assistant message", () => {
   assert.equal(renderToStaticMarkup(createElement(MessageView, { message: assistant() })), "");
 });
@@ -209,14 +241,132 @@ function renderToolResult(result) {
 }
 
 function persistedHerdrResult(isError = false, output = "PRIVATE_FIXTURE_OUTPUT") {
-  return redactHerdrPersistedMessage({
+  const code = isError && output.includes("HERDR_REQUEST_TIMEOUT") ? "HERDR_REQUEST_TIMEOUT" : null;
+  return {
     role: "toolResult",
     toolCallId: "herdr-result",
     toolName: "herdr_list",
-    content: [{ type: "text", text: output }],
+    content: [
+      {
+        type: "text",
+        text: code
+          ? `[Herdr tool failed: ${code}. Live Herdr content was not saved.]`
+          : "[Sensitive Herdr result was not saved. Ask Pi to inspect the live Herdr fleet again.]",
+      },
+    ],
     isError,
-  });
+    ...(code ? { details: { errorCode: code } } : {}),
+  };
 }
+
+test("tool images render from persisted content without depending on the temporary image file", () => {
+  const result = {
+    role: "toolResult",
+    toolCallId: "image-result",
+    toolName: "codemode",
+    content: [
+      { type: "text", text: "[Image saved to /tmp/already-removed.png]" },
+      { type: "image", data: "aGVsbG8=", mimeType: "image/png" },
+      { type: "image", source: { type: "base64", media_type: "image/webp", data: "d29ybGQ=" } },
+    ],
+    isError: false,
+  };
+  const before = JSON.stringify(result);
+  const html = renderToolResult(result);
+  assert.match(html, /<img[^>]+src="data:image\/png;base64,aGVsbG8="/);
+  assert.match(html, /<img[^>]+src="data:image\/webp;base64,d29ybGQ="/);
+  assert.match(html, /alt="Tool result image"/);
+  assert.doesNotMatch(html, /src="[^"]*already-removed/);
+  assert.equal(JSON.stringify(result), before);
+});
+
+test("tool images wait for deferred data and never fetch a remote image or an arbitrary MIME type", () => {
+  const html = renderToolResult({
+    role: "toolResult",
+    toolCallId: "deferred-image",
+    toolName: "codemode",
+    content: [
+      {
+        type: "image",
+        data: "aGVsbG8=",
+        mimeType: "image/png",
+        deferredContent: { entryId: "entry", originalBytes: 10 },
+      },
+      { type: "image", source: { type: "url", url: "https://example.invalid/image.png" } },
+      { type: "image", data: "aGVsbG8=", mimeType: "image/svg+xml" },
+    ],
+    isError: false,
+  });
+  assert.doesNotMatch(html, /<img|example\.invalid|data:image/);
+});
+
+test("generated images appear in the final reply without rendering tool details or changing the transcript", () => {
+  const image = { type: "image", data: "aGVsbG8=", mimeType: "image/png" };
+  const result = {
+    role: "toolResult",
+    toolCallId: "generated",
+    toolName: "codemode",
+    content: [{ type: "text", text: "PRIVATE_PROCESS_DETAILS" }, image],
+    details: { calls: [{ name: "models.generateImages", status: "ok" }] },
+  };
+  const answer = assistant({ content: [{ type: "text", text: "Your picture is ready." }] });
+  const messages = [{ role: "user", content: "Make a picture" }, result, answer];
+  const before = JSON.stringify(messages);
+  const reply = withGeneratedImageReply(answer, answer, messages, 1, 3);
+  const html = renderToStaticMarkup(createElement(MessageView, { message: reply }));
+  assert.match(html, /Your picture is ready/);
+  assert.match(html, /<img[^>]+src="data:image\/png;base64,aGVsbG8="/);
+  assert.match(html, /alt="Image in reply"/);
+  assert.doesNotMatch(html, /PRIVATE_PROCESS_DETAILS|codemode|Load full content/);
+  assert.equal(JSON.stringify(messages), before);
+  assert.equal(reply.content.at(-1), image);
+});
+
+test("reply projection stays within its turn, excludes read images and retains successful output after a later failure", () => {
+  const image = { type: "image", data: "aGVsbG8=", mimeType: "image/png" };
+  const generated = {
+    role: "toolResult",
+    toolCallId: "gen",
+    toolName: "codemode",
+    content: [image, image],
+    details: { calls: [{ name: "models.generateImages", status: "ok" }] },
+    isError: true,
+  };
+  const read = { ...generated, toolCallId: "read", details: { calls: [{ name: "read", status: "ok" }] } };
+  const failed = {
+    ...generated,
+    toolCallId: "failed",
+    details: { calls: [{ name: "models.generateImages", status: "error" }] },
+  };
+  const answer = assistant({ content: [{ type: "text", text: "Done" }] });
+  assert.equal(withGeneratedImageReply(answer, answer, [generated, read, failed], 1, 3), answer);
+  const reply = withGeneratedImageReply(null, answer, [generated, read, failed], 0, 3);
+  assert.equal(reply.content.length, 1);
+  assert.equal(reply.content[0], image);
+});
+
+test("deferred generated images keep the tool entry reference for automatic history loading", () => {
+  const image = {
+    type: "image",
+    source: { type: "url", url: "" },
+    deferredContent: { entryId: "tool-entry", blockIndex: 2, originalBytes: 700000, contentType: "image" },
+  };
+  const result = {
+    role: "toolResult",
+    toolCallId: "gen",
+    toolName: "codemode",
+    content: [image],
+    details: { calls: [{ name: "models.generateImages", status: "ok" }] },
+  };
+  const answer = assistant({ content: [{ type: "text", text: "Done" }] });
+  const reply = withGeneratedImageReply(answer, answer, [result], 0, 1);
+  assert.equal(reply.content.at(-1), image);
+  const html = renderToStaticMarkup(
+    createElement(MessageView, { message: reply, onLoadDeferredContent: async () => {} }),
+  );
+  assert.match(html, /Loading image/);
+  assert.doesNotMatch(html, /Load full content/);
+});
 
 test("persisted Herdr results show a neutral history notice without changing the stored message", () => {
   const result = persistedHerdrResult();

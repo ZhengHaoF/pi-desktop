@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { statSync } from "node:fs";
+import { abortedAssistantEntryIds } from "./agent-settlement";
 import type { HistoryWindow, PagedContextInfo } from "../contract/types";
 import type {
   AgentMessage,
@@ -109,6 +110,7 @@ function deriveContextSettings(path: SessionEntry[]): Pick<PagedContextInfo, "th
 
 function projectDisplayMessages(path: SessionEntry[]): ProjectedMessage[] {
   const projected: ProjectedMessage[] = [];
+  const aborted = abortedAssistantEntryIds(path);
   let pendingChannelSource: ReturnType<typeof parseChannelSourceMarker> = null;
   path.forEach((entry, pathIndex) => {
     if (entry.type === "custom" && entry.customType === "pi-desktop-channel-source") {
@@ -123,6 +125,7 @@ function projectDisplayMessages(path: SessionEntry[]): ProjectedMessage[] {
     }
     let message = entryToUiMessage(entry);
     if (!message) return;
+    if (message.role === "assistant" && aborted.has(entry.id)) message = { ...message, stopReason: "aborted" };
     if (message.role === "user") {
       message = withUserMessageSource(message, pendingChannelSource?.channel, pendingChannelSource?.attachments);
       pendingChannelSource = null;
@@ -293,6 +296,9 @@ export function buildSessionHistoryPage(options: {
   const { entries, historyWindow, historyRevision, cursor } = options;
   const anchorLeafId = cursor?.anchorLeafId ?? options.leafId ?? entries.at(-1)?.id ?? null;
   const path = buildEntryPath(entries, anchorLeafId);
+  const selection = path.findLast((entry) => entry.type === "model_change");
+  const selectedModel =
+    selection?.type === "model_change" ? { provider: selection.provider, modelId: selection.modelId } : undefined;
   if (cursor) {
     if (cursor.historyRevision !== historyRevision) throw new StaleHistoryCursorError();
     if (path.length < cursor.anchorPathLength) throw new StaleHistoryCursorError();
@@ -304,6 +310,7 @@ export function buildSessionHistoryPage(options: {
     const context = buildSessionContext(entries, options.leafId);
     return {
       ...context,
+      selectedModel,
       totalMessages: context.messages.length,
       loadedMessages: context.messages.length,
       truncatedBefore: false,
@@ -352,6 +359,7 @@ export function buildSessionHistoryPage(options: {
     messages: selected.map((item) => item.message),
     entryIds: selected.map((item) => item.entryId),
     ...settings,
+    selectedModel,
     totalMessages: allMessages.length,
     loadedMessages: selected.length,
     truncatedBefore: hasOlder,
