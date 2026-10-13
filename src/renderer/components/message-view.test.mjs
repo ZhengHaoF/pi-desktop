@@ -273,10 +273,10 @@ test("tool images render from persisted content without depending on the tempora
   };
   const before = JSON.stringify(result);
   const html = renderToolResult(result);
-  assert.match(html, /<img[^>]+src="data:image\/png;base64,aGVsbG8="/);
-  assert.match(html, /<img[^>]+src="data:image\/webp;base64,d29ybGQ="/);
-  assert.match(html, /alt="Tool result image"/);
-  assert.doesNotMatch(html, /src="[^"]*already-removed/);
+  assert.match(html, /"src":"data:image\/png;base64,aGVsbG8="/);
+  assert.match(html, /"src":"data:image\/webp;base64,d29ybGQ="/);
+  assert.match(html, /"alt":"Tool result image"/);
+  assert.doesNotMatch(html, /"src":"[^"]*already-removed/);
   assert.equal(JSON.stringify(result), before);
 });
 
@@ -297,7 +297,7 @@ test("tool images wait for deferred data and never fetch a remote image or an ar
     ],
     isError: false,
   });
-  assert.doesNotMatch(html, /<img|example\.invalid|data:image/);
+  assert.doesNotMatch(html, /"type":"img"|example\.invalid|data:image/);
 });
 
 test("generated images appear in the final reply without rendering tool details or changing the transcript", () => {
