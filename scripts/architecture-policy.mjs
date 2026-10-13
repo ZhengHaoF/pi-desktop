@@ -40,9 +40,9 @@ export const architecturePolicy = {
       reason: "Existing terminal/session coordination; lifecycle changes require native integration evidence.",
     },
     "src/agent-host/rpc-manager.ts": {
-      maxLines: 1541,
+      maxLines: 1543,
       reason:
-        "Late extension registration must reapply the explicit no-tools choice at binding and command boundaries; four additional lines are fixed by real-model regressions.",
+        "Late extension registration must reapply the explicit no-tools choice at binding and command boundaries; four additional lines are fixed by real-model regressions. Two further lines route aborted-turn omission, whose logic lives in aborted-turn-omission.ts.",
     },
     "src/renderer/components/SettingsConfig.tsx": {
       maxLines: 1480,

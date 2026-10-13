@@ -42,6 +42,7 @@ import { installHerdrSessionRedaction } from "./herdr/session-redaction";
 import { createDesktopPromptExtension, SessionPromptPolicy } from "./session-prompt-policy";
 import { createEphemeralContextExtension, SessionEphemeralContext } from "./session-ephemeral-context";
 import { createLegacyChannelContextExtension } from "./legacy-channel-context";
+import { scheduleAbortedTurnOmission } from "./aborted-turn-omission";
 
 // ============================================================================
 // Types
@@ -219,6 +220,7 @@ export class AgentSessionWrapper {
   start(): void {
     this.unsubscribe = this.inner.subscribe((event: AgentEvent) => {
       this.resetIdleTimer();
+      if (event.type === "message_end") scheduleAbortedTurnOmission(this.inner, event.message, () => this._alive);
       const displayEvent = this.withExternalChannelSource(event);
       this.emit(displayEvent);
       try {
