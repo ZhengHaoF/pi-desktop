@@ -1,4 +1,5 @@
 import { ORCHESTRATION_TOOL_NAMES } from "./orchestration-tools.ts";
+import { WEB_SEARCH_TOOL_NAMES } from "./web-search.ts";
 import { isMcpManagedTool } from "./mcp-tool-policy.ts";
 import { isAgentShell, type AgentShell } from "./agent-shell.ts";
 
@@ -17,6 +18,8 @@ export const PRESET_NONE: string[] = [];
 export const PRESET_DEFAULT: string[] = ["read", "bash", "edit", "write"];
 export const CODING_FULL_TOOLS = ["bash", "read", "edit", "write", "grep", "find", "ls"];
 export const PRESET_FULL: string[] = [...CODING_FULL_TOOLS, ...ORCHESTRATION_TOOL_NAMES];
+/** Optional capabilities join the full preset only when explicitly reported available, like powershell. */
+const EXPLICITLY_GATED_TOOLS = new Set(["powershell", ...WEB_SEARCH_TOOL_NAMES]);
 
 const BUILTIN_TOOL_NAMES = new Set([...CODING_FULL_TOOLS, "powershell"]);
 
@@ -87,11 +90,17 @@ export function getToolNamesForPreset(
   tools?: readonly Pick<ToolEntry, "name" | "available">[],
 ): string[] {
   if (preset === "none") return [...PRESET_NONE];
-  if (preset === "full")
-    return [
+  if (preset === "full") {
+    const names = [
       ...PRESET_FULL,
       ...(tools?.some((tool) => tool.name === "powershell" && tool.available !== false) ? ["powershell"] : []),
-    ].filter((name) => !tools?.some((tool) => tool.name === name && tool.available === false));
+      // Web tools enter the full preset only while the feature is enabled and a key resolves.
+      ...WEB_SEARCH_TOOL_NAMES.filter((name) => tools?.some((tool) => tool.name === name && tool.available !== false)),
+    ];
+    return tools
+      ? names.filter((name) => !tools.some((tool) => tool.name === name && tool.available === false))
+      : names.filter((name) => !EXPLICITLY_GATED_TOOLS.has(name));
+  }
   const shell =
     tools?.some((tool) => tool.name === "bash" && tool.available === false) &&
     tools.some((tool) => tool.name === "powershell" && tool.available !== false)

@@ -18,6 +18,9 @@ import { peekHerdrBridge } from "./herdr/runtime";
 import { createHerdrToolDefinitions } from "./herdr/tools";
 import { peekManagedProcessService } from "./managed-process/runtime";
 import { createManagedProcessToolDefinitions } from "./managed-process/tools";
+import { createWebSearchToolDefinitions } from "./web-search/tools";
+import { peekWebSearchRuntime, webSearchToolNamesForAvailability } from "./web-search/runtime";
+import { isWebSearchToolName } from "../shared/web-search.ts";
 import type { SessionExecutionHistory } from "./session-execution-history";
 import type { ToolExecutionContext } from "../shared/toolchains/types";
 import type { AgentShell } from "../shared/agent-shell";
@@ -65,6 +68,7 @@ export async function createDesktopSessionTools(
         : []),
       ...createDesktopSearchToolDefinitions(cwd, context, runtime),
       ...createBrowserToolDefinitions(),
+      ...createWebSearchToolDefinitions(),
       ...(peekHerdrBridge() ? [...createHerdrToolDefinitions(cwd, peekHerdrBridge()!)] : []),
       ...(peekManagedProcessService()
         ? createManagedProcessToolDefinitions(cwd, settings.isProjectTrusted(), peekManagedProcessService()!)
@@ -84,11 +88,15 @@ export async function createDesktopSessionTools(
       policy = executionPolicy;
       const publish = () => {
         wrapper.setToolchainSummary(executionContext.inventoryRevision, executionContext.summary);
-        executionPolicy.setAvailability(
-          (name) =>
+        executionPolicy.setAvailability((name) => {
+          // Web tools are always registered; availability reflects the global switch and key resolution.
+          if (isWebSearchToolName(name))
+            return webSearchToolNamesForAvailability(peekWebSearchRuntime()?.getAvailability()).includes(name);
+          return (
             codingToolAvailability(platform, executionContext.commands, shell).find((tool) => tool.name === name)
-              ?.available !== false,
-        );
+              ?.available !== false
+          );
+        });
       };
       publish();
       wrapper.refreshToolchain = async () => {

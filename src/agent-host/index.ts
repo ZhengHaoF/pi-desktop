@@ -15,8 +15,12 @@ import { readPiRuntimeVersion } from "./runtime-version";
 import { applyManagedProcessOwnerIdentity } from "./managed-process/owner-identity";
 import type { HerdrRuntimeDescriptor } from "../contract/herdr";
 import { herdrRuntimeController } from "./herdr/runtime-controller";
+import { initializeWebSearchRuntime } from "./web-search/runtime";
 
 const piRuntimeVersion = readPiRuntimeVersion();
+
+// Web search settings and credential state must exist before any session registers its tools.
+initializeWebSearchRuntime();
 
 const server = createRpcServer();
 const restoreGitRunner = installToolchainGitRunner(toolchainRuntime, () => {

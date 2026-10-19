@@ -45,6 +45,7 @@ import { ChannelManager } from "./channels/channel-manager";
 
 import { initializeManagedProcessService } from "./managed-process/runtime";
 import { ManagedProcessError } from "./managed-process/service";
+import { peekWebSearchRuntime } from "./web-search/runtime";
 
 import { HerdrBridgeError } from "./herdr/errors";
 import { clearHerdrBridge, initializeHerdrBridge } from "./herdr/runtime";
@@ -299,6 +300,18 @@ export function registerHandlers(server: RpcServer): () => Promise<void> {
 
     "settings.getAgentShell": guard(resourceHandlers.getAgentShell),
     "settings.setAgentShell": guard(resourceHandlers.setAgentShell),
+    "settings.getWebSearch": guard(resourceHandlers.getWebSearch),
+
+    "settings.setWebSearch": guard(async (params) => {
+      const snapshot = await resourceHandlers.setWebSearch(params);
+      // Republish availability, then reconcile active sessions so full-access picks the tools up.
+      await peekWebSearchRuntime()?.refresh();
+      syncDesktopToolsForAllSessions();
+      return snapshot;
+    }),
+
+    "settings.testWebSearch": guard(resourceHandlers.testWebSearch),
+
     "settings.getCacheWarming": guard(resourceHandlers.getCacheWarming),
 
     "settings.setCacheWarming": guard(resourceHandlers.setCacheWarming),

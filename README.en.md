@@ -134,6 +134,13 @@ Managed background processes support macOS, Linux, and Windows 11 x64. Windows A
 - Project configuration overrides global entries with the same name; extension sources and pending changes are shown separately, and tools still require session authorization after configuration is saved
 - Expose MCP tools directly to the model or discover and call them through tool search or Codemode; original results and complete structured content are retained in execution history
 
+### Web search and fetch
+
+- Enable read-only `web_search` and `web_fetch` tools in Settings → Search; both are off by default and granted per session like other tools
+- Search and fetch run on DeepSeek's Search/Fetch APIs and reuse the configured DeepSeek provider key, or a dedicated key saved in Settings
+- Successful calls are billed per request by the provider and recorded in execution history; rate limits, authentication failures, and insufficient balance surface as clear tool errors
+- Search results and fetched pages are marked as untrusted data for the model; nothing is executed and no key is ever logged or returned
+
 ### A project-focused file experience
 
 - Select project directories natively and manage Git branches and worktrees

@@ -30,9 +30,10 @@ import { CacheWarmingSettings } from "./settings/CacheWarmingSettings";
 import { DefaultThinkingLevelSettings } from "./settings/DefaultThinkingLevelSettings";
 import { SessionListSettings } from "./settings/SessionListSettings";
 import { McpConfig, type McpConfigHandle } from "./mcp/McpConfig";
+import { WebSearchSettings } from "./settings/WebSearchSettings";
 
 export type SettingsTab =
-  "general" | "herdr" | "browser" | "channels" | "models" | "tools" | "skills" | "plugins" | "mcp" | "about";
+  "general" | "herdr" | "browser" | "search" | "channels" | "models" | "tools" | "skills" | "plugins" | "mcp" | "about";
 
 interface SettingsConfigProps {
   cwd: string | null;
@@ -121,6 +122,7 @@ export function SettingsConfig({
     { id: "plugins", label: t("plugins", "Plugins") },
     { id: "mcp", label: t("mcpTab", "MCP") },
     { id: "browser", label: t("browser", "Browser") },
+    { id: "search", label: t("searchTab", "Search") },
     { id: "herdr", label: t("herdr", "Herdr") },
     { id: "channels", label: t("channels", "Channels") },
     { id: "tools", label: t("developerTools", "Developer Tools") },
@@ -327,6 +329,7 @@ export function SettingsConfig({
               />
             )}
             {activeTab === "browser" && <BrowserSettings sessionId={sessionId} />}
+            {activeTab === "search" && <WebSearchSettings />}
             {activeTab === "mcp" && <McpConfig ref={mcpConfigRef} cwd={cwd} sessionId={sessionId} />}
             {activeTab === "herdr" && <HerdrSettings />}
             {activeTab === "models" && (

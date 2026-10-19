@@ -5,6 +5,7 @@
 import { createRpcClient, type PiRpc } from "@contract/rpc";
 import type { ApiMethod, ApiParams, ApiResult, StreamTopic, Streams } from "@contract/api";
 import type { AgentCommand } from "@contract/types";
+import type { WebSearchSettings } from "@shared/web-search";
 
 let rpc: PiRpc | null = null;
 let connectPromise: Promise<PiRpc> | null = null;
@@ -214,6 +215,19 @@ export async function getCacheWarmingStatus() {
 
 export async function setCacheWarmingMode(mode: "off" | "streaming" | "idle") {
   return call("settings.setCacheWarming", { mode });
+}
+
+export async function getWebSearchSettings() {
+  return call("settings.getWebSearch");
+}
+
+export async function setWebSearchSettings(patch: Partial<WebSearchSettings>) {
+  return call("settings.setWebSearch", patch);
+}
+
+/** Validates the saved configuration, or an unsaved draft key, with one real search call. */
+export async function testWebSearchSettings(apiKeyOverride?: string) {
+  return call("settings.testWebSearch", apiKeyOverride === undefined ? undefined : { apiKeyOverride });
 }
 
 export async function listModels(cwd?: string) {

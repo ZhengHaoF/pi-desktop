@@ -161,6 +161,56 @@ test("model connection tests use isolated configuration and preserve success and
   if (before.version === "missing") assert.throws(() => readFileSync(modelFile), { code: "ENOENT" });
 });
 
+test("web search settings persist, gate availability, and test the effective key with one real call", async (t) => {
+  const { handlers } = await captureHandlers();
+  const { Response } = globalThis;
+  const original = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, auth: init.headers.Authorization, body: JSON.parse(init.body) });
+    return new Response(JSON.stringify({ results: [{ title: "DeepSeek 首页", url: "https://www.deepseek.com" }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  };
+  t.after(() => {
+    globalThis.fetch = original;
+  });
+
+  // Defaults keep the feature off with no resolvable credential.
+  const initial = await handlers["settings.getWebSearch"]();
+  assert.equal(initial.settings.enabled, false);
+  assert.equal(initial.credential.source, "none");
+  assert.equal(initial.credential.providerId, "deepseek");
+
+  // Saving a dedicated key makes it the reported credential source.
+  const saved = await handlers["settings.setWebSearch"]({ enabled: true, apiKeyOverride: "sk-web-search-fixture" });
+  assert.equal(saved.settings.enabled, true);
+  assert.equal(saved.credential.source, "override");
+
+  // The test runs exactly one real search with the saved key.
+  const passed = await handlers["settings.testWebSearch"]();
+  assert.equal(passed.ok, true, passed.error);
+  assert.equal(passed.responseText, "DeepSeek 首页");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "https://api.deepseek.com/v1/tools/search");
+  assert.equal(calls[0].auth, "Bearer sk-web-search-fixture");
+  assert.equal(calls[0].body.count, 1);
+
+  // A draft key is validated without being persisted.
+  const draft = await handlers["settings.testWebSearch"]({ apiKeyOverride: "sk-draft" });
+  assert.equal(draft.ok, true, draft.error);
+  assert.equal(calls[1].auth, "Bearer sk-draft");
+  assert.equal((await handlers["settings.getWebSearch"]()).settings.apiKeyOverride, "sk-web-search-fixture");
+
+  // Non-retryable provider failures map to readable errors.
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ error: { message: "insufficient balance" } }), { status: 402 });
+  const failed = await handlers["settings.testWebSearch"]({ apiKeyOverride: "sk-draft" });
+  assert.equal(failed.ok, false);
+  assert.match(failed.error, /balance/);
+});
+
 test("model list fetches use isolated configuration and parse provider catalogs", async (t) => {
   const { handlers } = await captureHandlers();
   const calls = [];

@@ -13,6 +13,7 @@ import { enUS as modelsEnUS, zhCN as modelsZhCN, zhTW as modelsZhTW } from "./i1
 import { enUS as resourcesEnUS, zhCN as resourcesZhCN, zhTW as resourcesZhTW } from "./i18n/resources.ts";
 import { enUS as sessionEnUS, zhCN as sessionZhCN, zhTW as sessionZhTW } from "./i18n/session.ts";
 import { enUS as settingsEnUS, zhCN as settingsZhCN, zhTW as settingsZhTW } from "./i18n/settings.ts";
+import { enUS as webSearchEnUS, zhCN as webSearchZhCN, zhTW as webSearchZhTW } from "./i18n/websearch.ts";
 
 export const enUS = mergeDictionaries(
   routingEnUS,
@@ -28,6 +29,7 @@ export const enUS = mergeDictionaries(
   resourcesEnUS,
   sessionEnUS,
   settingsEnUS,
+  webSearchEnUS,
 );
 export const zhCN = mergeDictionaries(
   routingZhCN,
@@ -43,6 +45,7 @@ export const zhCN = mergeDictionaries(
   resourcesZhCN,
   sessionZhCN,
   settingsZhCN,
+  webSearchZhCN,
 );
 export const zhTW = mergeDictionaries(
   routingZhTW,
@@ -58,6 +61,7 @@ export const zhTW = mergeDictionaries(
   resourcesZhTW,
   sessionZhTW,
   settingsZhTW,
+  webSearchZhTW,
 );
 
 export const dictionaries = { "en-US": enUS, "zh-CN": zhCN, "zh-TW": zhTW } satisfies Record<
