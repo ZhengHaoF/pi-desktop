@@ -246,10 +246,6 @@ export async function getModelPreferences(cwd?: string) {
   return call("models.preferences.get", cwd ? { cwd } : undefined);
 }
 
-export async function setModelPreferences(cwd: string | undefined, enabledModels: string[] | null) {
-  return call("models.preferences.set", { ...(cwd ? { cwd } : {}), enabledModels });
-}
-
 export async function setDefaultModel(cwd: string | undefined, provider: string, modelId: string) {
   return call("models.default.set", { ...(cwd ? { cwd } : {}), provider, modelId });
 }

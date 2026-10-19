@@ -13,7 +13,6 @@ import {
 import { modelCatalogRefreshCoordinator } from "../model-runtime";
 import { createDesktopAgentSessionServices as createAgentSessionServices } from "../desktop-session-services";
 import { stripThinkingSuffix } from "../../shared/thinking-levels";
-import { AUTO_ROUTING_MODEL, AUTO_ROUTING_PROVIDER } from "../../contract/model-settings";
 
 /** Thinking levels the desktop editor offers; the SDK also accepts "max". */
 const THINKING_LEVEL_VALUES = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
@@ -31,41 +30,21 @@ function normalizeThinkingLevelInput(value: unknown): PersistedThinkingLevel | n
   return value as PersistedThinkingLevel;
 }
 
-function filterByExactEnabledModels<T extends { id: string; provider: string }>(
-  available: readonly T[],
-  enabledModels: string[] | undefined,
-): readonly T[] {
-  if (!enabledModels || enabledModels.length === 0) return available;
-  const refs = new Set(enabledModels.map(stripThinkingSuffix).filter(Boolean));
-  const visible = available.filter(
-    (m) =>
-      refs.has(`${m.provider}/${m.id}`) ||
-      refs.has(m.id) ||
-      (m.provider === AUTO_ROUTING_PROVIDER && m.id === AUTO_ROUTING_MODEL),
-  );
-  return visible.length > 0 ? visible : available;
-}
-
 function resolveDefaultModel(
   settings: Pick<SettingsManager, "getDefaultProvider" | "getDefaultModel">,
-  visible: readonly { provider: string; id: string }[],
-  available: readonly { provider: string; id: string }[],
 ): { provider: string; modelId: string } | null {
   const provider = settings.getDefaultProvider();
   const modelId = settings.getDefaultModel();
   if (!provider || !modelId) return null;
-  const reference = { provider, modelId };
-  if (visible.some((model) => model.provider === provider && model.id === modelId)) return reference;
-  // A default the user filtered out of the picker never surfaces, so it is not
-  // projected. A default that is unavailable at all — its provider lost its
-  // credentials, an Azure migration renamed it — is still projected: dropping it
-  // would silently authorize a replacement the user never chose.
-  return available.some((model) => model.provider === provider && model.id === modelId) ? null : reference;
+  // A default whose provider lost its credentials or was renamed by an Azure
+  // migration is still projected: dropping it would silently authorize a
+  // replacement the user never chose.
+  return { provider, modelId };
 }
 
 /**
- * Mirrors Pi's own persisted-default handling: a default filtered out by
- * enabledModels never reaches the picker, so it is added back to the list.
+ * Mirrors Pi's own persisted-default handling: Pi's picker and model cycling
+ * still honor enabledModels, so a default outside that scope is added back.
  */
 export function includeDefaultModelInEnabled(
   enabledModels: string[] | undefined,
@@ -92,10 +71,10 @@ export function projectModelPreferences<T extends { id: string; name: string; pr
   const normalized = [...new Set((enabledModels ?? []).map(stripThinkingSuffix).filter(Boolean))];
   return {
     models,
+    // Still reported for Pi's own scoped picker and model cycling; the desktop
+    // model picker itself shows every available model.
     enabledModels: normalized.length > 0 ? normalized : null,
-    // The picker hides models filtered out by enabledModels, so a default that is
-    // filtered out would never surface; project it against the same visible set.
-    defaultModel: resolveDefaultModel(settings, filterByExactEnabledModels(available, enabledModels), available),
+    defaultModel: resolveDefaultModel(settings),
     defaultThinkingLevel: settings.getDefaultThinkingLevel() ?? null,
     modelThinkingLevels: settings.getAllModelThinkingLevels(),
   };
@@ -198,9 +177,7 @@ export async function projectModelsList(
     ? { models: [...modelRuntime.getAvailableSnapshot()], warnings: [] }
     : await resolveAvailableModels(modelRuntime, options.signal);
   const available = availability.models;
-  const enabledModels = settings.getEnabledModels();
-  const visible = filterByExactEnabledModels(available, enabledModels);
-  const models = visible
+  const models = available
     .map((model) => ({
       id: model.id,
       name: model.name,
@@ -212,7 +189,7 @@ export async function projectModelsList(
   const nameMap: Record<string, string> = {};
   const thinkingLevels: Record<string, string[]> = {};
   const thinkingLevelMaps: Record<string, Record<string, string | null>> = {};
-  for (const model of visible) {
+  for (const model of available) {
     const key = `${model.provider}:${model.id}`;
     nameMap[key] = model.name;
     thinkingLevels[key] = getSupportedThinkingLevels(model);
@@ -221,7 +198,7 @@ export async function projectModelsList(
 
   return {
     models,
-    defaultModel: resolveDefaultModel(settings, visible, available),
+    defaultModel: resolveDefaultModel(settings),
     thinkingLevels,
     thinkingLevelMaps,
     nameMap,

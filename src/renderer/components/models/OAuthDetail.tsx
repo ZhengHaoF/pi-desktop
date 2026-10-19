@@ -3,7 +3,6 @@ import { SectionTitle } from "../form-controls";
 import { useI18n } from "@/i18n";
 import { call, subscribeAuthLogin } from "@/lib/api-client";
 import type { ProviderStatus as OAuthProvider, LoginProgressEvent } from "@contract/types";
-import { type ModelSelectionControl, ManagedModelsControl } from "./ManagedModelsControl";
 import { AuthReplacementNotice } from "./AuthReplacementNotice";
 import type { CredentialMutationOptions } from "@contract/auth";
 import { oauthProviderName, authPromptLabel } from "./provider-display";
@@ -30,13 +29,11 @@ export function OAuthDetail({
   authType = "oauth",
   onRefresh,
   onReloadCredentials,
-  modelSelection,
 }: {
   provider: OAuthProvider;
   authType?: "oauth" | "api_key";
   onRefresh: () => void;
   onReloadCredentials?: () => void;
-  modelSelection: ModelSelectionControl;
 }) {
   const { t } = useI18n();
   const [loginState, setLoginState] = useState<OAuthLoginState>({ phase: "idle" });
@@ -556,8 +553,6 @@ export function OAuthDetail({
           </>
         )}
       </div>
-
-      {provider.loggedIn && <ManagedModelsControl providerId={provider.id} {...modelSelection} />}
     </div>
   );
 }

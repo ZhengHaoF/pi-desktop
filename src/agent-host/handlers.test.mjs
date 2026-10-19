@@ -831,9 +831,11 @@ test("model preferences project the persisted default and keep it enabled", asyn
   assert.equal(unfiltered.defaultThinkingLevel, "high");
   assert.deepEqual(unfiltered.modelThinkingLevels, { "fixture/alpha": "low" });
 
-  // A default filtered out of the picker never surfaces, so it must not be projected.
-  const filteredOut = projectModelPreferences(available, ["fixture/alpha"], settings);
-  assert.equal(filteredOut.defaultModel, null);
+  // The desktop picker lists every available model, so a default is projected
+  // whether or not enabledModels scopes it (Pi's own picker still honors that list).
+  const scoped = projectModelPreferences(available, ["fixture/alpha"], settings);
+  assert.deepEqual(scoped.enabledModels, ["fixture/alpha"]);
+  assert.deepEqual(scoped.defaultModel, { provider: "fixture", modelId: "beta" });
 
   // Persisting a default adds it back to enabledModels, matching Pi's own behavior.
   assert.deepEqual(includeDefaultModelInEnabled(["fixture/alpha"], "fixture", "beta"), [
@@ -1312,11 +1314,14 @@ test("session, model configuration, and auth handlers isolate state and preserve
     enabledModels: [`${selectedReference}:high`, selectedReference],
   });
   assert.deepEqual(updatedPreferences.enabledModels, [selectedReference]);
-  const filteredModels = await handlers["models.list"]({ cwd: root });
-  assert.deepEqual(
-    filteredModels.models.map((model) => `${model.provider}/${model.id}`),
-    [selectedReference],
+  const listedModels = await handlers["models.list"]({ cwd: root });
+  // The desktop picker ignores enabledModels: every available model is listed,
+  // including the scoped one and everything outside that scope.
+  assert.ok(
+    listedModels.models.some((model) => `${model.provider}/${model.id}` === selectedReference),
+    "the scoped model is still listed",
   );
+  assert.ok(listedModels.models.length > 1, "models outside enabledModels are listed too");
   const resetPreferences = await handlers["models.preferences.set"]({ cwd: root, enabledModels: null });
   assert.equal(resetPreferences.enabledModels, null);
   await assert.rejects(

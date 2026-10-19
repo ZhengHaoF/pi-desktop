@@ -18,13 +18,7 @@ import {
   type ModelsJson,
   type ProviderEntry,
 } from "@/lib/models-config-state";
-import {
-  call,
-  getModelPreferences,
-  setDefaultModel,
-  setModelPreferences,
-  setThinkingLevelDefault,
-} from "@/lib/api-client";
+import { call, getModelPreferences, setDefaultModel, setThinkingLevelDefault } from "@/lib/api-client";
 import type {
   ModelPreferencesResult,
   ProviderStatus as OAuthProvider,
@@ -76,9 +70,6 @@ export function ModelsConfig({
   const [oauthProviders, setOauthProviders] = useState<OAuthProvider[]>([]);
   const [apiKeyProviders, setApiKeyProviders] = useState<ApiKeyProvider[]>([]);
   const [modelPreferences, setModelPreferencesState] = useState<ModelPreferencesResult | null>(null);
-  const [modelPreferencesLoading, setModelPreferencesLoading] = useState(true);
-  const [modelPreferencesSaving, setModelPreferencesSaving] = useState(false);
-  const [modelPreferencesError, setModelPreferencesError] = useState<string | null>(null);
   const [defaultModelSaving, setDefaultModelSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const addProviderButtonRef = useRef<HTMLButtonElement>(null);
@@ -96,33 +87,14 @@ export function ModelsConfig({
   }, []);
 
   const loadModelPreferences = useCallback(async () => {
-    setModelPreferencesLoading(true);
-    setModelPreferencesError(null);
     try {
       setModelPreferencesState(await getModelPreferences(cwd ?? undefined));
     } catch (error) {
-      setModelPreferencesError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setModelPreferencesLoading(false);
+      // Preferences only carry the default model and thinking levels; a failed
+      // read leaves those at their defaults instead of blocking the editor.
+      console.error("Failed to load model preferences:", error);
     }
   }, [cwd]);
-
-  const updateModelPreferences = useCallback(
-    async (enabledModels: string[] | null) => {
-      setModelPreferencesSaving(true);
-      setModelPreferencesError(null);
-      try {
-        const result = await setModelPreferences(cwd ?? undefined, enabledModels);
-        setModelPreferencesState(result);
-        onChanged?.();
-      } catch (error) {
-        setModelPreferencesError(error instanceof Error ? error.message : String(error));
-      } finally {
-        setModelPreferencesSaving(false);
-      }
-    },
-    [cwd, onChanged],
-  );
 
   // Persists the conversation default model (Pi global settings). Failures surface
   // inline on the button, so the rejection is forwarded to the caller.
@@ -347,13 +319,6 @@ export function ModelsConfig({
             provider={p}
             onRefresh={refreshOAuthProviders}
             onReloadCredentials={reloadCredentials}
-            modelSelection={{
-              preferences: modelPreferences,
-              loading: modelPreferencesLoading,
-              saving: modelPreferencesSaving,
-              error: modelPreferencesError,
-              onChange: updateModelPreferences,
-            }}
           />
           {providerOverrides(p.id)}
         </div>
@@ -371,13 +336,6 @@ export function ModelsConfig({
             onBaseUrlChange={(baseUrl) => setConfig((prev) => setProviderBaseUrl(prev, p.id, baseUrl))}
             onRefresh={refreshApiKeyProviders}
             onReloadCredentials={reloadCredentials}
-            modelSelection={{
-              preferences: modelPreferences,
-              loading: modelPreferencesLoading,
-              saving: modelPreferencesSaving,
-              error: modelPreferencesError,
-              onChange: updateModelPreferences,
-            }}
           />
           {providerOverrides(p.id)}
         </div>

@@ -305,13 +305,6 @@ test("a configured classifier-only provider shows Jev without an empty chat sele
   const rendered = JSON.stringify(fixture.renderer.toJSON());
   assert.match(rendered, /jev-latest/);
   assert.match(rendered, /Codemode/);
-  assert.doesNotMatch(rendered, /No models are currently available|Choose which models appear/);
-  assert.equal(
-    fixture
-      .detail("ApiKeyDetail")
-      .findAll((node) => typeof node.type === "function" && node.type.name === "ManagedModelsControl").length,
-    0,
-  );
 });
 
 test("provider picker owns its search and focus lifecycle, supports Escape, and returns a custom selection to the editor", async (t) => {
@@ -505,24 +498,12 @@ test("OAuth completion and logout notify after commit while progress and duplica
   assert.equal(testApi.state.catalogReads, 3);
 });
 
-test("config and model-selection saves keep their existing single committed-change notification", async (t) => {
+test("a config save keeps its existing single committed-change notification", async (t) => {
   const fixture = await mount(t);
   await fixture.click("Save");
   assert.equal(fixture.changed, 0);
   await fixture.reply(0, { ok: true, version: "two" });
   assert.equal(fixture.changed, 1);
-  await fixture.select("API fixture");
-  const checkbox = fixture
-    .detail("ApiKeyDetail")
-    .find((node) => node.type === "input" && node.props.type === "checkbox");
-  const saved = createDeferred();
-  testApi.state.writeResult = saved.promise;
-  await act(async () => checkbox.props.onChange({ target: { checked: false } }));
-  assert.equal(fixture.changed, 1);
-  assert.deepEqual(testApi.state.writes, [{ cwd: "/project", enabledModels: [] }]);
-  await act(async () => saved.resolve({ models: [], enabledModels: [] }));
-  assert.equal(fixture.changed, 2);
-  assert.equal(testApi.state.catalogReads, 3);
 });
 
 test("fetching a provider model list imports the picked entries locally and persists them on save", async (t) => {

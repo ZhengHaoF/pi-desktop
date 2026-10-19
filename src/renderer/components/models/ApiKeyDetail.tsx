@@ -3,7 +3,6 @@ import { Field, SecretTextInput, SectionTitle, TextInput } from "../form-control
 import { useI18n } from "@/i18n";
 import { call } from "@/lib/api-client";
 import type { ApiKeyProviderStatus as ApiKeyProvider } from "@contract/types";
-import { type ModelSelectionControl, ManagedModelsControl } from "./ManagedModelsControl";
 import { AuthReplacementNotice } from "./AuthReplacementNotice";
 import type { CredentialMutationOptions } from "@contract/auth";
 import { OAuthDetail } from "./OAuthDetail";
@@ -15,14 +14,12 @@ export function ApiKeyDetail({
   onBaseUrlChange,
   onRefresh,
   onReloadCredentials,
-  modelSelection,
 }: {
   provider: ApiKeyProvider;
   baseUrl: string;
   onBaseUrlChange: (baseUrl: string) => void;
   onRefresh: () => void;
   onReloadCredentials?: () => void;
-  modelSelection: ModelSelectionControl;
 }) {
   const { t } = useI18n();
   const [apiKey, setApiKey] = useState("");
@@ -109,7 +106,6 @@ export function ApiKeyDetail({
           }}
           onRefresh={onRefresh}
           onReloadCredentials={onReloadCredentials}
-          modelSelection={modelSelection}
         />
         <AuxiliaryModels providerId={provider.id} models={provider.auxiliaryModels ?? []} />
         <Field label={t("modelBaseUrl", "Base URL")}>
@@ -248,9 +244,6 @@ export function ApiKeyDetail({
         {t("modelGuidedLogin", "Guided API key setup")}
       </button>
       <AuxiliaryModels providerId={provider.id} models={provider.auxiliaryModels ?? []} />
-      {provider.configured && provider.chatModelCount !== 0 && (
-        <ManagedModelsControl providerId={provider.id} {...modelSelection} />
-      )}
 
       {provider.configured && (provider.storedAuthType === undefined || provider.storedAuthType === "api_key") && (
         <button
