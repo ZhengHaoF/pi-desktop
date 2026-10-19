@@ -40,6 +40,7 @@ import {
   type StreamAction,
 } from "../lib/session-turn-state";
 export type { AgentPhase, CompactResultInfo, QueuedMessages } from "../lib/session-turn-state";
+import { readCompactionEstimate, withCompactionEstimate } from "../lib/session-context-usage";
 
 export type SessionData = SessionDetail;
 type AgentStateResponse = SessionRuntimeState;
@@ -221,6 +222,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     contextWindow: number;
     tokens: number | null;
   } | null>(null);
+  // Bridges the unknown reading Pi reports until the first response after a compaction.
+  const compactionEstimateRef = useRef<number | null>(null);
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
   const [forkingEntryId, setForkingEntryId] = useState<string | null>(null);
   const [currentModelOverride, setCurrentModelOverride] = useState<{ provider: string; modelId: string } | null>(null);
@@ -268,7 +271,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         if (liveState.agentSettled && runtimeGate.isCurrent(ticket, "run"))
           agentAbortedRef.current = liveState.agentSettled.aborted;
         if (liveState.contextUsage !== undefined && runtimeGate.accept(ticket, "usage"))
-          setContextUsage(liveState.contextUsage ?? null);
+          setContextUsage(withCompactionEstimate(liveState.contextUsage, compactionEstimateRef.current));
         if (liveState.systemPrompt !== undefined && runtimeGate.accept(ticket, "systemPrompt"))
           setSystemPrompt(liveState.systemPrompt ?? null);
         if (liveState.thinkingLevel !== undefined && runtimeGate.accept(ticket, "thinking"))
@@ -698,7 +701,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         }
         case "auto_compaction_end":
         case "compaction_end":
-          if (!event.errorMessage && !event.aborted && sessionIdRef.current) void loadSession(sessionIdRef.current);
+          // Usage captured before a compaction is stale: reload runtime state and
+          // let the projection bridge the unknown reading Pi reports after it.
+          if (event.errorMessage || event.aborted) break;
+          compactionEstimateRef.current = readCompactionEstimate(event.result);
+          if (sessionIdRef.current) void loadSession(sessionIdRef.current, false, true);
           break;
         case "extension_ui_request":
           handleExtensionUiRequest(event as ExtensionUiRequest);
@@ -970,7 +977,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       const result = await sendAgentCommand(sid, { type: "compact" });
       if (!ownsView()) return;
       dispatchTurn({ type: "compaction-result", result: readCompactResult(result, "manual") });
-      await loadSession(sid, true);
+      await loadSession(sid, true, true);
     } catch (e) {
       if (!ownsView()) return;
       dispatchTurn({ type: "compaction-error", error: e instanceof Error ? e.message : String(e) });
@@ -1019,7 +1026,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
             });
             if (!ownsView()) return { handled: true };
             dispatchTurn({ type: "compaction-result", result: readCompactResult(result, "manual") });
-            if (await loadSession(sid, true)) promoteNewSession();
+            if (await loadSession(sid, true, true)) promoteNewSession();
             return complete({ handled: true, message: t("contextCompacted", "Compacted context") });
           }
 

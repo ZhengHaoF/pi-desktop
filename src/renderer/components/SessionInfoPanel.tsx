@@ -8,6 +8,9 @@ import { LatestRequestGate } from "@/lib/latest-request-gate";
 type SessionCopyField = "file" | "id";
 type SessionCopyFeedback = { field: SessionCopyField; status: "copied" | "error" };
 
+// Context usage ring geometry (16x16 viewBox, r = 6); the arc encodes the used percentage.
+const CONTEXT_RING_CIRCUMFERENCE = 2 * Math.PI * 6;
+
 export function SessionInfoPanel({
   store,
   showChat,
@@ -80,8 +83,10 @@ export function SessionInfoPanel({
             n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
           let ctxColor = "var(--text-muted)";
           let ctxStr: string | null = null;
+          let ctxPercent: number | null = null;
           if (contextUsage?.contextWindow) {
             const pct = contextUsage.percent;
+            ctxPercent = pct;
             if (pct !== null && pct > 90) ctxColor = "#ef4444";
             else if (pct !== null && pct > 70) ctxColor = "rgba(234,179,8,0.95)";
             ctxStr =
@@ -160,19 +165,22 @@ export function SessionInfoPanel({
               )}
               {ctxStr && (
                 <span style={{ display: "flex", alignItems: "center", gap: 4, color: ctxColor }}>
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 10 10"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M1 9 L1 5 Q1 1 5 1 Q9 1 9 5 L9 9" />
-                    <line x1="1" y1="9" x2="9" y2="9" />
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <circle cx="8" cy="8" r="6" stroke="var(--border)" strokeWidth="2" />
+                    <circle
+                      cx="8"
+                      cy="8"
+                      r="6"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeDasharray={CONTEXT_RING_CIRCUMFERENCE}
+                      strokeDashoffset={
+                        CONTEXT_RING_CIRCUMFERENCE * (1 - Math.max(0, Math.min(100, ctxPercent ?? 0)) / 100)
+                      }
+                      transform="rotate(-90 8 8)"
+                      style={{ transition: "stroke-dashoffset 0.25s ease" }}
+                    />
                   </svg>
                   {ctxStr}
                 </span>

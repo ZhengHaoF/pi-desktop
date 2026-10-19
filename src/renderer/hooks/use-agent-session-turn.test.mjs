@@ -59,7 +59,12 @@ const { useAgentSession, testApi, SessionPresentationStore } = await importTestB
           export function resetCommands() { pendingCommands.clear(); commands.length = connections.length = historyReads = 0; }
           let detail, page;
           export function setHistory(nextDetail, nextPage) { detail = nextDetail; page = nextPage; }
-          export async function getSession() { historyReads++; if (!detail) throw new Error("unexpected detail read"); return detail; }
+          export async function getSession(id, includeState) {
+            historyReads++;
+            if (!detail) throw new Error("unexpected detail read");
+            // The host resolves runtime state only when the caller asks for it.
+            return includeState ? detail : { ...detail, agentState: undefined };
+          }
           export async function getSessionContextPage() { if (!page) throw new Error("unexpected page read"); return page; }
           const unexpected = async () => { throw new Error("unexpected session IO"); };
           export { unexpected as getSessionContext,
@@ -500,6 +505,35 @@ test("a newer history-only refresh does not discard the initial runtime hydratio
   assert.equal(fixture.current.agentRunning, true);
   assert.equal(fixture.current.systemPrompt, "initial");
   assert.deepEqual(fixture.current.messages, [message]);
+});
+
+test("a compaction reload refreshes context usage instead of keeping the pre-compaction reading", async (t) => {
+  const window = 1_000_000;
+  const fixture = await mountRuntime(
+    t,
+    runtimeDetail({
+      running: false,
+      state: { contextUsage: { percent: 59, tokens: 590_000, contextWindow: window } },
+    }),
+  );
+  assert.equal(fixture.current.contextUsage?.percent, 59);
+  // Pi reports usage as unknown until the first response after a compaction,
+  // so the compaction projection has to bridge that reading.
+  testApi.setHistory(
+    runtimeDetail({
+      running: false,
+      state: { contextUsage: { percent: null, tokens: null, contextWindow: window } },
+    }),
+    undefined,
+  );
+  await fixture.emit({
+    type: "compaction_end",
+    reason: "manual",
+    result: { tokensBefore: 590_000, estimatedTokensAfter: 40_000 },
+  });
+  assert.equal(fixture.current.contextUsage?.tokens, 40_000);
+  assert.equal(fixture.current.contextUsage?.percent, 4);
+  assert.equal(fixture.current.contextUsage?.contextWindow, window);
 });
 
 test("an initial snapshot hydrates the run while preserving newer queue, compaction and extension events", async (t) => {

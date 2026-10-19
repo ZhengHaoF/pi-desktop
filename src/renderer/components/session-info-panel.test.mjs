@@ -37,10 +37,10 @@ async function mount(t) {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const store = new SessionPresentationStore(),
     publisher = store.createPublisher();
-  const data = (id) => ({
+  const data = (id, contextUsage = null) => ({
     sessionId: id,
     info: { id, name: id },
-    contextUsage: null,
+    contextUsage,
     stats: {
       sessionId: id,
       sessionName: id,
@@ -88,6 +88,9 @@ async function mount(t) {
     async switchSession(id) {
       await act(async () => publisher.update(data(id)));
     },
+    async setContextUsage(contextUsage) {
+      await act(async () => publisher.update(data("a", contextUsage)));
+    },
   };
 }
 
@@ -126,4 +129,37 @@ test("a late clipboard success after panel unmount does not create a feedback ti
     pending.resolve();
   });
   assert.equal(timers, 0);
+});
+
+test("context usage renders as a ring whose arc encodes the used percentage", async (t) => {
+  const fixture = await mount(t),
+    circumference = 2 * Math.PI * 6;
+  const contextSpan = () =>
+    fixture.root
+      .findAllByType("span")
+      .find((span) =>
+        Array.isArray(span.props.children)
+          ? span.props.children.some((child) => typeof child === "string" && child.includes(" / "))
+          : false,
+      );
+  const arc = () => fixture.root.findByProps({ transform: "rotate(-90 8 8)" });
+
+  await fixture.setContextUsage({ percent: 13, contextWindow: 1_000_000, tokens: 130_000 });
+  assert.ok(contextSpan().props.children.includes("13% / 1.0M"));
+  assert.equal(arc().props.strokeDasharray, circumference);
+  assert.ok(Math.abs(arc().props.strokeDashoffset - circumference * 0.87) < 1e-9);
+  assert.equal(contextSpan().props.style.color, "var(--text-muted)");
+
+  // An unknown percentage keeps the question-mark text and leaves the ring empty.
+  await fixture.setContextUsage({ percent: null, contextWindow: 1_000_000, tokens: null });
+  assert.ok(contextSpan().props.children.includes("? / 1.0M"));
+  assert.equal(arc().props.strokeDashoffset, circumference);
+
+  // Out-of-range percentages clamp so the arc never overdraws the track.
+  await fixture.setContextUsage({ percent: 150, contextWindow: 1_000_000, tokens: 150_000 });
+  assert.equal(arc().props.strokeDashoffset, 0);
+
+  // High usage switches the arc and the text to the shared warning color.
+  await fixture.setContextUsage({ percent: 95, contextWindow: 1_000_000, tokens: 950_000 });
+  assert.equal(contextSpan().props.style.color, "#ef4444");
 });
