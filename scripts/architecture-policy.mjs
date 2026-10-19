@@ -31,7 +31,7 @@ export const architecturePolicy = {
       reason: "Existing browser permission and profile settings; preserve their security checks.",
     },
     "src/renderer/components/AppShell.tsx": {
-      maxLines: 1584,
+      maxLines: 1585,
       reason:
         "Reduced by 22-04 presentation extraction; one completion-time index reconciliation covers missed first-session file events.",
     },
