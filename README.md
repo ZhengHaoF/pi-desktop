@@ -16,7 +16,7 @@
 
 [English](./README.en.md) · **简体中文**
 
-[下载 v0.4.0](https://github.com/DLYZZT/pi-desktop/releases/tag/v0.4.0) · [截图](#应用截图) · [功能](#核心能力) · [快速开始](#快速开始) · [架构](#架构设计) · [变更记录](https://github.com/DLYZZT/pi-desktop/releases) · [路线图](#路线图)
+[下载 v0.4.1](https://github.com/DLYZZT/pi-desktop/releases/tag/v0.4.1) · [截图](#应用截图) · [功能](#核心能力) · [快速开始](#快速开始) · [架构](#架构设计) · [变更记录](https://github.com/DLYZZT/pi-desktop/releases) · [路线图](#路线图)
 
 </div>
 
@@ -143,7 +143,7 @@
 
 ### 模型与扩展统一管理
 
-- 内置 Pi Coding Agent 1.1.0，管理模型提供商和模型配置
+- main 中的 Windows 新会话默认 Shell 为 PowerShell，可在“设置 → 通用 → Agent 默认 Shell”改为 Bash。
 - 会话启动优先使用本地模型目录；需要时可显式刷新远程目录，离线、超时或部分 provider 失败时继续保留缓存模型
 - 按服务商提供 API Key、订阅或 OAuth 登录，支持多步凭据配置向导、已有凭据替换确认和 Azure 旧配置迁移
 - 模型编辑支持采样参数、按思考级别设置采样参数、图像与请求输入限制，以及按模型 ID 覆盖参数；支持的模型可选择 `max` 推理级别
@@ -151,6 +151,8 @@
 - 保存模型和高级配置时检测外部修改冲突，避免覆盖在 CLI 或编辑器中更新的配置
 - 搜索、安装和配置 Skills；正常安装沿用 npm 默认并发，遇到网络、超时或 cache lock 故障时使用隔离缓存重试一次
 - 管理 Plugins，并沿用 Pi Agent 的扩展体系
+
+开发分支的模型配置可先运行 `npm run check:models-config` 只读预检；无效字段会使整份自定义配置暂不生效，设置页保留原内容以便修正。OpenRouter 的个性化目录与 Pi CLI 共享缓存，不按 key 或 endpoint 分区；不同凭据交替使用、特别是离线启动时，列表可能来自另一个运行环境，不能将缓存目录视为当前 key 已获授权。
 
 ### Auto 虚拟模型与自动路由
 
@@ -203,9 +205,9 @@
 
 ### 使用桌面安装包
 
-最新稳定版为 [v0.4.0](https://github.com/DLYZZT/pi-desktop/releases/tag/v0.4.0)，提供 macOS Apple Silicon / Intel、Windows x64 和 Linux x64 安装包。
+最新稳定版为 [v0.4.1](https://github.com/DLYZZT/pi-desktop/releases/tag/v0.4.1)，提供 macOS Apple Silicon / Intel、Windows x64 和 Linux x64 安装包。
 
-v0.4.0 内置 Pi Coding Agent 1.1.0，包含 MCP 管理、图片生成、决策模型和 Auto 自动路由等功能。也可按下方步骤[从源码运行](#本地运行)。
+v0.4.1 内置 Pi Coding Agent 1.2.0，新增 Windows PowerShell 支持和默认 Agent Shell 设置，完善模型配置恢复、工具权限与渠道附件处理，并改善启动和设置面板加载体验。也可按下方步骤[从源码运行](#本地运行)。
 
 普通用户使用 Agent 本身无需单独安装 Pi CLI、Pi Coding Agent、Node.js 或 npm；安装桌面应用并配置模型提供商后即可使用。Skills、Plugins 或 Agent 脚本需要额外开发工具时，应用会优先复用健康的系统安装，也可以在用户确认后安装应用私有运行时。
 

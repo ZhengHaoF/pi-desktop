@@ -150,6 +150,28 @@ async function mount(t) {
   };
 }
 
+test("the permission menu contains presets and errors without shell configuration controls", async (t) => {
+  const f = await mount(t);
+  await f.update({
+    toolSelectionError: "save failed",
+  });
+  await f.clickLabel("Change permission settings");
+  assert.equal(f.root.findAllByType("input").length, 0);
+  assert.doesNotMatch(text(f.root), /PowerShell|Bash/);
+  assert.match(text(f.root), /save failed/);
+});
+
+test("choosing the displayed no-tools preset still sends a fresh revocation intent", async (t) => {
+  const f = await mount(t);
+  await f.update({ toolPreset: "none" });
+  await f.clickLabel("Change permission settings");
+  const selected = f.root.find(
+    (node) => node.type === "button" && node.props.role === "menuitemradio" && node.props["aria-checked"] === true,
+  );
+  await act(async () => selected.props.onClick());
+  assert.deepEqual(f.actions.at(-1), ["permission", "none"]);
+});
+
 test("model menus preserve provider identity, cancel an active refresh on close and release positioning observers", async (t) => {
   const f = await mount(t);
   await f.clickText("Chosen model");

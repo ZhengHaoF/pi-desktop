@@ -1,3 +1,4 @@
+import type { AgentShell, AgentShellSettings } from "../shared/agent-shell";
 import type { AdvancedModelSettings, AutoRoutingConfig, CatalogModel, ModelSettingsSnapshot } from "./model-settings";
 import type {
   AgentCommand,
@@ -135,6 +136,7 @@ export interface Api {
       inventoryRevision: number;
       resolutionId: string;
       capabilities: Partial<Record<ToolCapabilityId, { provider: ToolProvider; version: string }>>;
+      codingTools?: Array<{ name: string; available: boolean }>;
     };
   };
 
@@ -409,6 +411,8 @@ export interface Api {
   };
 
   // Config
+  "settings.getAgentShell": { params: void; result: AgentShellSettings };
+  "settings.setAgentShell": { params: { shell: AgentShell }; result: AgentShellSettings };
   "settings.getCacheWarming": {
     params: void;
     result: {

@@ -262,6 +262,7 @@ export function ChatWindow({
     handleRecallQueue,
     handleBuiltinSlashCommand,
     handleToolPresetChange,
+    toolSelectionError,
     handleThinkingLevelChange,
     loadSlashCommands,
     loadOlder,
@@ -375,6 +376,7 @@ export function ChatWindow({
       compactResult={compactResult}
       toolPreset={toolPreset}
       onToolPresetChange={session || isNew ? handleToolPresetChange : undefined}
+      toolSelectionError={toolSelectionError}
       thinkingLevel={thinkingLevel}
       onThinkingLevelChange={session || isNew ? handleThinkingLevelChange : undefined}
       availableThinkingLevels={availableThinkingLevels}

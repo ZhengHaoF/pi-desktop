@@ -12,7 +12,8 @@ import { useI18n, type AppLanguage } from "@/i18n";
 import { ModelsConfig } from "./ModelsConfig";
 import { SkillsConfig, type SkillsConfigHandle } from "./SkillsConfig";
 import { PluginsConfig } from "./PluginsConfig";
-import { ToolchainsConfig } from "./ToolchainsConfig";
+import { ToolchainsConfig } from "./ToolchainsSettings";
+import { WindowsAgentShellSetting } from "./AgentShellSetting";
 import { BrowserSettings } from "./browser/BrowserSettings";
 import { ChannelsConfig } from "./channels/ChannelsConfig";
 import type { ChannelsSnapshot } from "@shared/channel-types";
@@ -45,6 +46,8 @@ interface SettingsConfigProps {
   chatAppearance: ChatAppearancePreferences;
   chatAppearanceSaving: boolean;
   onChatAppearanceChange: (preferences: ChatAppearancePreferences) => Promise<void>;
+  /** Element to refocus on close; the deferred wrapper captures it before any loading frame takes focus. */
+  returnFocusTarget?: HTMLElement | null;
 }
 
 export function SettingsConfig({
@@ -59,6 +62,7 @@ export function SettingsConfig({
   chatAppearance,
   chatAppearanceSaving,
   onChatAppearanceChange,
+  returnFocusTarget,
 }: SettingsConfigProps) {
   const isMobile = useIsMobile();
   const { isDark, toggleTheme } = useTheme();
@@ -71,7 +75,11 @@ export function SettingsConfig({
   const skillsConfigRef = useRef<SkillsConfigHandle>(null);
   const mcpConfigRef = useRef<McpConfigHandle>(null);
   const returnFocusRef = useRef<HTMLElement | null>(
-    document.activeElement instanceof HTMLElement ? document.activeElement : null,
+    returnFocusTarget !== undefined
+      ? returnFocusTarget
+      : document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null,
   );
 
   const requestSettingsTransition = useCallback((action: () => void) => {
@@ -1090,6 +1098,8 @@ function GeneralSettings({
       </section>
 
       <div style={{ height: 1, background: "var(--border)", maxWidth: 620, margin: "28px 0" }} />
+
+      <WindowsAgentShellSetting />
 
       <section style={{ maxWidth: 620 }}>
         <h2 style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>{t("managedProcesses", "Managed processes")}</h2>

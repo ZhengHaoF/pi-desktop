@@ -30,6 +30,7 @@ import type {
   ProviderStatus as OAuthProvider,
   ApiKeyProviderStatus as ApiKeyProvider,
   AzureUpgradeReport,
+  ModelsConfigIssue,
 } from "@contract/types";
 import { ProviderDetail, ModelDetail, ModelOverridesField } from "./models/ModelForms";
 import { ProviderIcon } from "./models/ProviderIcon";
@@ -64,6 +65,7 @@ export function ModelsConfig({
   );
   const [configVersion, setConfigVersion] = useState<string | null>(null);
   const [azureUpgrade, setAzureUpgrade] = useState<AzureUpgradeReport>();
+  const [configIssues, setConfigIssues] = useState<ModelsConfigIssue[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -177,6 +179,7 @@ export function ModelsConfig({
       });
       setConfigVersion(snapshot.version);
       setAzureUpgrade(snapshot.azureUpgrade);
+      setConfigIssues(snapshot.issues ?? []);
       setConfigLoaded(true);
       setSaveConflict(false);
       setSaveError(null);
@@ -286,6 +289,7 @@ export function ModelsConfig({
         setSaveError("Invalid models config save response");
       } else {
         setConfigVersion(result.version);
+        setConfigIssues([]);
         setSaveConflict(false);
         setSavedOk(true);
         onChanged?.();
@@ -517,6 +521,26 @@ export function ModelsConfig({
           )}
 
           <AzureUpgradeNotice report={azureUpgrade} />
+          {configIssues.length > 0 && (
+            <div
+              role="alert"
+              style={{ padding: "10px 18px", color: "var(--error, #f87171)", maxHeight: 180, overflow: "auto" }}
+            >
+              <p>
+                {t(
+                  "modelConfigInvalidInSettings",
+                  "The saved models.json is invalid. All custom providers and overrides are inactive. Correct the editable fields here; for other fields, edit models.json manually and reload the disk version. Reload the session after repairing the configuration.",
+                )}
+              </p>
+              <ul>
+                {configIssues.map((issue, index) => (
+                  <li key={`${issue.path}:${index}`}>
+                    <code>{issue.path}</code>: {issue.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {/* Body */}
           <div style={{ flex: 1, display: "flex", flexDirection: isMobile ? "column" : "row", overflow: "hidden" }}>
             {/* Left: tree */}
@@ -866,7 +890,7 @@ export function ModelsConfig({
               }}
             >
               {saveError && <span style={{ fontSize: 12, color: "#f87171", flex: 1 }}>{saveError}</span>}
-              {saveConflict && (
+              {(saveConflict || configIssues.length > 0) && (
                 <button
                   type="button"
                   onClick={() => void loadModelsConfig()}

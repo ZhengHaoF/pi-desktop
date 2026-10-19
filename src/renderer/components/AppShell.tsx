@@ -23,7 +23,8 @@ import { SessionPresentationStore } from "@/lib/session-presentation-store";
 import { FileExplorer } from "./FileExplorer";
 import { FileViewer } from "./FileViewer";
 import { TabBar } from "./TabBar";
-import { SettingsConfig, type SettingsTab } from "./SettingsConfig";
+import type { SettingsTab } from "./SettingsConfig";
+import { preloadSettingsConfig, scheduleSettingsConfigPreload, SettingsConfig, TerminalDock } from "./DeferredPanels";
 import { useMcpSettingsRequests } from "../hooks/useMcpSettingsRequests";
 import { QuickChannelBinding } from "./channels/QuickChannelBinding";
 import { BrowserDock } from "./browser/BrowserDock";
@@ -59,7 +60,6 @@ import { worktreePathsEqual } from "@shared/worktree-path";
 import type { BrowserAgentAuthorizationRequest, BrowserAgentAuthorizationDecision } from "../../contract/browser";
 import { isManagedProcessActiveState } from "@contract/processes";
 import { QuickHerdrFleet } from "./herdr/QuickHerdrFleet";
-import { TerminalDock } from "./herdr/TerminalDock";
 import type { HerdrPane } from "@contract/herdr";
 
 const EXPLORER_TAB_ID = "explorer";
@@ -124,6 +124,8 @@ export function AppShell({
   useEffect(() => {
     setMobileSidebarReady(true);
   }, []);
+  // Warm the deferred Settings chunk once the UI is idle so the first open does not wait on it.
+  useEffect(() => scheduleSettingsConfigPreload(), []);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   const thinkingExpansionRegistryRef = useRef(new ThinkingExpansionRegistry());
   const processDetailsExpansionRegistryRef = useRef(new ThinkingExpansionRegistry());
@@ -756,7 +758,11 @@ export function AppShell({
             fontSize: 12,
             transition: "background 0.12s, color 0.12s",
           }}
+          onFocus={() => {
+            void preloadSettingsConfig().catch(() => undefined);
+          }}
           onMouseEnter={(e) => {
+            void preloadSettingsConfig().catch(() => undefined);
             e.currentTarget.style.background = "var(--bg-hover)";
             e.currentTarget.style.color = "var(--text)";
           }}

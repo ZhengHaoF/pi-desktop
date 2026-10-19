@@ -1,3 +1,5 @@
+import { SessionResourceReload } from "./session-resource-reload";
+import { loadSessionToolSelection } from "./session-shell";
 import { buildLiveSessionStats } from "./session-stats";
 import { AUTO_ROUTING_PROVIDER } from "../contract/model-settings";
 import {
@@ -7,7 +9,7 @@ import {
   type AgentSessionRuntimeDiagnostic,
 } from "@earendil-works/pi-coding-agent";
 import { randomUUID } from "crypto";
-import { EXCLUDED_PI_TOOLS, filterDesktopToolNames, validateDesktopToolNames } from "../shared/pi-tool-policy.ts";
+import { excludedPiTools, filterDesktopToolNames, validateDesktopToolNames } from "../shared/pi-tool-policy.ts";
 import { assertSessionWritable } from "./session-readonly.ts";
 import { cacheSessionPath } from "./session-reader";
 import type { SlashCommandInfo } from "@earendil-works/pi-coding-agent";
@@ -24,18 +26,16 @@ import { browserCapabilityRuntime } from "./browser-capability-runtime";
 import { browserAgentRuntime } from "./browser-agent-runtime";
 import { projectExtensionDiagnostics } from "./extension-diagnostics";
 import {
-  getDesktopSessionToolNames,
   setDesktopSessionToolNames,
   getDesktopSessionExecutionTools,
   setDesktopSessionExecutionTools,
   getDefaultStore,
 } from "./session-tool-store";
-import { withExtensionTools } from "./tool-activation";
+import { withExtensionTools, filterUnapprovedShellTools } from "./tool-activation";
 export { withExtensionTools } from "./tool-activation";
 import { SessionToolPolicy } from "./session-tool-policy";
 import { applySessionToolCommand } from "./session-tool-settings";
 import { withSessionOrchestration } from "./session-orchestration";
-import { getLegacySessionToolNames } from "./legacy-session-tools";
 export { getLegacySessionToolNames } from "./legacy-session-tools";
 import { peekHerdrBridge } from "./herdr/runtime";
 import { herdrToolNamesForRuntime, isHerdrToolName } from "./herdr/tools";
@@ -46,6 +46,7 @@ import { peekMcpService } from "./mcp/runtime";
 import { getDesktopSessionMcpExecutionTools, copyDesktopMcpTools } from "./session-tool-store";
 import { SessionExecutionHistory } from "./session-execution-history";
 import { createDesktopAgentSessionServices as createAgentSessionServices } from "./desktop-session-services";
+import { promptChannelTurn, cancelChannelAttachmentContext } from "./channel-attachment-context";
 import { createDesktopSessionTools } from "./desktop-session-tools";
 import { SessionModelSelection } from "./session-model-selection";
 
@@ -139,6 +140,8 @@ export class AgentSessionWrapper {
   private disposePromise: Promise<void> | null = null;
   private _alive = true;
   private requestedToolNames: string[] | undefined;
+  refreshToolchain?: () => Promise<void>;
+  private readonly resourceReload = new SessionResourceReload();
   private readonly persistToolNames: (sessionId: string, toolNames: string[]) => void;
 
   constructor(
@@ -152,8 +155,11 @@ export class AgentSessionWrapper {
     readonly modelSelection = new SessionModelSelection(),
   ) {
     this.inner = inner;
+    this.toolPolicy?.setResourceReady(() => this.resourceReload.executionReady());
     this.persistToolNames = persistToolNames;
-    this.requestedToolNames = requestedToolNames ? filterDesktopToolNames(requestedToolNames) : requestedToolNames;
+    this.requestedToolNames = requestedToolNames
+      ? filterDesktopToolNames(requestedToolNames, process.platform)
+      : requestedToolNames;
     this.forceEmptySystemPrompt = this.requestedToolNames?.length === 0;
     this.promptPolicy = promptPolicy ?? new SessionPromptPolicy(this.forceEmptySystemPrompt);
   }
@@ -217,7 +223,9 @@ export class AgentSessionWrapper {
     ).filter((name) => !isBrowserToolName(name) && !isHerdrToolName(name));
     const browserTools = browserToolNamesForSnapshot(browserCapabilityRuntime.getSnapshot());
     const herdrTools = herdrToolNamesForRuntime(peekHerdrBridge());
-    this.inner.setActiveToolsByName(filterDesktopToolNames([...current, ...browserTools, ...herdrTools]));
+    this.inner.setActiveToolsByName(
+      filterUnapprovedShellTools([...current, ...browserTools, ...herdrTools], this.requestedToolNames),
+    );
   }
 
   syncBrowserToolActivation(): void {
@@ -326,6 +334,7 @@ export class AgentSessionWrapper {
   }
 
   private async waitForExtensionsBound(): Promise<void> {
+    await this.resourceReload.ready();
     try {
       if (!this.extensionsBound) await this.ensureExtensionsBound();
     } catch (err) {
@@ -398,6 +407,8 @@ export class AgentSessionWrapper {
     onProgress?: (event: AgentEvent) => void;
   }): Promise<{ runId: string; finalText: string }> {
     return this.enqueueTurn(async () => {
+      // Extensions can start runs outside the wrapper queue; let their existing source finish first.
+      if (this.inner.isStreaming || this.inner.isCompacting) await this.inner.waitForIdle();
       this.modelSelection.assertReady(this.inner);
       this.emit({ type: "channel_turn_start", runId: params.runId });
       this.externalTurnActive = true;
@@ -412,27 +423,14 @@ export class AgentSessionWrapper {
           channel: params.channel,
           ...(params.channelAttachments?.length ? { attachments: params.channelAttachments } : {}),
         });
-        if (params.attachmentContext) {
-          await this.inner.sendCustomMessage(
-            {
-              customType: "pi-desktop-channel-attachment-context",
-              content: params.attachmentContext,
-              display: false,
-            },
-            { deliverAs: "nextTurn" },
-          );
-        }
-        await this.inner.prompt(params.message, {
-          ...(params.images?.length ? { images: params.images } : {}),
-          expandPromptTemplates: false,
-          source: "rpc",
-        });
-        const finalText = this.inner.getLastAssistantText()?.trim() ?? "";
+        const { preflight, finalText } = await promptChannelTurn(this.inner, params);
+        if (preflight === "handled" || this.agentSettled?.aborted)
+          cancelChannelAttachmentContext(this.inner.sessionManager, params.runId, Boolean(params.attachmentContext));
         this.emit({ type: "channel_turn_end", runId: params.runId, finalText });
         return { runId: params.runId, finalText };
       } catch (error) {
         try {
-          this.inner.sessionManager.appendCustomEntry("pi-desktop-channel-source-cancelled", { runId: params.runId });
+          cancelChannelAttachmentContext(this.inner.sessionManager, params.runId, Boolean(params.attachmentContext));
         } catch {
           // A best-effort UI marker must never hide the original turn failure.
         }
@@ -452,22 +450,31 @@ export class AgentSessionWrapper {
     });
   }
 
-  private async reloadSessionResources(): Promise<void> {
-    if (this.extensionBindingPromise) {
-      try {
-        await this.extensionBindingPromise;
-      } catch {
-        // Reload is the explicit recovery path for a failed extension bind.
+  private reloadSessionResources(): Promise<void> {
+    return this.resourceReload.run(async () => {
+      const recoverConfig = this.modelSelection.prepareConfigRecovery(this.inner);
+      if (this.extensionBindingPromise) {
+        try {
+          await this.extensionBindingPromise;
+        } catch {
+          // Reload is the explicit recovery path for a failed extension bind.
+        }
       }
-    }
-    this.extensionsBound = false;
-    this.extensionBindingPromise = null;
-    this.extensionBindingError = null;
-    this.extensionStatuses.clear();
-    this.extensionWidgets.clear();
-    await this.inner.reload();
-    await this.ensureExtensionsBound();
-    if (this.requestedToolNames !== undefined) this.applyRequestedTools(this.requestedToolNames);
+      this.extensionsBound = false;
+      this.extensionBindingError = null;
+      this.extensionStatuses.clear();
+      this.extensionWidgets.clear();
+      this.extensionsBound = await this.resourceReload.reloadSession(
+        this.inner,
+        this.refreshToolchain,
+        () => this.inner.extensionRunner.setUIContext?.(this.createExtensionUiContext(), "rpc"),
+        () => this._alive,
+      );
+      await this.ensureExtensionsBound();
+      if (this.requestedToolNames !== undefined) this.applyRequestedTools(this.requestedToolNames);
+      this.syncDesktopToolActivation();
+      return recoverConfig ? () => this.modelSelection.restoreAfterConfigRepair(this.inner) : undefined;
+    });
   }
 
   async runExternalCommand(params: { command: ExternalSessionCommand; customInstructions?: string }): Promise<void> {
@@ -641,7 +648,10 @@ export class AgentSessionWrapper {
         );
         this.persistToolNames(
           newSessionId,
-          filterDesktopToolNames(this.requestedToolNames ?? this.inner.getActiveToolNames()),
+          filterUnapprovedShellTools(
+            this.requestedToolNames ?? this.inner.getActiveToolNames(),
+            this.requestedToolNames,
+          ),
         );
         const execution = this.toolPolicy?.getExecution();
         if (execution) setDesktopSessionExecutionTools(newSessionId, execution);
@@ -775,11 +785,9 @@ export class AgentSessionWrapper {
           command,
         );
 
-      case "reload": {
+      case "reload":
         await this.enqueueTurn(() => this.reloadSessionResources());
-        this.syncDesktopToolActivation();
         return { success: true };
-      }
 
       case "abort_compaction": {
         this.inner.abortCompaction();
@@ -1296,15 +1304,7 @@ export class AgentSessionWrapper {
         this.reportUnsupportedExtensionFeature("extension-driven session switch");
         return { cancelled: true };
       },
-      reload: async () => {
-        this.extensionStatuses.clear();
-        this.extensionWidgets.clear();
-        await this.inner.reload({
-          beforeSessionStart: () => {
-            this.inner.extensionRunner.setUIContext?.(this.createExtensionUiContext(), "rpc");
-          },
-        });
-      },
+      reload: () => this.reloadSessionResources(),
     };
   }
 }
@@ -1427,7 +1427,7 @@ export async function startRpcSession(
   cwd: string,
   toolNames?: string[],
 ): Promise<{ session: AgentSessionWrapper; realSessionId: string }> {
-  if (toolNames !== undefined) validateDesktopToolNames(toolNames);
+  if (toolNames !== undefined) validateDesktopToolNames(toolNames, process.platform);
   const registry = getRegistry();
   const locks = getLocks();
 
@@ -1451,13 +1451,12 @@ export async function startRpcSession(
     const executionHistory = new SessionExecutionHistory(sessionManager);
     await executionHistory.recover();
 
-    // Desktop-owned session choices live outside Pi's shared JSONL so the CLI
-    // remains unaffected. Read the old custom entry only for one-way migration.
     const managerSessionId = sessionManager.getSessionId();
-    const desktopToolNames = getDesktopSessionToolNames(managerSessionId);
-    const legacyToolNames = desktopToolNames === undefined ? getLegacySessionToolNames(sessionManager) : undefined;
-    const persistedToolNames = desktopToolNames ?? legacyToolNames;
-    const sessionToolNames = persistedToolNames ?? toolNames;
+    const {
+      shell,
+      toolNames: sessionToolNames,
+      hasStoredTools,
+    } = loadSessionToolSelection(sessionManager, !sessionFile, toolNames);
     const toolPolicy = new SessionToolPolicy(
       sessionManager,
       sessionToolNames,
@@ -1487,18 +1486,19 @@ export async function startRpcSession(
       },
       { project: true, sessionManager },
     );
-    const { executionContext, customTools } = await createDesktopSessionTools(
+    const desktopTools = await createDesktopSessionTools(
       cwd,
       sessionManager,
       services.settingsManager,
       executionHistory,
+      { shell },
     );
     const model = modelSelection.prepare(services, sessionManager);
     const { session: inner, modelFallbackMessage } = await createAgentSessionFromServices({
       services,
       sessionManager,
-      customTools,
-      excludeTools: [...EXCLUDED_PI_TOOLS],
+      customTools: desktopTools.customTools,
+      excludeTools: [...excludedPiTools(process.platform)],
       ...(model ? { model } : {}),
     });
     modelSelection.finish(inner, modelFallbackMessage);
@@ -1509,7 +1509,7 @@ export async function startRpcSession(
     // them later. Narrow only the active set, never the registry allow-list.
     if (sessionToolNames !== undefined) {
       inner.setActiveToolsByName(withExtensionTools(inner, sessionToolNames));
-      if (desktopToolNames === undefined) setDesktopSessionToolNames(realSessionId, sessionToolNames);
+      if (!hasStoredTools) setDesktopSessionToolNames(realSessionId, sessionToolNames, shell);
     }
 
     const wrapper = new AgentSessionWrapper(
@@ -1523,7 +1523,7 @@ export async function startRpcSession(
       modelSelection,
     );
     wrapper.setRuntimeDiagnostics(services.diagnostics);
-    wrapper.setToolchainSummary(executionContext.inventoryRevision, executionContext.summary);
+    desktopTools.attach(wrapper, toolPolicy);
     wrapper.start();
     wrapper.syncDesktopToolActivation();
 

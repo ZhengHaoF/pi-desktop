@@ -16,7 +16,7 @@ Local-first · No internal server · Cross-platform
 
 **English** · [简体中文](./README.md)
 
-[Download v0.4.0](https://github.com/DLYZZT/pi-desktop/releases/tag/v0.4.0) · [Screenshots](#screenshots) · [Features](#features) · [Quick start](#quick-start) · [Architecture](#architecture) · [Changelog](https://github.com/DLYZZT/pi-desktop/releases) · [Roadmap](#roadmap)
+[Download v0.4.1](https://github.com/DLYZZT/pi-desktop/releases/tag/v0.4.1) · [Screenshots](#screenshots) · [Features](#features) · [Quick start](#quick-start) · [Architecture](#architecture) · [Changelog](https://github.com/DLYZZT/pi-desktop/releases) · [Roadmap](#roadmap)
 
 </div>
 
@@ -143,7 +143,7 @@ Managed background processes support macOS, Linux, and Windows 11 x64. Windows A
 
 ### Unified model and extension management
 
-- Bundle Pi Coding Agent 1.1.0 and manage model providers and model configurations
+- On main, new Windows sessions default to PowerShell; choose Bash in Settings → General → Default Agent shell.
 - Prefer the local model directory when sessions start; explicitly refresh the remote directory when needed while preserving cached models across offline, timeout, or partial-provider failures
 - Use API keys, subscriptions, or OAuth as supported by each provider, with guided credential setup, confirmation before replacing existing credentials, and migration of older Azure configuration
 - Configure sampling parameters, sampling by thinking level, image/request input limits, and per-model overrides; select `max` reasoning on models that support it
@@ -151,6 +151,8 @@ Managed background processes support macOS, Linux, and Windows 11 x64. Windows A
 - Detect external configuration changes when saving model and advanced settings to avoid overwriting edits made through the CLI or an editor
 - Search for, install, and configure Skills; normal installs keep npm's default concurrency, with one isolated-cache retry for network, timeout, or cache-lock failures
 - Manage Plugins while continuing to use the Pi Agent extension ecosystem
+
+On the development branch, run `npm run check:models-config` for a read-only configuration preflight. Invalid fields disable the whole custom configuration; Models settings preserve its content for repair. OpenRouter's personalized catalog shares the Pi CLI cache without credential or endpoint partitioning. With different credentials, especially offline, the list may reflect another runtime; it is not proof of authorization for the current key.
 
 ### Auto virtual model and routing
 
@@ -203,9 +205,9 @@ Generated images appear in final replies and remain viewable when session histor
 
 ### Use a desktop build
 
-The latest stable version is [v0.4.0](https://github.com/DLYZZT/pi-desktop/releases/tag/v0.4.0), with builds for macOS Apple Silicon and Intel, Windows x64, and Linux x64.
+The latest stable version is [v0.4.1](https://github.com/DLYZZT/pi-desktop/releases/tag/v0.4.1), with builds for macOS Apple Silicon and Intel, Windows x64, and Linux x64.
 
-Version 0.4.0 bundles Pi Coding Agent 1.1.0, including MCP management, image generation, decision models, and Auto routing. You can also [run from source](#run-locally) using the steps below.
+Version 0.4.1 bundles Pi Coding Agent 1.2.0, adds Windows PowerShell support and a default Agent shell setting, improves model configuration recovery, tool permissions, and channel attachment handling, and makes startup and Settings loading smoother. You can also [run from source](#run-locally) using the steps below.
 
 Regular users do not need to install the Pi CLI, Pi Coding Agent, Node.js, or npm just to use the Agent. When a Skill, Plugin, or Agent script needs additional developer tools, the application first reuses healthy system installations and can install private runtimes after explicit user confirmation.
 

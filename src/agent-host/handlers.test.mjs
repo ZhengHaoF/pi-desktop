@@ -405,7 +405,9 @@ test("model config saves reject payloads the runtime would drop and keep the pre
     }
   });
 
-  // A partial cost object makes the SDK drop every provider, so the save is refused.
+  // A partial cost object is refused before it reaches the disk: the schema gate
+  // names the missing property, and the runtime round-trip backs it up for
+  // payloads the schema alone would accept.
   await assert.rejects(
     () =>
       handlers["modelsConfig.set"]({
@@ -424,7 +426,7 @@ test("model config saves reject payloads the runtime would drop and keep the pre
     (error) =>
       error.code === "BAD_REQUEST" &&
       /cacheWrite/.test(error.message) &&
-      /rejected by the model runtime/.test(error.message),
+      (/no changes were saved/.test(error.message) || /rejected by the model runtime/.test(error.message)),
   );
   assert.deepEqual(await handlers["modelsConfig.get"](), before, "a rejected save must not touch models.json");
 
@@ -1165,7 +1167,7 @@ test("session, model configuration, and auth handlers isolate state and preserve
       custom: {
         api: "openai-completions",
         baseUrl: "https://example.invalid/v1",
-        headers: { Authorization: "Bearer test", "X-Remove-Me": "dropped" },
+        headers: { Authorization: "Bearer test", "X-Remove-Me": null },
         models: [
           {
             id: "model-one",
@@ -1185,8 +1187,27 @@ test("session, model configuration, and auth handlers isolate state and preserve
   };
   const editorOne = await handlers["modelsConfig.get"]();
   const editorTwo = await handlers["modelsConfig.get"]();
+  await assert.rejects(
+    handlers["modelsConfig.set"]({ config: v087Config, expectedVersion: editorOne.version }),
+    (error) => error.code === "BAD_REQUEST" && error.detail.issues.some((issue) => issue.path.endsWith("/X-Remove-Me")),
+  );
+  assert.deepEqual(
+    await handlers["modelsConfig.get"](),
+    editorOne,
+    "invalid legacy null headers must not overwrite configuration",
+  );
+  delete v087Config.providers.custom.headers["X-Remove-Me"];
   const winningSave = await handlers["modelsConfig.set"]({
-    config: v087Config,
+    config: {
+      ...v087Config,
+      providers: {
+        ...v087Config.providers,
+        custom: {
+          ...v087Config.providers.custom,
+          headers: { ...v087Config.providers.custom.headers, "X-Remove-Me": undefined },
+        },
+      },
+    },
     expectedVersion: editorOne.version,
   });
   assert.equal(winningSave.ok, true);

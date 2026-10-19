@@ -1,3 +1,4 @@
+import { codingToolAvailability } from "../../shared/tool-presets";
 import { readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { DefaultResourceLoader, getAgentDir } from "@earendil-works/pi-coding-agent";
@@ -9,6 +10,8 @@ import { updateSkillModelInvocation } from "../skill-frontmatter";
 import { ToolchainError } from "../../shared/toolchains/errors";
 import { toolchainRuntime } from "../toolchain-runtime";
 import { cacheWarmingSettings, isCacheWarmingMode } from "../cache-warming-settings";
+import { agentShellPreferences } from "../agent-shell-settings";
+import { isAgentShell } from "../../shared/agent-shell";
 
 async function resolveLoadedSkill(cwd: string, filePath: string) {
   if (!cwd || !filePath) {
@@ -46,6 +49,8 @@ function writeTextAtomically(filePath: string, content: string): void {
 }
 
 type ResourceHandlers = {
+  getAgentShell: NonNullable<ApiHandler["settings.getAgentShell"]>;
+  setAgentShell: NonNullable<ApiHandler["settings.setAgentShell"]>;
   toolchain: NonNullable<ApiHandler["host.toolchain"]>;
   getCacheWarming: NonNullable<ApiHandler["settings.getCacheWarming"]>;
   setCacheWarming: NonNullable<ApiHandler["settings.setCacheWarming"]>;
@@ -65,6 +70,7 @@ export const resourceHandlers = {
     return {
       inventoryRevision: context.inventoryRevision,
       resolutionId: context.resolutionId,
+      codingTools: codingToolAvailability(process.platform, context.commands, agentShellPreferences().get().shell),
       capabilities: Object.fromEntries(
         Object.entries(context.commands).map(([capability, command]) => [
           capability,
@@ -75,6 +81,13 @@ export const resourceHandlers = {
   },
 
   getCacheWarming: async () => cacheWarmingSettings.get(),
+
+  getAgentShell: async () => agentShellPreferences().get(),
+  setAgentShell: async (params) => {
+    if (process.platform !== "win32" || !isAgentShell(params?.shell))
+      throw new RpcError({ code: "BAD_REQUEST", message: "Invalid Agent shell selection" });
+    return agentShellPreferences().set(params.shell);
+  },
 
   setCacheWarming: async (params) => {
     const mode = (params as { mode?: unknown } | undefined)?.mode;

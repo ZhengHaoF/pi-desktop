@@ -35,6 +35,7 @@ export interface ComposerToolbarOptions {
   compactError?: string | null;
   toolPreset?: ToolPreset;
   onToolPresetChange?: (preset: SelectableToolPreset) => void;
+  toolSelectionError?: string;
   thinkingLevel?: ThinkingLevelOption;
   onThinkingLevelChange?: (level: ThinkingLevelOption) => void;
   availableThinkingLevels?: string[] | null;
@@ -93,6 +94,7 @@ function ComposerToolbarView({
     compactError,
     toolPreset,
     onToolPresetChange,
+    toolSelectionError,
     thinkingLevel,
     onThinkingLevelChange,
     availableThinkingLevels,
@@ -873,7 +875,7 @@ function ComposerToolbarView({
                         role="menuitemradio"
                         aria-checked={isActive}
                         onClick={() => {
-                          if (!isActive) onToolPresetChange(preset);
+                          onToolPresetChange(preset);
                           setToolDropdownOpen(false);
                           requestAnimationFrame(() => toolButtonRef.current?.focus());
                         }}
@@ -923,6 +925,11 @@ function ComposerToolbarView({
                       </button>
                     );
                   })}
+                  {toolSelectionError && (
+                    <div role="alert" style={{ color: "var(--danger)", fontSize: scaledChatFont(12), padding: 8 }}>
+                      {toolSelectionError}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
