@@ -12,6 +12,7 @@ import type { PiRuntimeProbeResult } from "../contract/runtime";
 import { HostManager, getUserDataPath, resolveHostEntry } from "./host-manager";
 import { appendMainLog } from "./logger";
 import { installAppMenu } from "./menu";
+import { notificationLabels } from "./notification-labels";
 import { handleAppProtocol, registerAppProtocol, rendererRootPath } from "./protocol";
 import { acquireSingleInstanceLock } from "./single-instance";
 import { loadUiState, saveUiStateStrict } from "./window-state";
@@ -669,11 +670,10 @@ function startMainProcess(): void {
           const win = getMainWindow();
           const shouldNotify = !win || !win.isVisible() || !win.isFocused();
           if (shouldNotify && Notification.isSupported()) {
+            const labels = notificationLabels(getNativeLanguage());
             const notification = new Notification({
-              title: "Pi Agent Desktop update available",
-              body: state.availableVersion
-                ? `Version ${state.availableVersion} is ready to download.`
-                : "A new version is ready to download.",
+              title: labels.updateAvailableTitle,
+              body: labels.updateAvailableBody(state.availableVersion ?? null),
             });
             notification.on("click", () => {
               openUpdateSettings(false);
@@ -890,10 +890,8 @@ function startMainProcess(): void {
         const win = getMainWindow();
         const shouldNotify = !win || !win.isVisible() || !win.isFocused();
         if (shouldNotify && Notification.isSupported() && sessionId) {
-          const n = new Notification({
-            title: "Agent finished",
-            body: "A session completed in the background",
-          });
+          const labels = notificationLabels(getNativeLanguage());
+          const n = new Notification({ title: labels.agentFinishedTitle, body: labels.agentFinishedBody });
           n.on("click", () => {
             const w = getMainWindow();
             if (w) {

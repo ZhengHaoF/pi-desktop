@@ -1,4 +1,5 @@
 import { getNativeLanguage } from "./native-language";
+import { notificationLabels } from "./notification-labels";
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, shell } from "electron";
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
 import type {
@@ -282,9 +283,10 @@ export function installDesktopIpc(options: DesktopIpcOptions): void {
 
   trustedOn("desktop:notify-agent-end", (_event, payload: { sessionId: string; title?: string }) => {
     if (!Notification.isSupported()) return;
+    const labels = notificationLabels(getNativeLanguage());
     const notification = new Notification({
-      title: payload.title || "Agent finished",
-      body: "Session completed",
+      title: payload.title || labels.agentFinishedTitle,
+      body: labels.agentFinishedBody,
     });
     notification.on("click", () => {
       const win = getMainWindow();
