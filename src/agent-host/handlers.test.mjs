@@ -211,7 +211,7 @@ test("web search settings persist, gate availability, and test the effective key
   assert.match(failed.error, /balance/);
 });
 
-test("model list fetches use isolated configuration and parse provider catalogs", async (t) => {
+test("model discovery uses isolated configuration and parses provider catalogs", async (t) => {
   const { handlers } = await captureHandlers();
   const calls = [];
   let fail = false;
@@ -259,25 +259,24 @@ test("model list fetches use isolated configuration and parse provider catalogs"
     models: [{ id: "" }],
   };
 
-  const result = await handlers["modelsConfig.listModels"]({ providerName: "plan22-list-test", provider });
+  const result = await handlers["modelsConfig.discover"]({ providerName: "plan22-list-test", provider });
   assert.equal(result.ok, true, result.error);
   assert.deepEqual(result.models, [{ id: "fixture-alpha" }, { id: "fixture-beta", name: "Fixture Beta" }]);
-  assert.equal(result.status, 200);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, "/v1/models");
   assert.equal(calls[0].auth, "Bearer nonsecret-local-fixture");
 
   fail = true;
-  const failure = await handlers["modelsConfig.listModels"]({ providerName: "plan22-list-test", provider });
+  const failure = await handlers["modelsConfig.discover"]({ providerName: "plan22-list-test", provider });
   assert.equal(failure.ok, false);
   assert.equal(failure.status, 401);
-  assert.match(failure.error, /PLAN22_MODEL_LIST_FAILURE/);
+  assert.match(failure.error, /authentication failed/);
   assert.equal(calls.length, 2, "provider failures must not retry other endpoint candidates");
 
   // A base URL without the version segment falls back to /v1/models, and
   // Anthropic-style catalogs authenticate with x-api-key instead of Bearer.
   fail = false;
-  const anthropic = await handlers["modelsConfig.listModels"]({
+  const anthropic = await handlers["modelsConfig.discover"]({
     providerName: "plan22-list-test",
     provider: {
       baseUrl: "http://127.0.0.1:" + server.address().port,
@@ -292,10 +291,7 @@ test("model list fetches use isolated configuration and parse provider catalogs"
   assert.equal(calls[3].auth, undefined);
   assert.equal(calls[3].version, "2023-06-01");
 
-  const missing = await handlers["modelsConfig.listModels"]({ provider: {} });
-  assert.equal(missing.ok, false);
-  assert.match(missing.error, /providerName is required/);
-  const unsupported = await handlers["modelsConfig.listModels"]({
+  const unsupported = await handlers["modelsConfig.discover"]({
     providerName: "plan22-list-test",
     provider: { baseUrl: "https://example.invalid", api: "google-generative-ai", apiKey: "nonsecret-local-fixture" },
   });

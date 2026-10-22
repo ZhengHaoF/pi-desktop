@@ -12,11 +12,11 @@ import type {
   FileMeta,
   HistoryWindow,
   LoginProgressEvent,
-  ListModelsResult,
   ModelInfoFillResult,
   ModelPreferencesResult,
   ModelsConfig,
   ModelsConfigSnapshot,
+  ModelDiscoveryResult,
   ModelsListResult,
   PagedContextInfo,
   ProviderStatus,
@@ -487,7 +487,7 @@ export interface Api {
   };
   "modelsConfig.get": { params: void; result: ModelsConfigSnapshot };
   "modelsConfig.set": {
-    params: { config: ModelsConfig; expectedVersion: string };
+    params: { config: ModelsConfig; expectedVersion: string; providerRenames?: Record<string, string> };
     result: { ok: true; version: string };
   };
   "modelsConfig.test": {
@@ -499,13 +499,13 @@ export interface Api {
     };
     result: TestResult;
   };
-  "modelsConfig.listModels": {
+  "modelsConfig.discover": {
     params: {
       providerName?: string;
-      provider?: Record<string, unknown>;
+      provider: Record<string, unknown>;
       [key: string]: unknown;
     };
-    result: ListModelsResult;
+    result: ModelDiscoveryResult;
   };
   "modelsConfig.fillModelInfo": {
     params: {

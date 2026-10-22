@@ -175,6 +175,15 @@ export interface ModelPreferencesResult {
   modelThinkingLevels: Record<string, string>;
 }
 
+export interface DiscoveredModel {
+  id: string;
+  name?: string;
+}
+
+export type ModelDiscoveryResult =
+  | { ok: true; models: DiscoveredModel[]; baseUrl: string }
+  | { ok: false; error: string; status?: number; unsupported?: boolean };
+
 export interface ModelsConfig {
   [key: string]: unknown;
 }
@@ -211,22 +220,6 @@ export interface TestResult {
   latencyMs?: number;
   status?: number;
   responseText?: string;
-}
-
-/** One model advertised by a provider's remote catalog endpoint. */
-export interface ProviderModelInfo {
-  id: string;
-  name?: string;
-}
-
-export interface ListModelsResult {
-  ok: boolean;
-  models?: ProviderModelInfo[];
-  error?: string;
-  latencyMs?: number;
-  status?: number;
-  /** True when the provider API has no remote model-list endpoint (e.g. google-generative-ai). */
-  unsupported?: boolean;
 }
 
 /** Model metadata ready to merge into a models.json model entry. */

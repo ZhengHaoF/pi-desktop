@@ -339,7 +339,7 @@ export function registerHandlers(server: RpcServer): () => Promise<void> {
     "modelsConfig.get": guard(modelConfigHandlers.get),
     "modelsConfig.set": guard(modelConfigHandlers.set),
     "modelsConfig.test": guard(modelConfigHandlers.test),
-    "modelsConfig.listModels": guard(modelConfigHandlers.listModels),
+    "modelsConfig.discover": guard(modelConfigHandlers.discover),
     "modelsConfig.fillModelInfo": guard(modelConfigHandlers.fillModelInfo),
 
     "auth.providers": guard(authHandlers.providers),

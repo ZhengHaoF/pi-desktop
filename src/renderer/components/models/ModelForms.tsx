@@ -1,5 +1,6 @@
 import { JsonObjectField } from "./JsonObjectField";
-import { THINKING_LEVELS, type ThinkingLevel } from "@shared/thinking-levels";
+import { ProviderModelDiscovery } from "./ProviderModelDiscovery";
+import { THINKING_LEVELS, configuredThinkingLevels, type ThinkingLevel } from "@shared/thinking-levels";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Check, Field, NumInput, SecretTextInput, Select, SectionTitle, TextInput } from "../form-controls";
 import { applyStrictOptionalPositiveInteger } from "@/lib/strict-integer";
@@ -7,7 +8,6 @@ import { useI18n } from "@/i18n";
 import { type ModelEntry, type ProviderEntry } from "@/lib/models-config-state";
 import { call } from "@/lib/api-client";
 import type { ModelInfoFillResult } from "@contract/types";
-import { ImportModelsPanel } from "./ImportModelsPanel";
 
 /** Public database behind the "fill model info" action. */
 const MODELS_DEV_URL = "https://models.dev";
@@ -30,165 +30,129 @@ export function ProviderDetail({
   name,
   provider,
   onChange,
-  onRename,
+  nameDraft,
+  onNameChange,
+  nameError,
   onDelete,
-  onImportModels,
+  onAddModel,
   onValidityChange,
 }: {
   name: string;
   provider: ProviderEntry;
   onChange: (p: ProviderEntry) => void;
-  onRename: (n: string) => void;
+  nameDraft: string;
+  onNameChange: (value: string) => void;
+  nameError?: string;
   onDelete: () => void;
-  onImportModels: (models: ModelEntry[]) => void;
+  onAddModel?: () => void;
   onValidityChange?: (valid: boolean) => void;
 }) {
   const { t } = useI18n();
-  const [editingName, setEditingName] = useState(name);
-  const [importOpen, setImportOpen] = useState(false);
-  useEffect(() => setEditingName(name), [name]);
-  const set = <K extends keyof ProviderEntry>(k: K, v: ProviderEntry[K]) => onChange({ ...provider, [k]: v });
-
+  const [section, setSection] = useState<"connection" | "advanced">("connection");
+  const set = <K extends keyof ProviderEntry>(key: K, value: ProviderEntry[K]) =>
+    onChange({ ...provider, [key]: value });
   useEffect(() => {
     if (!provider.api) onChange({ ...provider, api: "openai-completions" });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initial provider load intentionally runs once.
   }, [provider.api]);
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <SectionTitle>{t("modelProvider", "Provider")}</SectionTitle>
-        <button
-          type="button"
-          onClick={onDelete}
-          style={{
-            minHeight: 32,
-            padding: "0 10px",
-            background: "none",
-            border: "1px solid rgba(239,68,68,0.3)",
-            borderRadius: 4,
-            color: "#ef4444",
-            cursor: "pointer",
-            fontSize: 12,
-          }}
-        >
-          {t("delete", "Delete")}
-        </button>
-      </div>
-
-      <Field label={t("modelProviderName", "Provider name")}>
-        <TextInput value={editingName} onChange={setEditingName} placeholder="provider-name" mono />
-        {editingName !== name && editingName.trim() && (
+    <div className="custom-model-form">
+      <div className="custom-model-heading">
+        <div>
+          <small>{t("modelCustomProvider", "Custom provider")}</small>
+          <h3>{name}</h3>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          {onAddModel && (
+            <button type="button" onClick={onAddModel} className="custom-model-secondary-action">
+              {t("modelAddModelAction", "Add model")}
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => onRename(editingName.trim())}
+            onClick={onDelete}
             style={{
-              marginTop: 4,
               minHeight: 32,
-              padding: "0 12px",
-              background: "var(--accent)",
-              border: "none",
-              borderRadius: 4,
-              color: "#fff",
-              cursor: "pointer",
+              padding: "0 10px",
+              border: "1px solid var(--danger-border)",
+              borderRadius: 5,
+              background: "none",
+              color: "var(--danger)",
               fontSize: 12,
-              alignSelf: "flex-start",
+              cursor: "pointer",
             }}
           >
-            {t("rename", "Rename")}
+            {t("delete", "Delete")}
           </button>
-        )}
-      </Field>
-
-      <Field label={t("modelBaseUrl", "Base URL")}>
-        <TextInput
-          value={provider.baseUrl ?? ""}
-          onChange={(v) => set("baseUrl", v || undefined)}
-          placeholder="https://api.example.com/v1"
-          mono
-        />
-      </Field>
-
-      <Field label={t("modelApiKey", "API Key")}>
-        <SecretTextInput
-          value={provider.apiKey ?? ""}
-          onChange={(v) => set("apiKey", v || undefined)}
-          placeholder={t("modelApiKeySourcePlaceholder", "ENV_VAR_NAME, !shell-command, or literal key")}
-          mono
-        />
-        <span style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>
-          {t("modelApiKeySourceHint", "Prefix with ! to run a shell command, or use an environment variable name.")}
-        </span>
-      </Field>
-
-      <Field label={t("modelApi", "API")}>
-        <Select
-          value={provider.api ?? "openai-completions"}
-          onChange={(v) => set("api", v)}
-          options={API_OPTIONS}
-          required
-        />
-      </Field>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <button
-          type="button"
-          onClick={() => setImportOpen((open) => !open)}
-          aria-expanded={importOpen}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            alignSelf: "flex-start",
-            gap: 6,
-            minHeight: 32,
-            padding: "0 12px",
-            background: "none",
-            border: "1px solid var(--border)",
-            borderRadius: 5,
-            color: "var(--text-muted)",
-            cursor: "pointer",
-            fontSize: 12,
-          }}
-        >
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          {t("modelFetchModelList", "Fetch model list")}
-        </button>
-        {!importOpen && (
-          <span style={{ fontSize: 10, color: "var(--text-dim)", lineHeight: 1.5 }}>
-            {t(
-              "modelFetchModelListHint",
-              "Fetches the provider's available models using the Base URL and API Key above, then adds the ones you pick.",
-            )}
-          </span>
-        )}
-        {importOpen && (
-          <ImportModelsPanel
-            providerName={name}
-            provider={provider}
-            onImport={onImportModels}
-            onClose={() => setImportOpen(false)}
-          />
-        )}
+        </div>
       </div>
-
-      <ModelOverridesField
-        value={provider.modelOverrides}
-        onValidityChange={onValidityChange}
-        onChange={(modelOverrides) => set("modelOverrides", modelOverrides)}
-      />
+      <div
+        className="custom-model-tabs"
+        role="group"
+        aria-label={t("modelProviderSections", "Provider settings sections")}
+      >
+        <button type="button" aria-pressed={section === "connection"} onClick={() => setSection("connection")}>
+          {t("modelConnectionSection", "Connection & discovery")}
+        </button>
+        <button type="button" aria-pressed={section === "advanced"} onClick={() => setSection("advanced")}>
+          {t("modelAdvancedSection", "Advanced")}
+        </button>
+      </div>
+      <div hidden={section !== "connection"}>
+        <div className="custom-model-fields">
+          <div className="custom-model-grid">
+            <Field label={t("modelProviderName", "Provider name")}>
+              <TextInput value={nameDraft} onChange={onNameChange} placeholder="provider-name" mono />
+              {nameError && (
+                <span role="alert" style={{ color: "var(--danger)", fontSize: 11 }}>
+                  {nameError}
+                </span>
+              )}
+            </Field>
+            <Field label={t("modelApi", "API")}>
+              <Select
+                value={provider.api ?? "openai-completions"}
+                onChange={(value) => set("api", value)}
+                options={API_OPTIONS}
+                required
+              />
+            </Field>
+          </div>
+          <Field label={t("modelBaseUrl", "Base URL")}>
+            <TextInput
+              value={provider.baseUrl ?? ""}
+              onChange={(value) => set("baseUrl", value || undefined)}
+              placeholder="https://api.example.com/v1"
+              mono
+            />
+          </Field>
+          <Field label={t("modelApiKey", "API Key")}>
+            <SecretTextInput
+              value={provider.apiKey ?? ""}
+              onChange={(value) => set("apiKey", value || undefined)}
+              placeholder={t("modelApiKeySourcePlaceholder", "$ENV_VAR_NAME, !shell-command, or literal key")}
+              mono
+            />
+            <span className="custom-model-hint">
+              {t(
+                "modelApiKeySourceHint",
+                "Use $ENV_VAR_NAME for an environment variable, or prefix a shell command with !.",
+              )}
+            </span>
+          </Field>
+          <ProviderModelDiscovery provider={provider} onChange={onChange} />
+          <div className="custom-model-callout">
+            {t("modelConnectionNextStep", "Save connection and model changes, then add the models you need.")}
+          </div>
+        </div>
+      </div>
+      <div hidden={section !== "advanced"}>
+        <ModelOverridesField
+          value={provider.modelOverrides}
+          onValidityChange={onValidityChange}
+          onChange={(modelOverrides) => set("modelOverrides", modelOverrides)}
+        />
+      </div>
     </div>
   );
 }
@@ -243,177 +207,114 @@ function modelCostLabel(
   }
 }
 
-const LEVEL_COLORS: Record<ThinkingLevel, string> = {
-  off: "var(--text-dim)",
-  minimal: "#a19d92",
-  low: "#d97706",
-  medium: "#ea580c",
-  high: "#c2410c",
-  xhigh: "#9a3412",
-  max: "#7c2d12",
-};
-
 function ThinkingLevelMapEditor({
   value,
   onChange,
+  onValidityChange,
 }: {
   value: Record<string, string | null> | undefined;
-  onChange: (v: Record<string, string | null> | undefined) => void;
+  onChange: (value: Record<string, string | null> | undefined) => void;
+  onValidityChange: (valid: boolean) => void;
 }) {
   const { t } = useI18n();
   const map = value ?? {};
-
   const setLevel = (level: ThinkingLevel, entry: string | null | "omit") => {
     const next = { ...map };
-    if (entry === "omit") {
-      delete next[level];
-    } else {
-      next[level] = entry;
-    }
+    if (entry === "omit") delete next[level];
+    else next[level] = entry;
+    onValidityChange(
+      Object.values(next).every((value) => value === null || (typeof value === "string" && Boolean(value.trim()))),
+    );
     onChange(Object.keys(next).length ? next : undefined);
   };
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      {THINKING_LEVELS.map((level) => {
-        const raw = map[level];
-        const state: "omit" | "null" | "string" = !(level in map) ? "omit" : raw === null ? "null" : "string";
-        const strVal = typeof raw === "string" ? raw : "";
-        const color = LEVEL_COLORS[level];
-
-        const btnBase: React.CSSProperties = {
-          minHeight: 32,
-          padding: "0 10px",
-          fontSize: 12,
-          border: "none",
-          cursor: "pointer",
-          fontWeight: 400,
-          transition: "background 0.1s, color 0.1s",
-          whiteSpace: "nowrap",
-          background: "var(--bg-panel)",
-          color: "var(--text-dim)",
-        };
-        const btnActive: React.CSSProperties = {
-          background: "var(--accent)",
-          color: "#fff",
-          fontWeight: 600,
-        };
-        const btnActiveDisabled: React.CSSProperties = {
-          background: "#ef4444",
-          color: "#fff",
-          fontWeight: 600,
-        };
-
-        return (
-          <div
-            key={level}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "5px 4px",
-              borderRadius: 6,
-              background: "transparent",
-              border: "1px solid transparent",
-            }}
-          >
-            {/* Level badge */}
-            <div style={{ display: "flex", alignItems: "center", gap: 5, width: 68, flexShrink: 0 }}>
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  background: color,
-                  flexShrink: 0,
-                  opacity: state === "null" ? 0.3 : 1,
-                }}
-              />
-              <span
-                style={{
-                  fontSize: 11,
-                  fontFamily: "var(--font-mono)",
-                  color: state === "null" ? "var(--text-dim)" : "var(--text-muted)",
-                  textDecoration: state === "null" ? "line-through" : "none",
-                }}
-              >
-                {thinkingLevelLabel(level, t)}
-              </span>
-            </div>
-
-            {/* Default + Disabled buttons */}
-            <div
-              style={{
-                display: "flex",
-                borderRadius: 5,
-                border: "1px solid var(--border)",
-                overflow: "hidden",
-                flexShrink: 0,
-              }}
-            >
-              <button
-                onClick={() => setLevel(level, "omit")}
-                style={{ ...btnBase, ...(state === "omit" ? btnActive : {}) }}
-              >
-                {t("modelDefault", "Default")}
-              </button>
-              <button
-                onClick={() => setLevel(level, null)}
-                style={{
-                  ...btnBase,
-                  borderLeft: "1px solid var(--border)",
-                  ...(state === "null" ? btnActiveDisabled : {}),
-                }}
-              >
-                {t("modelDisabled", "Disabled")}
-              </button>
-            </div>
-
-            {/* Custom button + input fused */}
-            <div
-              style={{
-                display: "flex",
-                borderRadius: 5,
-                border: `1px solid ${state === "string" ? "var(--accent)" : "var(--border)"}`,
-                overflow: "hidden",
-                transition: "border-color 0.1s",
-              }}
-            >
-              <button
-                onClick={() => setLevel(level, strVal || level)}
-                style={{
-                  ...btnBase,
-                  ...(state === "string" ? btnActive : {}),
-                  borderRight: "1px solid var(--border)",
-                  flexShrink: 0,
-                }}
-              >
-                {t("modelCustom", "Custom")}
-              </button>
-              <input
-                value={strVal}
-                onChange={(e) => setLevel(level, e.target.value)}
-                onFocus={() => {
-                  if (state !== "string") setLevel(level, strVal || level);
-                }}
-                placeholder={level}
-                maxLength={10}
-                style={{
-                  width: "12ch",
-                  background: state === "string" ? "var(--bg)" : "var(--bg-panel)",
-                  border: "none",
-                  outline: "none",
-                  color: state === "string" ? "var(--text)" : "var(--text-dim)",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11,
-                  padding: "4px 7px",
-                  transition: "background 0.1s, color 0.1s",
-                }}
-              />
-            </div>
-          </div>
-        );
-      })}
+    <div>
+      <div className="custom-thinking-preview" role="status">
+        {t("modelThinkingAvailable", "Available with this mapping: {levels}").replace(
+          "{levels}",
+          configuredThinkingLevels(true, map)
+            .map((level) => thinkingLevelLabel(level, t))
+            .join(" · ") || t("modelThinkingNone", "No levels enabled"),
+        )}
+      </div>
+      <details className="custom-thinking-help">
+        <summary>{t("modelThinkingHelp", "How level mapping works")}</summary>
+        <p>
+          {t(
+            "modelThinkingMapHint",
+            "Maps a Pi reasoning level to the value sent to the provider. Mapping Minimal to max does not enable the Maximum option.",
+          )}
+        </p>
+        <p>
+          {t(
+            "modelThinkingExtendedHint",
+            "Extra high (xhigh) and Maximum (max) need an explicit custom value to appear in chat. Use only values supported by your provider; disabling a level hides it.",
+          )}
+        </p>
+      </details>
+      <table className="custom-thinking-table">
+        <thead>
+          <tr>
+            <th scope="col">{t("modelThinkingLevelColumn", "Pi level")}</th>
+            <th scope="col">{t("modelThinkingModeColumn", "Availability")}</th>
+            <th scope="col">{t("modelThinkingValueColumn", "Provider value")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {THINKING_LEVELS.map((level) => {
+            const raw = map[level];
+            const mode = raw === undefined ? "default" : raw === null ? "disabled" : "custom";
+            const extended = level === "xhigh" || level === "max";
+            const label = thinkingLevelLabel(level, t);
+            return (
+              <tr key={level}>
+                <td>{label}</td>
+                <td>
+                  <select
+                    aria-label={t("modelThinkingModeLabel", "{level}: availability").replace("{level}", label)}
+                    value={mode}
+                    onChange={(event) =>
+                      setLevel(
+                        level,
+                        event.target.value === "default"
+                          ? "omit"
+                          : event.target.value === "disabled"
+                            ? null
+                            : typeof raw === "string" && raw
+                              ? raw
+                              : level,
+                      )
+                    }
+                  >
+                    <option value="default">
+                      {extended ? t("modelThinkingNotEnabled", "Not enabled") : t("modelDefault", "Default")}
+                    </option>
+                    <option value="disabled">{t("modelDisabled", "Disabled")}</option>
+                    <option value="custom">{t("modelCustom", "Custom")}</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    aria-label={t("modelThinkingProviderValue", "{level}: provider value").replace("{level}", label)}
+                    value={
+                      typeof raw === "string"
+                        ? raw
+                        : mode === "default" && !extended
+                          ? t("modelDefaultProviderValue", "Provider default")
+                          : ""
+                    }
+                    placeholder={mode === "custom" ? level : "—"}
+                    disabled={mode !== "custom"}
+                    aria-invalid={mode === "custom" && (typeof raw !== "string" || !raw.trim())}
+                    onChange={(event) => setLevel(level, event.target.value)}
+                    onBlur={(event) => setLevel(level, event.target.value.trim() || "omit")}
+                  />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -476,11 +377,19 @@ export function ModelDetail({
   onValidityChange?: (valid: boolean) => void;
 }) {
   const { t } = useI18n();
-  const [invalidFields, setInvalidFields] = useState<string[]>([]);
+  const [invalidFields, setInvalidFields] = useState<string[]>(() =>
+    Object.values(model.thinkingLevelMap ?? {}).some(
+      (value) => value !== null && (typeof value !== "string" || !value.trim()),
+    )
+      ? ["thinkingLevelMap"]
+      : [],
+  );
+  useEffect(() => {
+    onValidityChange?.(invalidFields.length === 0);
+  }, [invalidFields, onValidityChange]);
   const validField = (key: string, valid: boolean) => {
     const next = valid ? invalidFields.filter((field) => field !== key) : [...new Set([...invalidFields, key])];
     setInvalidFields(next);
-    onValidityChange?.(next.length === 0);
   };
   const [testState, setTestState] = useState<ModelTestState>({ phase: "idle" });
   const [fillState, setFillState] = useState<ModelFillState>({ phase: "idle" });
@@ -698,9 +607,12 @@ export function ModelDetail({
   })();
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <SectionTitle>{t("model", "Model")}</SectionTitle>
+    <div className="custom-model-form">
+      <div className="custom-model-heading">
+        <div>
+          <small>{providerName}</small>
+          <h3>{model.name || model.id || t("modelNewModel", "new model")}</h3>
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {testSummary && (
             <span
@@ -851,17 +763,36 @@ export function ModelDetail({
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div className="custom-model-fields">
         <Field label={t("modelId", "ID *")}>
           <TextInput value={model.id} onChange={(v) => set("id", v)} placeholder="model-id" mono />
         </Field>
-        <Field label={t("modelName", "Name")}>
-          <TextInput
-            value={model.name ?? ""}
-            onChange={(v) => set("name", v || undefined)}
-            placeholder={t("modelDisplayName", "Display name")}
-          />
-        </Field>
+        <div className="custom-model-grid">
+          <Field label={t("modelName", "Name")}>
+            <TextInput
+              value={model.name ?? ""}
+              onChange={(v) => set("name", v || undefined)}
+              placeholder={t("modelDisplayName", "Display name")}
+            />
+          </Field>
+          <Field label={t("modelApiOverride", "API override")}>
+            <Select
+              value={model.api ?? ""}
+              onChange={(v) => set("api", v || undefined)}
+              required
+              options={[
+                {
+                  value: "",
+                  label: t("modelInheritApi", "Use provider API ({api})").replace(
+                    "{api}",
+                    provider.api ?? "openai-completions",
+                  ),
+                },
+                ...API_OPTIONS,
+              ]}
+            />
+          </Field>
+        </div>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -914,10 +845,6 @@ export function ModelDetail({
         )}
       </div>
 
-      <Field label={t("modelApiOverride", "API override")}>
-        <Select value={model.api ?? ""} onChange={(v) => set("api", v || undefined)} options={API_OPTIONS} />
-      </Field>
-
       <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
         <Check
           label={t("modelReasoning", "Reasoning / thinking")}
@@ -933,27 +860,30 @@ export function ModelDetail({
 
       {model.reasoning && (
         <>
-          <div>
-            <Check
-              label={t("modelDeepSeekCompat", "DeepSeek compatibility")}
-              checked={hasDeepseekCompat(model)}
-              onChange={(v) => onChange(setDeepseekCompat(model, v))}
-            />
-            <div
-              style={{
-                fontSize: 11,
-                lineHeight: 1.5,
-                color: "var(--text-dim)",
-                marginTop: 2,
-                maxWidth: 520,
-              }}
-            >
-              {t(
-                "modelDeepSeekCompatHint",
-                "Sends DeepSeek's request protocol: the thinking switch, the system (not developer) role, and reasoning_content on replayed assistant messages. Enable for DeepSeek models behind a relay or custom endpoint.",
-              )}
+          {((model.api ?? provider.api ?? "openai-completions") === "openai-completions" ||
+            hasDeepseekCompat(model)) && (
+            <div>
+              <Check
+                label={t("modelDeepSeekCompat", "DeepSeek compatibility")}
+                checked={hasDeepseekCompat(model)}
+                onChange={(v) => onChange(setDeepseekCompat(model, v))}
+              />
+              <div
+                style={{
+                  fontSize: 11,
+                  lineHeight: 1.5,
+                  color: "var(--text-dim)",
+                  marginTop: 2,
+                  maxWidth: 520,
+                }}
+              >
+                {t(
+                  "modelDeepSeekCompatHint",
+                  "Sends DeepSeek's request protocol: the thinking switch, the system (not developer) role, and reasoning_content on replayed assistant messages. Enable for DeepSeek models behind a relay or custom endpoint.",
+                )}
+              </div>
             </div>
-          </div>
+          )}
           <div>
             <Field label={t("modelDefaultThinkingLevel", "Default thinking level")}>
               <Select
@@ -992,7 +922,10 @@ export function ModelDetail({
               {model.thinkingLevelMap && (
                 <button
                   type="button"
-                  onClick={() => set("thinkingLevelMap", undefined)}
+                  onClick={() => {
+                    set("thinkingLevelMap", undefined);
+                    validField("thinkingLevelMap", true);
+                  }}
                   style={{
                     minHeight: 32,
                     fontSize: 12,
@@ -1008,7 +941,11 @@ export function ModelDetail({
                 </button>
               )}
             </div>
-            <ThinkingLevelMapEditor value={model.thinkingLevelMap} onChange={(v) => set("thinkingLevelMap", v)} />
+            <ThinkingLevelMapEditor
+              value={model.thinkingLevelMap}
+              onChange={(v) => set("thinkingLevelMap", v)}
+              onValidityChange={(valid) => validField("thinkingLevelMap", valid)}
+            />
           </div>
         </>
       )}
@@ -1030,38 +967,43 @@ export function ModelDetail({
         </Field>
       </div>
 
-      <div>
-        <SectionTitle>{t("modelCostPerMillion", "Cost (per million tokens)")}</SectionTitle>
-        <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
-          {(["input", "output", "cacheRead", "cacheWrite"] as const).map((k) => (
-            <Field key={k} label={modelCostLabel(k, t)}>
-              <NumInput value={costVal(k)} onChange={(v) => setCost(k, v)} placeholder="0" />
-            </Field>
-          ))}
+      <details className="custom-model-disclosure">
+        <summary>{t("modelCostAndAdvanced", "Pricing & advanced parameters")}</summary>
+        <div>
+          <div>
+            <SectionTitle>{t("modelCostPerMillion", "Cost (per million tokens)")}</SectionTitle>
+            <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
+              {(["input", "output", "cacheRead", "cacheWrite"] as const).map((k) => (
+                <Field key={k} label={modelCostLabel(k, t)}>
+                  <NumInput value={costVal(k)} onChange={(v) => setCost(k, v)} placeholder="0" />
+                </Field>
+              ))}
+            </div>
+          </div>
+          <SectionTitle>{t("modelAdvancedParameters", "Advanced model parameters")}</SectionTitle>
+          <JsonObjectField
+            label={t("modelSamplingParams", "Sampling parameters (JSON)")}
+            example={JSON.stringify({ temperature: 0.2, top_p: 0.9 }, null, 2)}
+            value={model.samplingParams}
+            onValidityChange={(valid) => validField("samplingParams", valid)}
+            onChange={(value) => set("samplingParams", value)}
+          />
+          <JsonObjectField
+            label={t("modelSamplingByThinking", "Sampling parameters by thinking level (JSON)")}
+            example={JSON.stringify({ high: { temperature: 0.2 }, low: { temperature: 0.7 } }, null, 2)}
+            value={model.samplingParamsByThinkingLevel as Record<string, unknown> | undefined}
+            onValidityChange={(valid) => validField("samplingParamsByThinkingLevel", valid)}
+            onChange={(value) => set("samplingParamsByThinkingLevel", value)}
+          />
+          <JsonObjectField
+            label={t("modelInputLimits", "Image and request input limits (JSON)")}
+            example={JSON.stringify({ images: { resize: { maxWidth: 2000, maxHeight: 2000 } } }, null, 2)}
+            value={model.inputLimits as Record<string, unknown> | undefined}
+            onValidityChange={(valid) => validField("inputLimits", valid)}
+            onChange={(value) => set("inputLimits", value)}
+          />
         </div>
-      </div>
-      <SectionTitle>{t("modelAdvancedParameters", "Advanced model parameters")}</SectionTitle>
-      <JsonObjectField
-        label={t("modelSamplingParams", "Sampling parameters (JSON)")}
-        example={JSON.stringify({ temperature: 0.2, top_p: 0.9 }, null, 2)}
-        value={model.samplingParams}
-        onValidityChange={(valid) => validField("samplingParams", valid)}
-        onChange={(value) => set("samplingParams", value)}
-      />
-      <JsonObjectField
-        label={t("modelSamplingByThinking", "Sampling parameters by thinking level (JSON)")}
-        example={JSON.stringify({ high: { temperature: 0.2 }, low: { temperature: 0.7 } }, null, 2)}
-        value={model.samplingParamsByThinkingLevel as Record<string, unknown> | undefined}
-        onValidityChange={(valid) => validField("samplingParamsByThinkingLevel", valid)}
-        onChange={(value) => set("samplingParamsByThinkingLevel", value)}
-      />
-      <JsonObjectField
-        label={t("modelInputLimits", "Image and request input limits (JSON)")}
-        example={JSON.stringify({ images: { resize: { maxWidth: 2000, maxHeight: 2000 } } }, null, 2)}
-        value={model.inputLimits as Record<string, unknown> | undefined}
-        onValidityChange={(valid) => validField("inputLimits", valid)}
-        onChange={(value) => set("inputLimits", value)}
-      />
+      </details>
     </div>
   );
 }
