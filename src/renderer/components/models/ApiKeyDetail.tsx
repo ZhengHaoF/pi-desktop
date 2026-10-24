@@ -8,6 +8,14 @@ import type { CredentialMutationOptions } from "@contract/auth";
 import { OAuthDetail } from "./OAuthDetail";
 import { AuxiliaryModels } from "./AuxiliaryModels";
 
+// These providers collect account fields or an authentication-method choice in addition to a key.
+const GUIDED_CREDENTIAL_PROVIDERS = new Set([
+  "cloudflare-workers-ai",
+  "cloudflare-ai-gateway",
+  "google-vertex",
+  "amazon-bedrock",
+]);
+
 export function ApiKeyDetail({
   provider,
   baseUrl,
@@ -23,7 +31,6 @@ export function ApiKeyDetail({
 }) {
   const { t } = useI18n();
   const [apiKey, setApiKey] = useState("");
-  const [guided, setGuided] = useState(provider.id.startsWith("cloudflare-"));
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +98,7 @@ export function ApiKeyDetail({
     }
   }, [provider.id, provider.credentialVersion, onRefresh, onReloadCredentials]);
 
-  if (guided)
+  if (GUIDED_CREDENTIAL_PROVIDERS.has(provider.id))
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <OAuthDetail
@@ -240,9 +247,6 @@ export function ApiKeyDetail({
       {error && <p style={{ margin: 0, fontSize: 12, color: "#f87171" }}>{error}</p>}
       {warning && <p style={{ margin: 0, fontSize: 12, color: "#d97706" }}>{warning}</p>}
 
-      <button type="button" onClick={() => setGuided(true)}>
-        {t("modelGuidedLogin", "Guided API key setup")}
-      </button>
       <AuxiliaryModels providerId={provider.id} models={provider.auxiliaryModels ?? []} />
 
       {provider.configured && (provider.storedAuthType === undefined || provider.storedAuthType === "api_key") && (

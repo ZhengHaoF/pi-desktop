@@ -15,6 +15,7 @@ import type {
   ModelInfoFillResult,
   ModelPreferencesResult,
   ModelsConfig,
+  ModelsConfigIssue,
   ModelsConfigSnapshot,
   ModelDiscoveryResult,
   ModelsListResult,
@@ -488,7 +489,7 @@ export interface Api {
   "modelsConfig.get": { params: void; result: ModelsConfigSnapshot };
   "modelsConfig.set": {
     params: { config: ModelsConfig; expectedVersion: string; providerRenames?: Record<string, string> };
-    result: { ok: true; version: string };
+    result: { ok: true; version: string; warnings?: ModelsConfigIssue[] };
   };
   "modelsConfig.test": {
     params: {
