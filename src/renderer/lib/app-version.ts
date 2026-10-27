@@ -14,4 +14,5 @@ export const PI_VERSION =
 
 export const APP_DISPLAY_NAME = "Pi Agent Desktop";
 export const APP_AUTHOR = "DLYZZT";
+export const APP_FORK_AUTHOR = "ZhengHaoF";
 export const APP_GITHUB_URL = "https://github.com/ZhengHaoF/pi-desktop";

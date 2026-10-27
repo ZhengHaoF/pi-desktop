@@ -21,7 +21,14 @@ import type { ChatAppearancePreferences, ChatAssistantWidth, ChatFontSize, ChatL
 import { APP_WEBSITE_URL } from "@shared/app-links";
 import type { DesktopUpdateState } from "../../contract/desktop";
 import type { ManagedProcessCapability } from "../../contract/processes";
-import { APP_AUTHOR, APP_DISPLAY_NAME, APP_GITHUB_URL, APP_VERSION, PI_VERSION } from "@/lib/app-version";
+import {
+  APP_AUTHOR,
+  APP_DISPLAY_NAME,
+  APP_FORK_AUTHOR,
+  APP_GITHUB_URL,
+  APP_VERSION,
+  PI_VERSION,
+} from "@/lib/app-version";
 import appIconUrl from "../../../build/icon.png";
 import { isAutoSessionTitleEnabled, setAutoSessionTitleEnabled } from "../lib/auto-session-title";
 import { HerdrSettings } from "./herdr/HerdrSettings";
@@ -419,6 +426,7 @@ function AboutSettings({ onClose }: { onClose: () => void }) {
             <AboutRow label={t("softwareVersion", "Software version")} value={`v${APP_VERSION}`} />
             <AboutRow label={t("piVersion", "Pi version")} value={`v${PI_VERSION}`} />
             <AboutRow label={t("author", "Author")} value={APP_AUTHOR} />
+            <AboutRow label={t("forkAuthor", "Fork author")} value={APP_FORK_AUTHOR} />
             <AboutRow
               label={t("officialWebsite", "Official website")}
               value={
