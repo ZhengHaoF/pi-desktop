@@ -402,6 +402,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          # Intentionally the last upstream-published installer: this reproduces the
+          # first cross-feed upgrade performed by an existing upstream installation.
           $previous = Join-Path $env:RUNNER_TEMP "Pi-Agent-Desktop-Unsigned-Beta-Setup-0.1.10.exe"
           curl.exe --fail --location --retry 3 --output $previous "https://github.com/DLYZZT/pi-desktop/releases/download/v0.1.10/Pi-Agent-Desktop-Unsigned-Beta-Setup-0.1.10.exe"
           if ($LASTEXITCODE -ne 0) { throw "previous installer download exited $LASTEXITCODE" }
@@ -1007,6 +1009,8 @@ jobs:
       - name: Run Windows NSIS upgrade and rollback E2E
         shell: pwsh
         run: |
+          # Intentionally the last upstream-published installer: this reproduces the
+          # first cross-feed upgrade performed by an existing upstream installation.
           $previous = Join-Path $env:RUNNER_TEMP "Pi-Agent-Desktop-Unsigned-Beta-Setup-0.1.10.exe"
           curl.exe --fail --location --retry 3 --output $previous "https://github.com/DLYZZT/pi-desktop/releases/download/v0.1.10/Pi-Agent-Desktop-Unsigned-Beta-Setup-0.1.10.exe"
           if ($LASTEXITCODE -ne 0) { throw "previous installer download exited $LASTEXITCODE" }

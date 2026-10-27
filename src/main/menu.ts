@@ -148,7 +148,7 @@ export function installAppMenu(
         {
           label: "Learn More",
           click: () => {
-            void shell.openExternal("https://github.com/DLYZZT/pi-desktop");
+            void shell.openExternal("https://github.com/ZhengHaoF/pi-desktop");
           },
         },
       ],

@@ -467,7 +467,7 @@ export function createWindowsSbom(facts) {
         version: facts.packageJson.version,
         licenses: licenses(facts.packageJson.license),
         hashes: [{ alg: "SHA-256", content: facts.installerHash }],
-        purl: `pkg:github/DLYZZT/pi-desktop@${facts.packageJson.version}?arch=x86_64&os=windows`,
+        purl: `pkg:github/ZhengHaoF/pi-desktop@${facts.packageJson.version}?arch=x86_64&os=windows`,
         properties: [
           { name: "pi:artifact:file", value: facts.installerName },
           { name: "pi:artifact:sha256", value: facts.installerHash },
