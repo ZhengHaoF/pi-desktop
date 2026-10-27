@@ -93,7 +93,9 @@ export async function runDev(projectRoot = root) {
     await waitForSuccessfulBuild(initialBuild);
     const tsupCli = resolvePackageFile(projectRoot, "tsup", "dist/cli-default.js");
     const viteCli = resolvePackageFile(projectRoot, "vite", "bin/vite.js");
-    runtime.run("tsup watch", process.execPath, [tsupCli, "--config", "tsup.config.ts", "--watch"]);
+    // Scope watch to src: tsup expands its watch root with a glob that includes
+    // node_modules (~2 min of 100% CPU on Windows before the first rebuild).
+    runtime.run("tsup watch", process.execPath, [tsupCli, "--config", "tsup.config.ts", "--watch", "src"]);
     runtime.run("Vite", process.execPath, [viteCli, "--config", "vite.config.ts"]);
     await waitForViteReady(rendererUrl);
 
