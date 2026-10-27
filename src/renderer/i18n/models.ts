@@ -191,7 +191,7 @@ export const enUS: Record<string, string> = {
   modelDiscover: "Fetch model list",
   modelDiscovering: "Fetching models…",
   modelDiscoverHint:
-    "Fetch models from an OpenAI-compatible /models endpoint using this URL and API key. New IDs are added without replacing existing settings. Save below to apply.",
+    "Fetch models from an OpenAI-compatible /models endpoint using this URL and API key, then pick the ones to add. Existing settings are kept; save below to apply.",
   modelDiscoverEmpty: "The endpoint returned no models.",
   modelDiscoverSuccess: "Found {found} models; added {added}. Review their capabilities before saving.",
   modelUnableResetLogin: "Unable to reset login",
@@ -383,7 +383,7 @@ export const zhCN: Record<string, string> = {
   modelDiscover: "获取模型列表",
   modelDiscovering: "正在获取模型…",
   modelDiscoverHint:
-    "使用当前地址和 API Key 从兼容 OpenAI 的 /models 接口获取模型。仅添加新模型，保留已有设置；点击下方“保存”后生效。",
+    "使用当前地址和 API Key 从兼容 OpenAI 的 /models 接口获取模型，再勾选要添加的模型。已有设置会保留；点击下方“保存”后生效。",
   modelDiscoverEmpty: "接口未返回任何模型。",
   modelDiscoverSuccess: "发现 {found} 个模型，新增 {added} 个。保存前请检查模型能力设置。",
   modelUnableResetLogin: "无法重置登录状态",
@@ -577,7 +577,7 @@ export const zhTW: Record<string, string> = {
   modelDiscover: "取得模型清單",
   modelDiscovering: "正在取得模型…",
   modelDiscoverHint:
-    "使用目前位址和 API Key 從相容 OpenAI 的 /models 介面取得模型。僅新增模型，保留已有設定；點擊下方「儲存」後生效。",
+    "使用目前位址和 API Key 從相容 OpenAI 的 /models 介面取得模型，再勾選要新增的模型。已有設定會保留；點擊下方「儲存」後生效。",
   modelDiscoverEmpty: "介面未回傳任何模型。",
   modelDiscoverSuccess: "發現 {found} 個模型，新增 {added} 個。儲存前請檢查模型能力設定。",
   modelUnableResetLogin: "無法重設登入狀態",

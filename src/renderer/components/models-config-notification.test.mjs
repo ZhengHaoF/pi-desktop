@@ -1155,7 +1155,7 @@ test("explicit disk reload replaces an invalid JSON draft even when the stored o
   );
 });
 
-test("discovered models merge into the latest draft, retain custom settings and save only on request", async (t) => {
+test("discovered models are listed for selection and only chosen entries merge into the latest draft", async (t) => {
   const existing = { id: "existing", reasoning: true, thinkingLevelMap: { max: "max" }, contextWindow: 32768 };
   const fixture = await mount(t, {
     config: {
@@ -1182,11 +1182,30 @@ test("discovered models merge into the latest draft, retain custom settings and 
   const result = {
     ok: true,
     baseUrl: "http://fixture.test/v1",
-    models: [{ id: "existing", name: "Remote name" }, { id: "new", name: "New model" }, { id: "new" }],
+    models: [
+      { id: "existing", name: "Remote name" },
+      { id: "new", name: "New model" },
+      { id: "other", name: "Other model" },
+    ],
   };
   await fixture.reply(0, result);
-  const draft = fixture.detail("ProviderDetail").props.provider;
-  assert.deepEqual(draft.models, [existing, { id: "new", name: "New model" }]);
+  let draft = fixture.detail("ProviderDetail").props.provider;
+  assert.deepEqual(draft.models, [existing], "fetching must not add models before the user picks them");
+  assert.equal(draft.baseUrl, "http://fixture.test/");
+  const rowCheckbox = (label) => {
+    const row = fixture.renderer.root.find((node) => node.type === "label" && text(node).includes(label));
+    return row.find((node) => node.type === "input");
+  };
+  assert.equal(rowCheckbox("existing").props.disabled, true);
+  const filter = () =>
+    fixture.renderer.root.find((node) => node.type === "input" && node.props["aria-label"] === "Filter fetched models");
+  await act(async () => filter().props.onChange({ target: { value: "model" } }));
+  await act(async () => rowCheckbox("New model").props.onChange({ target: { checked: true } }));
+  await act(async () => rowCheckbox("Other model").props.onChange({ target: { checked: true } }));
+  await act(async () => filter().props.onChange({ target: { value: "" } }));
+  await fixture.click("Add selected models (2)");
+  draft = fixture.detail("ProviderDetail").props.provider;
+  assert.deepEqual(draft.models, [existing, { id: "new", name: "New model" }, { id: "other", name: "Other model" }]);
   assert.equal(draft.baseUrl, result.baseUrl);
   assert.equal(draft.modelOverrides.existing.samplingParams.temperature, 0.2);
   assert.equal(
@@ -1195,8 +1214,12 @@ test("discovered models merge into the latest draft, retain custom settings and 
   );
   await fixture.click("Fetch model list");
   await fixture.reply(1, result);
-  assert.match(text(fixture.renderer.toJSON()), /added 0/);
-  assert.equal(fixture.detail("ProviderDetail").props.provider.models.length, 2);
+  assert.equal(
+    fixture.renderer.root.find((node) => node.type === "button" && text(node) === "Add selected models (0)").props
+      .disabled,
+    true,
+  );
+  assert.equal(fixture.detail("ProviderDetail").props.provider.models.length, 3);
   await fixture.click("Save");
   assert.equal(fixture.requests[2].method, "modelsConfig.set");
   assert.deepEqual(fixture.requests[2].params.config.providers.custom, draft);
@@ -1218,9 +1241,10 @@ test("discovery ignores results from an edited connection or a deselected provid
   await fixture.reply(0, { ok: true, baseUrl: "https://old.test/v1", models: [{ id: "stale" }] });
   assert.equal(fixture.detail("ProviderDetail").props.provider.baseUrl, "https://new.test/v1");
   assert.deepEqual(fixture.detail("ProviderDetail").props.provider.models, []);
+  assert.doesNotMatch(text(fixture.renderer.root), /stale/);
   await fixture.click("Fetch model list");
   await fixture.reply(1, { ok: false, error: "Authentication failed", status: 401 });
-  assert.match(text(fixture.renderer.toJSON()), /Authentication failed/);
+  assert.match(text(fixture.renderer.root), /Authentication failed/);
   await fixture.click("Fetch model list");
   await fixture.select("other");
   await fixture.reply(2, { ok: true, baseUrl: "https://new.test/v1", models: [{ id: "stale" }] });
@@ -1228,7 +1252,7 @@ test("discovery ignores results from an edited connection or a deselected provid
   assert.deepEqual(fixture.detail("ProviderDetail").props.provider.models, []);
   await fixture.click("Fetch model list");
   await fixture.reply(3, { ok: true, baseUrl: "https://new.test/v1", models: [] });
-  assert.match(text(fixture.renderer.toJSON()), /returned no models/);
+  assert.match(text(fixture.renderer.root), /empty model list/);
 });
 
 test("thinking settings explain opt-in levels and update the supported-level preview when explicitly mapped", async (t) => {
