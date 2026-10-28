@@ -243,6 +243,87 @@ test("external turns respect a reader away from the bottom and explicit touch ge
   assert.deepEqual(fixture.calls, []);
 });
 
+test("scrolling back to the bottom during a run resumes streaming follow", async (t) => {
+  const fixture = await mount(t);
+  fixture.current.reattachAutoFollow();
+  await fixture.update({ agentRunning: true, streamState: stream("one") });
+  await fixture.flush();
+  assert.ok(fixture.calls.some((call) => call.target === "live"));
+  fixture.calls.length = 0;
+
+  fixture.container.scrollTop = 1300;
+  fixture.container.emit("wheel", new fixture.WheelEvent(-10));
+  fixture.container.emit("scroll", {});
+  await fixture.update({ streamState: stream("two") });
+  await fixture.flush();
+  assert.deepEqual(fixture.calls, [], "upward input stops follow");
+
+  // Intent lands before the position moves, mirroring the browser event order.
+  fixture.container.emit("wheel", new fixture.WheelEvent(10));
+  fixture.container.scrollTop = 1400;
+  fixture.container.emit("scroll", {});
+  await fixture.update({ streamState: stream("three") });
+  await fixture.flush();
+  assert.ok(
+    fixture.calls.some((call) => call.target === "live"),
+    "arriving at the bottom resumes follow",
+  );
+
+  fixture.calls.length = 0;
+  fixture.container.scrollTop = 1300;
+  fixture.container.emit("wheel", new fixture.WheelEvent(-10));
+  fixture.container.emit("scroll", {});
+  await fixture.update({ streamState: stream("four") });
+  await fixture.flush();
+  assert.deepEqual(fixture.calls, [], "follow stops again after another scroll up");
+});
+
+test("returning to the bottom mid-run restores the completion scroll", async (t) => {
+  const fixture = await mount(t);
+  fixture.current.reattachAutoFollow();
+  await fixture.update({ agentRunning: true, streamState: stream("one") });
+  await fixture.flush();
+  fixture.calls.length = 0;
+
+  fixture.container.scrollTop = 1300;
+  fixture.container.emit("wheel", new fixture.WheelEvent(-10));
+  fixture.container.emit("scroll", {});
+  fixture.container.emit("wheel", new fixture.WheelEvent(10));
+  fixture.container.scrollTop = 1400;
+  fixture.container.emit("scroll", {});
+
+  fixture.calls.length = 0;
+  await fixture.update({ agentRunning: false, messageCount: 2 });
+  assert.ok(fixture.calls.some((call) => call.target === "end"));
+});
+
+test("a long downward touch drag keeps the intent window alive to re-attach follow", async (t) => {
+  const fixture = await mount(t);
+  fixture.current.reattachAutoFollow();
+  await fixture.update({ agentRunning: true, streamState: stream("one") });
+  await fixture.flush();
+  fixture.calls.length = 0;
+
+  fixture.container.scrollTop = 1300;
+  fixture.container.emit("touchstart", { touches: [{ clientY: 300 }] });
+  fixture.container.emit("touchmove", { touches: [{ clientY: 340 }] });
+  fixture.container.emit("touchend", { touches: [] });
+  fixture.container.emit("scroll", {});
+  await fixture.update({ streamState: stream("two") });
+  await fixture.flush();
+  assert.deepEqual(fixture.calls, [], "upward touch stops follow");
+
+  fixture.advance(2000);
+  fixture.container.emit("touchstart", { touches: [{ clientY: 400 }] });
+  fixture.advance(2000);
+  fixture.container.emit("touchmove", { touches: [{ clientY: 360 }] });
+  fixture.container.scrollTop = 1400;
+  fixture.container.emit("scroll", {});
+  await fixture.update({ streamState: stream("three") });
+  await fixture.flush();
+  assert.ok(fixture.calls.some((call) => call.target === "live"));
+});
+
 test("prepend anchors yield to new local turns and cannot write after unmount", async (t) => {
   const fixture = await mount(t);
   fixture.container.scrollTop = 300;

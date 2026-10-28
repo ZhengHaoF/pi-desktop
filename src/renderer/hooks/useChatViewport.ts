@@ -5,6 +5,7 @@ import {
   isUpwardScrollKey,
   isUpwardTouchGesture,
   shouldDisengageScrollMagnet,
+  shouldReattachChatAutoFollow,
   shouldStopChatAutoFollow,
 } from "./chat-scroll-policy";
 
@@ -191,21 +192,28 @@ export function useChatViewport({
     setIsAwayFromBottom((prev) => (prev === !nearBottom ? prev : !nearBottom));
   }, []);
 
+  // Flags only: the live-follow effect owns the actual scrolling. Shared by the
+  // explicit reattach button and by the user scrolling back to the bottom.
+  const engageAutoFollow = useCallback(() => {
+    if (!activeRef.current) return;
+    completionScrollAllowedRef.current = true;
+    autoFollowMagnetRef.current = true;
+    setScrollMagnetEngaged(true);
+  }, []);
+
   // "Scroll to bottom": snap to the end and re-magnet the viewport so the next
   // streaming ticks keep following until the user scrolls away again.
   const reattachAutoFollow = useCallback(() => {
     if (!activeRef.current) return;
     interactionRevisionRef.current++;
     pendingHistoryPrependRef.current = false;
-    completionScrollAllowedRef.current = true;
     externalTurnAutoFollowRef.current = false;
-    autoFollowMagnetRef.current = true;
-    setScrollMagnetEngaged(true);
+    engageAutoFollow();
     pendingScrollToUserRef.current = false;
     initialScrollDoneRef.current = true;
     userScrollIntentUntilRef.current = 0;
     scrollToBottom("auto");
-  }, [scrollToBottom]);
+  }, [engageAutoFollow, scrollToBottom]);
 
   const disengageAutoFollowForExplicitUpwardGesture = useCallback(() => {
     if (!activeRef.current) return;
@@ -254,8 +262,11 @@ export function useChatViewport({
   const handleTouchMove = useCallback(
     (event: TouchEvent) => {
       const currentClientY = event.touches[0]?.clientY;
-      if (currentClientY === undefined || !isUpwardTouchGesture(touchStartClientYRef.current, currentClientY)) return;
+      if (currentClientY === undefined) return;
+      // Every touch movement is explicit intent: a long downward drag must keep
+      // the intent window alive so arriving at the bottom can re-attach follow.
       markUserScrollIntent(event);
+      if (!isUpwardTouchGesture(touchStartClientYRef.current, currentClientY)) return;
       disengageAutoFollowForExplicitUpwardGesture();
       touchStartClientYRef.current = currentClientY;
     },
@@ -318,8 +329,23 @@ export function useChatViewport({
       // win even while a session-transition guard is active.
       autoFollowMagnetRef.current = false;
       setScrollMagnetEngaged(false);
+    } else if (
+      shouldReattachChatAutoFollow({
+        previousScrollTop,
+        currentScrollTop,
+        now,
+        userIntentUntil: userScrollIntentUntilRef.current,
+        nearBottom: isNearBottomExcludingSpacer(container),
+      })
+    ) {
+      // Explicitly scrolled back to the newest content mid-run: resume follow
+      // immediately instead of resuming out the full intent window.
+      interactionRevisionRef.current++;
+      pendingHistoryPrependRef.current = false;
+      userScrollIntentUntilRef.current = 0;
+      engageAutoFollow();
     }
-  }, [agentRunningRef, updateScrollPresence]);
+  }, [agentRunningRef, engageAutoFollow, updateScrollPresence]);
 
   useEffect(() => {
     window.addEventListener("keydown", markUserScrollIntent);

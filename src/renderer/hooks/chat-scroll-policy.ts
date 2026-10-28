@@ -1,5 +1,5 @@
 export const CHAT_BOTTOM_PROXIMITY_PX = 96;
-export const USER_SCROLL_UP_MIN_PX = 1;
+export const USER_SCROLL_MIN_PX = 1;
 export const TOUCH_SCROLL_UP_MIN_PX = 8;
 
 export function isUpwardScrollKey(key: string): boolean {
@@ -29,7 +29,11 @@ export function isNearChatBottom(metrics: ScrollMetrics, threshold = CHAT_BOTTOM
 }
 
 export function didUserScrollUp(previousScrollTop: number, currentScrollTop: number): boolean {
-  return currentScrollTop < previousScrollTop - USER_SCROLL_UP_MIN_PX;
+  return currentScrollTop < previousScrollTop - USER_SCROLL_MIN_PX;
+}
+
+export function didUserScrollDown(previousScrollTop: number, currentScrollTop: number): boolean {
+  return currentScrollTop > previousScrollTop + USER_SCROLL_MIN_PX;
 }
 
 export interface ScrollMagnetDisengageInput {
@@ -61,4 +65,18 @@ export function shouldStopChatAutoFollow(input: AutoFollowStopInput): boolean {
   if (input.now > input.userIntentUntil) return false;
   if (input.now < input.programmaticScrollUntil && !input.externalAutoFollow) return false;
   return didUserScrollUp(input.previousScrollTop, input.currentScrollTop);
+}
+
+export interface AutoFollowReattachInput {
+  previousScrollTop: number;
+  currentScrollTop: number;
+  now: number;
+  userIntentUntil: number;
+  nearBottom: boolean;
+}
+
+export function shouldReattachChatAutoFollow(input: AutoFollowReattachInput): boolean {
+  if (input.now > input.userIntentUntil) return false;
+  if (!input.nearBottom) return false;
+  return didUserScrollDown(input.previousScrollTop, input.currentScrollTop);
 }

@@ -4,11 +4,13 @@ import path from "node:path";
 import test from "node:test";
 
 const {
+  didUserScrollDown,
   didUserScrollUp,
   isNearChatBottom,
   isUpwardScrollKey,
   isUpwardTouchGesture,
   shouldDisengageScrollMagnet,
+  shouldReattachChatAutoFollow,
   shouldStopChatAutoFollow,
 } = await importTestBundle("src/renderer/hooks/chat-scroll-policy", {
   entryPoints: [path.join(import.meta.dirname, "chat-scroll-policy.ts")],
@@ -40,6 +42,24 @@ test("external-turn follow starts near the bottom and stops only for a meaningfu
   );
   assert.equal(shouldStopChatAutoFollow({ ...decision, userIntentUntil: 999 }), false);
   assert.equal(shouldStopChatAutoFollow({ ...decision, currentScrollTop: 950 }), false);
+});
+
+test("re-attaching follow needs explicit downward input within the intent window and a bottom landing", () => {
+  assert.equal(didUserScrollDown(900, 902), true);
+  assert.equal(didUserScrollDown(900, 901), false, "sub-threshold movement is not an explicit scroll");
+  assert.equal(didUserScrollDown(900, 850), false, "upward movement never re-attaches");
+
+  const decision = {
+    previousScrollTop: 1_300,
+    currentScrollTop: 1_400,
+    now: 1_000,
+    userIntentUntil: 2_000,
+    nearBottom: true,
+  };
+  assert.equal(shouldReattachChatAutoFollow(decision), true);
+  assert.equal(shouldReattachChatAutoFollow({ ...decision, userIntentUntil: 999 }), false);
+  assert.equal(shouldReattachChatAutoFollow({ ...decision, nearBottom: false }), false);
+  assert.equal(shouldReattachChatAutoFollow({ ...decision, currentScrollTop: 1_250 }), false);
 });
 
 test("run spacer must not count as content: bottom stays near even with a full-viewport spacer", () => {
