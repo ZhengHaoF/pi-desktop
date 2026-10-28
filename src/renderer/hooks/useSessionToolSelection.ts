@@ -11,6 +11,7 @@ export function useSessionToolSelection({
   ensuringNewSessionRef,
   preset,
   setPreset,
+  resolvePreset,
   isActive,
   captureCommandView,
 }: {
@@ -20,6 +21,8 @@ export function useSessionToolSelection({
   ensuringNewSessionRef: RefObject<Promise<string | null> | null>;
   preset: ToolPreset;
   setPreset: (preset: ToolPreset) => void;
+  /** Resolves the new-session preset once settings have loaded, so the first send never races. */
+  resolvePreset?: () => Promise<ToolPreset>;
   isActive: () => boolean;
   captureCommandView: () => () => boolean;
 }) {
@@ -58,13 +61,13 @@ export function useSessionToolSelection({
     if (sid) return (await sendAgentCommand(sid, { type: "get_tools" })) ?? [];
     return cwd ? ((await call("host.toolchain", { cwd }))?.codingTools ?? []) : [];
   }, [cwd, sessionIdRef]);
-  const initialToolNames = useCallback(
-    async () =>
-      (desired.current && desired.current.owner === key ? desired.current.names : selected) ??
-      // The Host captures the default executor when it creates the session.
-      getToolNamesForPreset(preset, preset === "full" ? await available() : undefined),
-    [available, preset, selected, key],
-  );
+  const initialToolNames = useCallback(async () => {
+    if (desired.current && desired.current.owner === key) return desired.current.names;
+    if (selected) return selected;
+    // The Host captures the default executor when it creates the session.
+    const initialPreset = resolvePreset ? await resolvePreset() : preset;
+    return getToolNamesForPreset(initialPreset, initialPreset === "full" ? await available() : undefined);
+  }, [available, preset, resolvePreset, selected, key]);
   const apply = useCallback(
     async (names: string[], nextPreset: ToolPreset, request: number) => {
       const owns = captureCommandView();

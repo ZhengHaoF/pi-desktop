@@ -14,6 +14,18 @@ export interface ToolEntry {
 export type ToolPreset = "none" | "default" | "full" | "custom";
 export type SelectableToolPreset = Exclude<ToolPreset, "custom">;
 
+export const SELECTABLE_TOOL_PRESETS: readonly SelectableToolPreset[] = Object.freeze(["none", "default", "full"]);
+/** New sessions fall back to this preset when the desktop preference is unset. */
+export const DEFAULT_TOOL_PRESET: SelectableToolPreset = "default";
+
+export interface ToolPresetSettings {
+  preset: SelectableToolPreset;
+}
+
+export function isSelectableToolPreset(value: unknown): value is SelectableToolPreset {
+  return typeof value === "string" && (SELECTABLE_TOOL_PRESETS as readonly string[]).includes(value);
+}
+
 export const PRESET_NONE: string[] = [];
 export const PRESET_DEFAULT: string[] = ["read", "bash", "edit", "write"];
 export const CODING_FULL_TOOLS = ["bash", "read", "edit", "write", "grep", "find", "ls"];

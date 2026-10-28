@@ -12,6 +12,7 @@ import { getPresetFromTools } from "@/lib/tool-presets";
 import type { ToolPreset } from "@shared/tool-presets";
 import type { SessionStatsInfo } from "@/lib/pi-types";
 import { useSessionToolSelection } from "./useSessionToolSelection";
+import { useNewSessionDefaultPreset } from "./useNewSessionDefaultPreset";
 import { useSessionEvents } from "./useSessionEvents";
 import { requestAutoSessionTitle, shouldAutoTitleMessage } from "../lib/auto-session-title";
 
@@ -263,13 +264,31 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const prependAnchorRef = useRef<ReturnType<typeof useChatViewport>["capturePrependAnchor"] | null>(null);
   const capturePrependAnchor = useCallback(() => prependAnchorRef.current?.(), []);
   const setToolPresetState = opts.setToolPreset ?? setToolPreset;
+  const toolPresetRef = useRef(toolPreset);
+  toolPresetRef.current = toolPreset;
+  const { resolve: resolveDefaultPreset, markChosen: markPresetChosen } = useNewSessionDefaultPreset(
+    isNew,
+    setToolPresetState,
+  );
+  const resolvePresetForNewSession = useCallback(
+    () => resolveDefaultPreset(toolPresetRef.current),
+    [resolveDefaultPreset],
+  );
+  const handleToolPresetState = useCallback(
+    (value: ToolPreset) => {
+      markPresetChosen();
+      setToolPresetState(value);
+    },
+    [markPresetChosen, setToolPresetState],
+  );
   const { loadTools, initialToolNames, handleToolPresetChange, toolSelectionError } = useSessionToolSelection({
     cwd: newSessionCwd ?? session?.cwd,
     owner: session?.id ?? newSessionCwd,
     sessionIdRef,
     ensuringNewSessionRef,
     preset: toolPreset,
-    setPreset: setToolPresetState,
+    setPreset: handleToolPresetState,
+    resolvePreset: resolvePresetForNewSession,
     isActive,
     captureCommandView,
   });

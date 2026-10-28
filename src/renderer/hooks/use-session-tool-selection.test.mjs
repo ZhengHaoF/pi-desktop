@@ -101,3 +101,52 @@ test("permission presets use the configured shell and retain no-tools after a fa
   await act(async () => renderer.update(createElement(Fixture)));
   assert.deepEqual(await current.initialToolNames(), ["read", "bash", "edit", "write"]);
 });
+
+test("initial tool names use the resolved default preset until the user picks one", async (t) => {
+  const saved = Object.getOwnPropertyDescriptor(globalThis, "IS_REACT_ACT_ENVIRONMENT");
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  api.state.requests.length = 0;
+  api.state.failure = false;
+  api.state.hold = null;
+  api.state.choices = [
+    { name: "bash", available: true },
+    { name: "powershell", available: false },
+  ];
+  let resolverCalls = 0,
+    current,
+    preset = "default",
+    renderer;
+  function Fixture() {
+    current = useSessionToolSelection({
+      cwd: "/workspace",
+      owner: "first",
+      sessionIdRef: { current: null },
+      ensuringNewSessionRef: { current: null },
+      preset,
+      setPreset: (value) => {
+        preset = value;
+      },
+      resolvePreset: async () => {
+        resolverCalls += 1;
+        return "none";
+      },
+      isActive: () => true,
+      captureCommandView: () => () => true,
+    });
+    return null;
+  }
+  await act(async () => {
+    renderer = create(createElement(Fixture));
+  });
+  t.after(async () => {
+    await act(async () => renderer.unmount());
+    if (saved) Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", saved);
+    else delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  });
+  assert.deepEqual(await current.initialToolNames(), []);
+  assert.equal(resolverCalls, 1);
+  await act(async () => current.handleToolPresetChange("default"));
+  resolverCalls = 0;
+  assert.deepEqual(await current.initialToolNames(), ["read", "bash", "edit", "write"]);
+  assert.equal(resolverCalls, 0, "a manual selection never waits for the stored default");
+});

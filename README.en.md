@@ -93,6 +93,7 @@ The workspace and key settings. Click an image to view it at full size.
 ### Session tools and execution history
 
 - Manage Codemode, tool search, and tool presets from the session tools menu; Full access includes Codemode and tool search
+- Choose the default tool preset for new sessions in Settings → General; existing sessions and channels keep their own selection
 - Control model-visible entry points, tools available for nested discovery, and execution grants separately; nested calls follow the current session's tool permissions
 - Inspect direct and nested calls in a parent/child execution tree, including state, duration, and original arguments/results, with history filtered to the current session branch
 - Read large results and persisted temporary output in pages; after reopening or compacting a session, the Agent can retrieve original content with `tool_history_get`

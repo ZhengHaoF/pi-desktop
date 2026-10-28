@@ -1,4 +1,5 @@
 import type { AgentShell, AgentShellSettings } from "../shared/agent-shell";
+import type { SelectableToolPreset, ToolPresetSettings } from "../shared/tool-presets";
 import type { WebSearchSettings, WebSearchSnapshot } from "../shared/web-search";
 import type { AdvancedModelSettings, AutoRoutingConfig, CatalogModel, ModelSettingsSnapshot } from "./model-settings";
 import type {
@@ -415,6 +416,8 @@ export interface Api {
   // Config
   "settings.getAgentShell": { params: void; result: AgentShellSettings };
   "settings.setAgentShell": { params: { shell: AgentShell }; result: AgentShellSettings };
+  "settings.getDefaultToolPreset": { params: void; result: ToolPresetSettings };
+  "settings.setDefaultToolPreset": { params: { preset: SelectableToolPreset }; result: ToolPresetSettings };
   "settings.getWebSearch": { params: void; result: WebSearchSnapshot };
   "settings.setWebSearch": { params: Partial<WebSearchSettings>; result: WebSearchSnapshot };
   "settings.testWebSearch": { params: { apiKeyOverride?: string } | void; result: TestResult };

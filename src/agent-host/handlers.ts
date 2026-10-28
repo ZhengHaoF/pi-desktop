@@ -300,6 +300,8 @@ export function registerHandlers(server: RpcServer): () => Promise<void> {
 
     "settings.getAgentShell": guard(resourceHandlers.getAgentShell),
     "settings.setAgentShell": guard(resourceHandlers.setAgentShell),
+    "settings.getDefaultToolPreset": guard(resourceHandlers.getDefaultToolPreset),
+    "settings.setDefaultToolPreset": guard(resourceHandlers.setDefaultToolPreset),
     "settings.getWebSearch": guard(resourceHandlers.getWebSearch),
 
     "settings.setWebSearch": guard(async (params) => {

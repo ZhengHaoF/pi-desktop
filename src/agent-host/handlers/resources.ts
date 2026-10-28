@@ -22,6 +22,8 @@ import { toolchainRuntime } from "../toolchain-runtime";
 import { cacheWarmingSettings, isCacheWarmingMode } from "../cache-warming-settings";
 import { agentShellPreferences } from "../agent-shell-settings";
 import { isAgentShell } from "../../shared/agent-shell";
+import { isSelectableToolPreset } from "../../shared/tool-presets";
+import { toolPresetPreferences } from "../tool-preset-settings";
 
 /** A live query with stable results, so a successful test proves key, network and billing in one call. */
 const WEB_SEARCH_TEST_QUERY = "DeepSeek";
@@ -107,6 +109,8 @@ function writeTextAtomically(filePath: string, content: string): void {
 type ResourceHandlers = {
   getAgentShell: NonNullable<ApiHandler["settings.getAgentShell"]>;
   setAgentShell: NonNullable<ApiHandler["settings.setAgentShell"]>;
+  getDefaultToolPreset: NonNullable<ApiHandler["settings.getDefaultToolPreset"]>;
+  setDefaultToolPreset: NonNullable<ApiHandler["settings.setDefaultToolPreset"]>;
   getWebSearch: NonNullable<ApiHandler["settings.getWebSearch"]>;
   setWebSearch: NonNullable<ApiHandler["settings.setWebSearch"]>;
   testWebSearch: NonNullable<ApiHandler["settings.testWebSearch"]>;
@@ -191,6 +195,13 @@ export const resourceHandlers = {
     if (process.platform !== "win32" || !isAgentShell(params?.shell))
       throw new RpcError({ code: "BAD_REQUEST", message: "Invalid Agent shell selection" });
     return agentShellPreferences().set(params.shell);
+  },
+
+  getDefaultToolPreset: async () => toolPresetPreferences().get(),
+  setDefaultToolPreset: async (params) => {
+    if (!isSelectableToolPreset(params?.preset))
+      throw new RpcError({ code: "BAD_REQUEST", message: "Invalid default tool preset selection" });
+    return toolPresetPreferences().set(params.preset);
   },
 
   setCacheWarming: async (params) => {
