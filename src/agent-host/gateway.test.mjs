@@ -72,7 +72,12 @@ class FakeRelaySocket {
   }
 
   deliver(payload) {
-    this.emit("message", JSON.stringify({ v: 1, traceId: "t", ts: Date.now(), nonce: "n", role: "relay", payload }));
+    // Frames forwarded by the relay carry the sending device's id in the
+    // envelope header; the gateway uses it to route responses back (spec §2).
+    this.emit(
+      "message",
+      JSON.stringify({ v: 1, traceId: "t", ts: Date.now(), nonce: "n", role: "relay", deviceId: "dev-1", payload }),
+    );
   }
 
   helloSent() {
@@ -223,6 +228,11 @@ test("gateway: extension_ui_request mirrored to remote.approval; stop aborts", a
   const { server, socket, gateway } = await makeGateway(mod);
   const decisions = [];
   gateway.onApproval((decision) => decisions.push(decision.outcome));
+
+  // The approval mirror is routed to devices seen on this relay session (the
+  // relay requires an envelope deviceId); deliver one device frame first.
+  socket.deliver({ kind: "subscribe", id: "sub-0", topic: "agent.events", key: "s1" });
+  await new Promise((resolve) => setTimeout(resolve, 30));
 
   server.emit("agent.events", "s1", {
     type: "extension_ui_request",

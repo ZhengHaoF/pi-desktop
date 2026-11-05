@@ -59,6 +59,8 @@ export class RemoteGateway {
   private readonly pending = new Map<string, PendingRequest>();
   /** Remote-plane subscriptions: topic → Set<key> (keys are sessionIds). */
   private readonly remoteSubscriptions = new Map<string, Set<string>>();
+  /** Devices seen on this relay session (envelope header), used for frame routing. */
+  private readonly knownDevices = new Set<string>();
   private internalSubscriptionsReady: Promise<unknown> = Promise.resolve();
   private readonly approvalBridge: ApprovalBridge;
   private socket: GatewaySocket | undefined;
@@ -126,7 +128,9 @@ export class RemoteGateway {
       });
       socket.on("open", () => {
         this.state = "ready";
-        this.sendToRelay({
+        // hello is consumed by the relay itself (no routing), so it is sent
+        // raw — before any device is known on this session.
+        this.sendRaw({
           v: 1,
           traceId: randomUUID(),
           ts: Date.now(),
@@ -205,37 +209,49 @@ export class RemoteGateway {
 
   private onRelayMessage(data: unknown): void {
     const text = typeof data === "string" ? data : Buffer.isBuffer(data) ? data.toString("utf8") : "";
-    let envelope: { payload?: unknown };
+    let envelope: { deviceId?: unknown; payload?: unknown };
     try {
-      envelope = JSON.parse(text) as { payload?: unknown };
+      envelope = JSON.parse(text) as { deviceId?: unknown; payload?: unknown };
     } catch {
       return;
     }
+    // The relay routes host→device frames by the envelope's deviceId; remember
+    // which device(s) this session serves so responses and mirrored events can
+    // be addressed back. Frames without a target are closed by the relay.
+    const fromDevice =
+      typeof envelope.deviceId === "string" && envelope.deviceId.length > 0 ? envelope.deviceId : undefined;
+    if (fromDevice) this.knownDevices.add(fromDevice);
     const payload = envelope.payload as WireMessage | undefined;
     if (!payload || typeof payload !== "object") return;
 
     if (payload.kind === "request") {
-      void this.handleRemoteRequest(payload);
+      void this.handleRemoteRequest(payload, fromDevice);
       return;
     }
     if (payload.kind === "subscribe") {
       if (!isSubscriptionAllowed(payload.topic, payload.key)) {
-        this.sendResponse(payload.id, false, undefined, {
-          code: "FORBIDDEN",
-          message: "subscription denied (topic not allowlisted or wildcard key)",
-        });
+        this.sendResponse(
+          payload.id,
+          false,
+          undefined,
+          {
+            code: "FORBIDDEN",
+            message: "subscription denied (topic not allowlisted or wildcard key)",
+          },
+          fromDevice,
+        );
         return;
       }
       const keys = this.remoteSubscriptions.get(payload.topic) ?? new Set<string>();
       keys.add(payload.key);
       this.remoteSubscriptions.set(payload.topic, keys);
-      this.sendResponse(payload.id, true, { subscribed: true });
+      this.sendResponse(payload.id, true, { subscribed: true }, undefined, fromDevice);
       return;
     }
     if (payload.kind === "unsubscribe") {
       const keys = this.remoteSubscriptions.get(payload.topic);
       keys?.delete(payload.key);
-      this.sendResponse(payload.id, true, { unsubscribed: true });
+      this.sendResponse(payload.id, true, { unsubscribed: true }, undefined, fromDevice);
       return;
     }
     if (payload.kind === "response") {
@@ -243,7 +259,7 @@ export class RemoteGateway {
     }
   }
 
-  private async handleRemoteRequest(request: WireMessage & { kind: "request" }): Promise<void> {
+  private async handleRemoteRequest(request: WireMessage & { kind: "request" }, fromDevice?: string): Promise<void> {
     if (!isMethodAllowed(request.method)) {
       this.sendResponse(request.id, false, undefined, {
         code: "FORBIDDEN",
@@ -259,7 +275,7 @@ export class RemoteGateway {
       return;
     }
     const response = await this.callRpc(request.method, request.params);
-    this.sendResponse(request.id, response.ok, response.result, response.error);
+    this.sendResponse(request.id, response.ok, response.result, response.error, fromDevice);
   }
 
   private callRpc(
@@ -287,20 +303,47 @@ export class RemoteGateway {
     });
   }
 
-  private sendResponse(id: string, ok: boolean, result: unknown, error?: { code: string; message: string }): void {
-    this.sendToRelay({
-      v: 1,
-      traceId: randomUUID(),
-      ts: Date.now(),
-      nonce: randomUUID(),
-      role: "host",
-      payload: { kind: "response", id, ok, ...(ok ? { result } : { error }) },
-    });
+  private sendResponse(
+    id: string,
+    ok: boolean,
+    result: unknown,
+    error?: { code: string; message: string },
+    targetDeviceId?: string,
+  ): void {
+    this.sendToRelay(
+      {
+        v: 1,
+        traceId: randomUUID(),
+        ts: Date.now(),
+        nonce: randomUUID(),
+        role: "host",
+        payload: { kind: "response", id, ok, ...(ok ? { result } : { error }) },
+      },
+      targetDeviceId,
+    );
   }
 
-  private sendToRelay(envelope: Record<string, unknown>): void {
+  /** Unrouted frame (hello) — consumed by the relay itself, no deviceId needed. */
+  private sendRaw(envelope: Record<string, unknown>): void {
     if (this.socket && this.state === "ready") {
       this.socket.send(JSON.stringify(envelope));
+    }
+  }
+
+  /**
+   * Routed frame. With an explicit target the envelope carries that deviceId;
+   * without one (mirrored events / approval mirrors) it fans out to every
+   * device seen on this relay session — the relay routes host frames by
+   * deviceId and closes the connection on frames without a target.
+   */
+  private sendToRelay(envelope: Record<string, unknown>, targetDeviceId?: string): void {
+    if (!this.socket || this.state !== "ready") return;
+    if (targetDeviceId) {
+      this.sendRaw({ ...envelope, deviceId: targetDeviceId });
+      return;
+    }
+    for (const deviceId of this.knownDevices) {
+      this.sendRaw({ ...envelope, deviceId });
     }
   }
 }

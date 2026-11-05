@@ -34,7 +34,7 @@ class ConnectPage extends StatefulWidget {
 }
 
 class _ConnectPageState extends State<ConnectPage> {
-  final _urlController = TextEditingController(text: 'ws://10.0.2.2:8787');
+  final _urlController = TextEditingController(text: 'ws://10.0.2.2:8787/ws');
   final _deviceController = TextEditingController();
   RemoteConnection? _connection;
   LinkState _state = LinkState.disconnected;
@@ -97,7 +97,7 @@ class _ConnectPageState extends State<ConnectPage> {
               controller: _urlController,
               decoration: const InputDecoration(
                 labelText: 'Relay 地址',
-                hintText: 'ws://192.168.x.x:8787',
+                hintText: 'ws://192.168.x.x:8787/ws',
                 border: OutlineInputBorder(),
               ),
             ),

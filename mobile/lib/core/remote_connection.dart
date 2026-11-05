@@ -26,6 +26,7 @@ class RemoteConnection {
   final String deviceLabel;
 
   WebSocketChannel? _channel;
+  String? _hostId;
   LinkState state = LinkState.disconnected;
   final _stateController = StreamController<LinkState>.broadcast();
   final _eventsController = StreamController<RemoteSessionEvent>.broadcast();
@@ -82,6 +83,7 @@ class RemoteConnection {
       nonce: _nextNonce(),
       role: 'device',
       deviceId: deviceId,
+      hostId: _hostId,
       payload: payload,
     );
     _channel?.sink.add(envelope.encode());
@@ -99,7 +101,11 @@ class RemoteConnection {
     if (payload is! Map<String, dynamic>) return;
     switch (payload['kind']) {
       case 'hello_ack':
-        // Handshake confirmed; nothing further needed in M1a.
+        // Handshake confirmed. The relay tells us which host to address
+        // (spec §4); every routed envelope must carry this hostId or the
+        // relay closes the link with "missing target id".
+        final hid = payload['hostId'];
+        if (hid is String && hid.isNotEmpty) _hostId = hid;
         break;
       case 'event':
         final event = WireEvent.fromJson(payload);

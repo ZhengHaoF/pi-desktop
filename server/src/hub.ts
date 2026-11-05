@@ -151,6 +151,9 @@ export class RelayHub {
       outcome: "ok",
       traceId: typeof envelope.traceId === "string" ? envelope.traceId : "hello",
     });
+    // Spec §4: hello_ack carries hostId — the host learns its assigned id and
+    // a device learns which host to address (M1a: single-host topology).
+    const ackHostId = role === "host" ? id : this.registry.onlineHosts()[0]?.id;
     peer.send(
       JSON.stringify({
         v: 1,
@@ -158,7 +161,12 @@ export class RelayHub {
         ts: Date.now(),
         nonce: randomUUID(),
         role: "relay",
-        payload: { kind: "hello_ack", protocolVersion: 1, cipherRequired: this.config.cipherRequired },
+        payload: {
+          kind: "hello_ack",
+          protocolVersion: 1,
+          ...(ackHostId ? { hostId: ackHostId } : {}),
+          cipherRequired: this.config.cipherRequired,
+        },
       }),
     );
     return peer;
