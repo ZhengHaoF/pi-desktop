@@ -14,3 +14,8 @@ build/toolchains/.core-cache/
 build/toolchains/core/
 build/herdr/bin/
 native/**/target/
+mobile/build/
+mobile/android/.gradle/
+mobile/.dart_tool/
+.qoder-credits/
+.workbuddy/

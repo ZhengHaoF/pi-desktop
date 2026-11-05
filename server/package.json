@@ -1,0 +1,24 @@
+{
+  "name": "@pi-desktop/relay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Zero-knowledge relay for Pi Agent Desktop remote control.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0 <23"
+  },
+  "scripts": {
+    "dev": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types src/index.ts",
+    "start": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types src/index.ts",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test --test-force-exit test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5"
+  }
+}

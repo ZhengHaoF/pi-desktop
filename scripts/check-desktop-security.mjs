@@ -18,6 +18,9 @@ const credentialVault = read("src/main/credential-vault.ts");
 const weixinChannelApi = read("src/agent-host/channels/adapters/weixin/api.ts");
 const telegramChannelApi = read("src/agent-host/channels/adapters/telegram/api.ts");
 const feishuChannelApi = read("src/agent-host/channels/adapters/feishu/api.ts");
+const remoteGateway = read("src/agent-host/remote/gateway.ts");
+const remotePolicy = read("src/agent-host/remote/policy.ts");
+const remoteApprovalBridge = read("src/agent-host/remote/approval-bridge.ts");
 const channelManager = read("src/agent-host/channels/channel-manager.ts");
 const channelMediaStore = read("src/agent-host/channels/media-store.ts");
 const channelOutboundFiles = read("src/agent-host/channels/outbound-files.ts");
@@ -515,6 +518,34 @@ const checks = [
   [!/(createServer|\.listen\s*\()/.test(weixinChannelApi), "Weixin MVP must not open a local listener"],
   [!/(createServer|\.listen\s*\()/.test(telegramChannelApi), "Telegram polling must not open a local listener"],
   [!/(createServer|\.listen\s*\()/.test(feishuChannelApi), "Feishu WebSocket mode must not open a local listener"],
+  // Remote control plane (M1a): outbound-only, deny-by-default, wildcard-free.
+  [
+    remotePolicy.includes("isSubscriptionAllowed") &&
+      remotePolicy.includes('key !== "*"') &&
+      remotePolicy.includes("ALLOWED_REQUEST_METHODS") &&
+      remotePolicy.includes("ALLOWED_AGENT_COMMAND_TYPES"),
+    "remote gateway policy must keep deny-by-default allowlists and forbid wildcard subscriptions",
+  ],
+  [
+    remoteGateway.includes("isSubscriptionAllowed") &&
+      remoteGateway.includes("isMethodAllowed") &&
+      remoteGateway.includes("isAgentCommandPayloadAllowed"),
+    "remote gateway must enforce policy before touching the RPC server",
+  ],
+  [
+    !/(createServer|\.listen\s*\()/.test(remoteGateway) &&
+      !/(createServer|\.listen\s*\()/.test(remotePolicy) &&
+      !/(createServer|\.listen\s*\()/.test(remoteApprovalBridge),
+    "remote gateway must stay outbound-only and never open a local listener",
+  ],
+  [
+    remoteApprovalBridge.includes("abortAll") && remoteApprovalBridge.includes("extension_ui_response"),
+    "remote approval bridge must support batch abort and idempotent ui_response forwarding",
+  ],
+  [
+    remoteGateway.includes("defaultConnect") && remoteGateway.includes('import("ws"'),
+    "remote gateway transport must be an outbound WebSocket client",
+  ],
   [
     feishuChannelApi.includes("im.v1.messageResource.get") &&
       feishuChannelApi.includes("FEISHU_MEDIA_MAX_BYTES") &&
