@@ -8,7 +8,7 @@ import { importTestBundle } from "#test-bundle";
 const { ReplyImage } = await importTestBundle("reply-image", {
   stdin: { contents: 'export {ReplyImage} from "./ReplyImage.tsx";', resolveDir: import.meta.dirname, loader: "tsx" },
   tsconfig: path.resolve(import.meta.dirname, "../../../tsconfig.renderer.json"),
-  external: ["react"],
+  external: ["react", "react-dom"],
   plugins: [
     {
       name: "i18n",

@@ -1,6 +1,7 @@
 import { useI18n } from "@/i18n";
 import type { ToolResultMessage } from "@/lib/types";
 import { persistedImageSource } from "@/lib/persisted-image";
+import { EnlargableImage } from "./ImageLightbox";
 
 export function ToolResultImages({ content }: { content: ToolResultMessage["content"] }) {
   const { t } = useI18n();
@@ -13,7 +14,7 @@ export function ToolResultImages({ content }: { content: ToolResultMessage["cont
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "8px 12px" }}>
       {images.map((src, index) => (
-        <img
+        <EnlargableImage
           key={index}
           src={src}
           alt={t("toolResultImage", "Tool result image")}

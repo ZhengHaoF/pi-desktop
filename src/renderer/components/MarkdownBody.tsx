@@ -19,6 +19,7 @@ import { useMarkdownPlugins } from "@/lib/markdown";
 import { shouldHighlightCode } from "@/lib/code-highlight-policy";
 import { mermaidCacheKey, renderMermaidSvg } from "@/lib/mermaid-renderer";
 import { SessionProfiler } from "./SessionProfiler";
+import { EnlargableImage } from "./ImageLightbox";
 import { useI18n } from "@/i18n";
 import { scaledChatFont } from "@/lib/chat-appearance";
 
@@ -274,7 +275,7 @@ function MarkdownImage({
     return <span className="markdown-image-loading" aria-label={alt || "Loading image"} />;
   }
 
-  return <img src={previewSrc} alt={alt ?? ""} loading="lazy" referrerPolicy="no-referrer" {...props} />;
+  return <EnlargableImage src={previewSrc} alt={alt ?? ""} loading="lazy" referrerPolicy="no-referrer" {...props} />;
 }
 
 function normalizeDisplayMath(markdown: string): string {

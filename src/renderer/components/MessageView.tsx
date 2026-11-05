@@ -3,6 +3,7 @@ import { memo, useState, useRef, useEffect, useMemo, useSyncExternalStore } from
 import { MarkdownBody } from "./MarkdownBody";
 import { ToolResultImages } from "./ToolResultImages";
 import { ReplyImage } from "./ReplyImage";
+import { EnlargableImage } from "./ImageLightbox";
 import { DeferredContentActions } from "./DeferredContentActions";
 import { AssistantOutcome } from "./AssistantOutcome";
 import { scaledChatFont } from "@/lib/chat-appearance";
@@ -237,18 +238,10 @@ function UserMessageView({
           {imageBlocks.length > 0 && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: visibleContent ? 8 : 0 }}>
               {imageBlocks.map((img, i) => {
-                // lib/types.ts ImageContent uses {source:{type,data,media_type,url}}
-                // pi-ai on-disk format uses flat {data, mimeType} — handle both
-                const flat = img as unknown as { data?: string; mimeType?: string };
-                const src = img.source
-                  ? img.source.type === "base64"
-                    ? `data:${img.source.media_type};base64,${img.source.data}`
-                    : (img.source.url ?? "")
-                  : flat.data
-                    ? `data:${flat.mimeType};base64,${flat.data}`
-                    : "";
+                const src = imageSource(img);
+                if (!src) return null;
                 return (
-                  <img
+                  <EnlargableImage
                     key={i}
                     src={src}
                     alt=""
@@ -1774,7 +1767,7 @@ function CustomMessageView({
                   const src = imageSource(img);
                   if (!src) return null;
                   return (
-                    <img
+                    <EnlargableImage
                       key={i}
                       src={src}
                       alt=""

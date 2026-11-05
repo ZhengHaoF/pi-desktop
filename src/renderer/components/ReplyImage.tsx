@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n";
 import type { ImageContent } from "@/lib/types";
 import { persistedImageSource } from "@/lib/persisted-image";
+import { EnlargableImage } from "./ImageLightbox";
 
 export function ReplyImage({
   image,
@@ -55,7 +56,7 @@ export function ReplyImage({
   return (
     <div ref={target} style={{ minHeight: src ? undefined : 120 }}>
       {src ? (
-        <img
+        <EnlargableImage
           src={src}
           alt={t("replyImage", "Image in reply")}
           loading="lazy"
