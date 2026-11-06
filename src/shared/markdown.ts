@@ -1,6 +1,5 @@
 import type { Options as ReactMarkdownOptions } from "react-markdown";
 import type rehypeKatex from "rehype-katex";
-import type rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -27,17 +26,13 @@ type MarkdownNode = {
   children?: MarkdownNode[];
 };
 
-export type MarkdownFeatures = { math: boolean; html: boolean };
+export type MarkdownFeatures = { math: boolean };
 
-// Inspect the parsed tree so code examples, escaped dollars, and autolinks do
-// not load optional renderers. This runs as part of the existing remark pass.
+// Inspect the parsed tree so code examples and escaped dollars do not load
+// optional renderers. This runs as part of the existing remark pass.
 export function collectMarkdownFeatures(node: MarkdownNode, features: MarkdownFeatures): void {
   if (node.type === "math" || node.type === "inlineMath" || (node.type === "code" && node.lang === "math")) {
     features.math = true;
-  }
-  if (node.type === "html") {
-    features.html = true;
-    if (/\b(?:language-math|math-inline|math-display)\b/.test(node.value ?? "")) features.math = true;
   }
   for (const child of node.children ?? []) collectMarkdownFeatures(child, features);
 }
@@ -128,15 +123,30 @@ export const markdownRemarkPlugins: ReactMarkdownOptions["remarkPlugins"] = [
 ];
 
 export type OptionalMarkdownPlugins = {
-  raw?: typeof rehypeRaw;
   katex?: typeof rehypeKatex;
 };
 
-export function createMarkdownRehypePlugins({ raw, katex }: OptionalMarkdownPlugins = {}): NonNullable<
+type HastNode = { type: string; value?: string; children?: HastNode[] };
+
+// Render raw HTML as literal text instead of interpreting it. rehype-sanitize
+// would otherwise drop the raw nodes (tags and content) entirely.
+function rawToText(node: HastNode): void {
+  if (!node.children) return;
+  node.children = node.children.flatMap((child) => {
+    if (child.type === "raw") return [{ type: "text", value: child.value ?? "" }];
+    rawToText(child);
+    return [child];
+  });
+}
+
+export function rehypeRawToText() {
+  return (tree: HastNode) => rawToText(tree);
+}
+
+export function createMarkdownRehypePlugins({ katex }: OptionalMarkdownPlugins = {}): NonNullable<
   ReactMarkdownOptions["rehypePlugins"]
 > {
-  const plugins: NonNullable<ReactMarkdownOptions["rehypePlugins"]> = [];
-  if (raw) plugins.push(raw);
+  const plugins: NonNullable<ReactMarkdownOptions["rehypePlugins"]> = [rehypeRawToText];
   plugins.push([rehypeSanitize, markdownSanitizeSchema]);
   if (katex) plugins.push([katex, { throwOnError: false, strict: false }]);
   return plugins;

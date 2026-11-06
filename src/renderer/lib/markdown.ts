@@ -11,7 +11,6 @@ export * from "@shared/markdown";
 
 const loaded: OptionalMarkdownPlugins = {};
 let mathPromise: Promise<void> | undefined;
-let htmlPromise: Promise<void> | undefined;
 
 export async function loadMarkdownPlugins(features: MarkdownFeatures): Promise<void> {
   const tasks: Promise<void>[] = [];
@@ -26,17 +25,6 @@ export async function loadMarkdownPlugins(features: MarkdownFeatures): Promise<v
       });
     tasks.push(mathPromise);
   }
-  if (features.html && !loaded.raw) {
-    htmlPromise ??= import("rehype-raw")
-      .then(({ default: raw }) => {
-        loaded.raw = raw;
-      })
-      .catch((error) => {
-        htmlPromise = undefined;
-        throw error;
-      });
-    tasks.push(htmlPromise);
-  }
   await Promise.all(tasks);
 }
 
@@ -44,7 +32,7 @@ export function useMarkdownPlugins(markdown: string) {
   const [plugins, setPlugins] = useState<OptionalMarkdownPlugins>(() => ({ ...loaded }));
   const rehypePlugins = useMemo(() => createMarkdownRehypePlugins(plugins), [plugins]);
   const detection = useMemo(() => {
-    const features: MarkdownFeatures = { math: false, html: false };
+    const features: MarkdownFeatures = { math: false };
     if (!markdown) return { features, remarkPlugins: markdownRemarkPlugins };
     return {
       features,
@@ -58,17 +46,17 @@ export function useMarkdownPlugins(markdown: string) {
   }, [markdown]);
 
   useEffect(() => {
-    const { features } = detection;
-    if ((!features.math || plugins.katex) && (!features.html || plugins.raw)) return;
-    let disposed = false;
-    void loadMarkdownPlugins(features)
-      .then(() => {
-        if (!disposed) setPlugins({ ...loaded });
-      })
-      .catch((error) => console.error("[pi-desktop] failed to load Markdown plugins:", error));
-    return () => {
-      disposed = true;
-    };
+    if (detection.features.math && !plugins.katex) {
+      let disposed = false;
+      void loadMarkdownPlugins(detection.features)
+        .then(() => {
+          if (!disposed) setPlugins({ ...loaded });
+        })
+        .catch((error) => console.error("[pi-desktop] failed to load Markdown plugins:", error));
+      return () => {
+        disposed = true;
+      };
+    }
   }, [detection, plugins]);
 
   return { remarkPlugins: detection.remarkPlugins, rehypePlugins };

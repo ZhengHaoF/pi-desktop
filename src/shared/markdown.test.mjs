@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import rehypeKatex from "rehype-katex";
-import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -11,21 +10,43 @@ import {
   createMarkdownRehypePlugins,
   markdownRehypePlugins,
   markdownRemarkPlugins,
+  rehypeRawToText,
   remarkLocalFileLinks,
 } from "./markdown.ts";
 
-test("Markdown plugins preserve GFM/math, add AST path links, and sanitize raw HTML", () => {
+test("Markdown plugins preserve GFM/math, keep AST path links, and show raw HTML as text", () => {
   assert.deepEqual(markdownRemarkPlugins, [remarkGfm, remarkMath, remarkLocalFileLinks]);
-  assert.equal(markdownRehypePlugins.length, 1);
-  assert.equal(markdownRehypePlugins[0][0], rehypeSanitize);
-  const richPlugins = createMarkdownRehypePlugins({ raw: rehypeRaw, katex: rehypeKatex });
-  assert.equal(richPlugins[0], rehypeRaw);
+  assert.equal(markdownRehypePlugins.length, 2);
+  assert.equal(markdownRehypePlugins[0], rehypeRawToText);
+  assert.equal(markdownRehypePlugins[1][0], rehypeSanitize);
+  const richPlugins = createMarkdownRehypePlugins({ katex: rehypeKatex });
+  assert.equal(richPlugins[0], rehypeRawToText);
   assert.equal(richPlugins[1][0], rehypeSanitize);
   assert.equal(richPlugins[2][0], rehypeKatex);
   assert.deepEqual(richPlugins[2][1], { throwOnError: false, strict: false });
   const schema = richPlugins[1][1];
   assert.deepEqual(schema.strip.slice(-4), ["iframe", "object", "style", "form"]);
   assert.ok(schema.protocols.href.includes("file"));
+});
+
+test("rehypeRawToText converts raw HTML nodes to literal text before sanitizing", () => {
+  const tree = {
+    type: "root",
+    children: [
+      { type: "text", value: "keep" },
+      { type: "raw", value: "<b>bold</b>" },
+      { type: "element", tagName: "p", children: [{ type: "raw", value: "<br>" }] },
+    ],
+  };
+  rehypeRawToText()(tree);
+  assert.deepEqual(tree, {
+    type: "root",
+    children: [
+      { type: "text", value: "keep" },
+      { type: "text", value: "<b>bold</b>" },
+      { type: "element", tagName: "p", children: [{ type: "text", value: "<br>" }] },
+    ],
+  });
 });
 
 function linkTargets(value) {

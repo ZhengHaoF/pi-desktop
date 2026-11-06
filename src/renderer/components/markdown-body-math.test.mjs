@@ -36,7 +36,7 @@ const { MarkdownBody, loadMarkdownPlugins } = await importTestBundle("markdown-b
 
 // Static rendering does not run effects. Load the optional plugins first for
 // these formatting regressions; the lazy-loading tests exercise the effects.
-await loadMarkdownPlugins({ math: true, html: true });
+await loadMarkdownPlugins({ math: true });
 
 function render(markdown) {
   return renderToStaticMarkup(createElement(MarkdownBody, null, markdown));
@@ -86,7 +86,7 @@ function assertFollowingMarkdown(html) {
   assert.match(html, /<strong>Following bold text<\/strong>/);
   assert.match(html, /<table>/);
   assert.match(html, /<td>42<\/td>/);
-  assert.match(html, /Line one<br\/>Line two/);
+  assert.match(html, /Line one&lt;br&gt;Line two/);
   assert.match(html, /<p>Final paragraph\.<\/p>/);
 }
 
