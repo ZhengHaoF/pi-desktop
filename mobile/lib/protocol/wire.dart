@@ -45,7 +45,7 @@ class WireEvent {
 }
 
 /// RemoteEnvelope minus the cipher block — M1a talks to a local/plain relay
-/// (diagnostic mode); E2EE lands with the gateway cipher layer in M1b.
+/// (diagnostic mode); E2EE arrives with the gateway cipher layer in M1b.
 class RemoteEnvelope {
   final int v;
   final String traceId;
@@ -54,6 +54,8 @@ class RemoteEnvelope {
   final String role; // host | device | relay
   final String? deviceId;
   final String? hostId;
+  /// Envelope-level control kind (e.g. "hosts.list") — relay-local, no payload.
+  final String? control;
   final Object? payload; // WireMessage or hello map
 
   RemoteEnvelope({
@@ -63,6 +65,7 @@ class RemoteEnvelope {
     required this.payload,
     this.deviceId,
     this.hostId,
+    this.control,
     this.v = protocolVersion,
     int? ts,
   }) : ts = ts ?? DateTime.now().millisecondsSinceEpoch;
@@ -75,6 +78,7 @@ class RemoteEnvelope {
         'role': role,
         if (deviceId != null) 'deviceId': deviceId,
         if (hostId != null) 'hostId': hostId,
+        if (control != null) 'control': control,
         'payload': payload,
       };
 
@@ -117,6 +121,13 @@ const List<String> allowedRequestMethods = [
   'files.read',
   'files.preview',
   'system.runningCount',
+  // Read-only model preferences for the set_model picker; mirrors
+  // packages/protocol/src/allowlist.ts (mutating models.* stays forbidden).
+  'models.preferences.get',
+  // Read-only skill catalog for the "/" palette; session management parity.
+  'skills.list',
+  'sessions.rename',
+  'sessions.delete',
 ];
 
 const List<String> allowedAgentCommandTypes = [
