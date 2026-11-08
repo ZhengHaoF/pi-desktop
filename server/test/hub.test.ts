@@ -250,6 +250,102 @@ test("relay: zero-knowledge — payloads never appear in audit log", { timeout: 
   }
 });
 
+function helloEnvelopeWithHost(hostId: string, label?: string): string {
+  return JSON.stringify({
+    v: 1,
+    traceId: "t1",
+    ts: Date.now(),
+    nonce: "n1",
+    role: "host",
+    payload: {
+      kind: "hello",
+      protocolVersion: 1,
+      appVersion: "0.1.0",
+      ...(label ? { label } : {}),
+      hostId,
+      auth: {},
+    },
+  });
+}
+
+test("relay: multi-PC — host declares stable hostId + label; device sees directory", { timeout: 10000 }, async () => {
+  const relay = await startRelay();
+  try {
+    const hostA = await connect(relay.url, "host");
+    hostA.send(helloEnvelopeWithHost("host-stable-a", "ZHF-WORK"));
+    const ackA = JSON.parse(await nextMessage(hostA)) as { payload: { hostId?: string } };
+    assert.equal(ackA.payload.hostId, "host-stable-a", "host keeps its declared stable hostId");
+
+    const device = await connect(relay.url, "device");
+    device.send(helloEnvelope("device", "dev-1"));
+    const ack2 = JSON.parse(await nextMessage(device)) as {
+      payload: { hostId?: string; hosts?: Array<{ id: string; label?: string; online: boolean }> };
+    };
+    assert.equal(ack2.payload.hostId, "host-stable-a");
+    const entry = ack2.payload.hosts?.find((h) => h.id === "host-stable-a");
+    assert.ok(entry, "device hello_ack carries the host directory");
+    assert.equal(entry?.online, true);
+    assert.equal(entry?.label, "ZHF-WORK");
+
+    // Envelope-level control: hosts.list answered relay-locally.
+    device.send(
+      JSON.stringify({
+        v: 1,
+        traceId: "tl",
+        ts: Date.now(),
+        nonce: "n2",
+        role: "device",
+        deviceId: "dev-1",
+        control: "hosts.list",
+        payload: { kind: "ping" },
+      }),
+    );
+    const listing = JSON.parse(await nextMessage(device)) as {
+      payload: { kind: string; hosts: Array<{ id: string; online: boolean }> };
+    };
+    assert.equal(listing.payload.kind, "hosts.list.result");
+    assert.equal(listing.payload.hosts.length, 1);
+    assert.equal(listing.payload.hosts[0].id, "host-stable-a");
+    hostA.close();
+    device.close();
+  } finally {
+    await relay.close();
+  }
+});
+
+test("relay: multi-PC — offline hosts keep label + lastSeenAt; reconnect replaces", { timeout: 10000 }, async () => {
+  const relay = await startRelay();
+  try {
+    const host = await connect(relay.url, "host");
+    host.send(helloEnvelopeWithHost("host-stable-b", "ZHF-Home-PC"));
+    await nextMessage(host);
+    host.close();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    const device = await connect(relay.url, "device");
+    device.send(helloEnvelope("device", "dev-1"));
+    const ack = JSON.parse(await nextMessage(device)) as {
+      payload: { hosts?: Array<{ id: string; online: boolean; lastSeenAt?: number; label?: string }> };
+    };
+    const offline = ack.payload.hosts?.find((h) => h.id === "host-stable-b");
+    assert.ok(offline, "offline host still listed");
+    assert.equal(offline?.online, false);
+    assert.equal(offline?.label, "ZHF-Home-PC");
+    assert.ok(typeof offline?.lastSeenAt === "number", "lastSeenAt recorded on disconnect");
+
+    // Reconnect with the same stable hostId replaces the registry entry.
+    const hostAgain = await connect(relay.url, "host");
+    hostAgain.send(helloEnvelopeWithHost("host-stable-b", "ZHF-Home-PC"));
+    const ackAgain = JSON.parse(await nextMessage(hostAgain)) as { payload: { hostId?: string } };
+    assert.equal(ackAgain.payload.hostId, "host-stable-b");
+    assert.equal(relay.hub.registry.onlineHosts().filter((h) => h.id === "host-stable-b").length, 1);
+    hostAgain.close();
+    device.close();
+  } finally {
+    await relay.close();
+  }
+});
+
 test("pairing: token lifecycle + attempt lockout", () => {
   const audit = new AuditLog();
   const service = new PairingService(testConfig(), audit);
