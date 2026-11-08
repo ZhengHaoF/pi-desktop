@@ -22,6 +22,7 @@ export const ALLOWED_REQUEST_METHODS: readonly string[] = [
   // Read-only model preferences so a device can render a model picker for
   // the already-allowlisted `set_model` command. Every mutating / network
   // models.* method stays explicitly forbidden below.
+  "agent.state",
   "models.preferences.get",
   // Read-only skill catalog for the "/" command palette (mirrors the desktop
   // input). Skills search/install/set stay forbidden.

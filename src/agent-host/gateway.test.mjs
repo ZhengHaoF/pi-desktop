@@ -120,6 +120,7 @@ test("policy: wildcard subscriptions and unknown methods are denied", async () =
   assert.equal(mod.isSubscriptionAllowed("agent.events", "*"), false);
   assert.equal(mod.isSubscriptionAllowed("herdr.fleet", "s1"), false);
   assert.equal(mod.isMethodAllowed("sessions.list"), true);
+  assert.equal(mod.isMethodAllowed("agent.state"), true);
   assert.equal(mod.isMethodAllowed("sessions.export"), false);
   assert.equal(mod.isAgentCommandPayloadAllowed({ sessionId: "s", command: { type: "abort" } }), true);
   assert.equal(mod.isAgentCommandPayloadAllowed({ sessionId: "s", command: { type: "set_tools" } }), false);

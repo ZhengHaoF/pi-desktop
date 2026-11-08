@@ -116,6 +116,7 @@ const List<String> allowedRequestMethods = [
   'sessions.executionContent',
   'agent.new',
   'agent.command',
+  'agent.state',
   'files.list',
   'files.meta',
   'files.read',

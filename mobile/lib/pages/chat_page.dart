@@ -44,6 +44,13 @@ class _ChatPageState extends State<ChatPage> {
   bool _awaitingFirst = false;
   bool _slashOpen = false;
   bool _slashSkillsLoaded = false;
+  /// Turn-state mirror (PC `isStreaming` equivalent): true while the agent
+  /// is running a turn on the PC. Drives steer-vs-prompt and the queue bar.
+  bool _turnRunning = false;
+  Timer? _queuePollTimer;
+  List<String> _steeringQueue = const [];
+  List<String> _followUpQueue = const [];
+  bool _clearingQueue = false;
   List<Map<String, String>> _slashItems = const [
     {'name': 'compact', 'desc': '压缩上下文，可附指令', 'source': '内置'},
     {'name': 'reload', 'desc': '重载扩展、技能、提示词与工具', 'source': '内置'},
@@ -63,13 +70,19 @@ class _ChatPageState extends State<ChatPage> {
     _events = widget.connection.onEvent.listen(_onEvent);
     try {
       await widget.connection.subscribe('agent.events', _sessionId);
+      await widget.connection.subscribe('agent.running', _sessionId);
       final detail = await widget.connection.request('sessions.get', {'id': _sessionId});
       setState(() {
         _lines
           ..clear()
           ..addAll(historyLinesFromDetail(detail));
         _currentModel = _modelFromDetail(detail);
+        // Restore the turn-running mirror from the session snapshot so the
+        // steer-vs-prompt choice is correct right after opening the page.
+        final agentState = detail['agentState'];
+        _turnRunning = agentState is Map ? agentState['running'] == true : false;
       });
+      if (_turnRunning) _startQueuePolling();
       _throttledScroll();
     } catch (err) {
       setState(() => _error = err.toString());
@@ -139,6 +152,24 @@ class _ChatPageState extends State<ChatPage> {
       final data = Map<String, dynamic>.from(event.data as Map);
       if ((data['sessionId'] as String?) == _sessionId) {
         setState(() => _approvals.add(data));
+      }
+      return;
+    }
+    if (event.topic == 'agent.running') {
+      // Turn lifecycle from the PC: refresh running state + queue bar.
+      final running = event.data is Map ? (event.data as Map)['running'] : null;
+      final nowRunning = running == true;
+      if (nowRunning != _turnRunning || nowRunning) {
+        setState(() => _turnRunning = nowRunning);
+        if (nowRunning) {
+          _startQueuePolling();
+        } else {
+          _stopQueuePolling();
+          setState(() {
+            _steeringQueue = const [];
+            _followUpQueue = const [];
+          });
+        }
       }
       return;
     }
@@ -215,6 +246,75 @@ class _ChatPageState extends State<ChatPage> {
       _lines.last.done = done;
     } else {
       _lines.add(ChatLine.thinking(role: role, text: chunk, done: done));
+    }
+  }
+
+  /// Queue polling (PC parity): only while the turn is running, refresh the
+  /// steering/follow-up lists from agentState.queuedMessages.
+  void _startQueuePolling() {
+    _queuePollTimer?.cancel();
+    _pollQueueOnce();
+    _queuePollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _pollQueueOnce());
+  }
+
+  void _stopQueuePolling() {
+    _queuePollTimer?.cancel();
+    _queuePollTimer = null;
+  }
+
+  Future<void> _pollQueueOnce() async {
+    try {
+      final state = await widget.connection.request('agent.state', {'sessionId': _sessionId});
+      final agentState = state['state'] is Map ? state['state'] as Map : state;
+      final queued = agentState['queuedMessages'];
+      if (!mounted) return;
+      final steeringList = queued is Map ? queued['steering'] : null;
+      final followUpList = queued is Map ? queued['followUp'] : null;
+      setState(() {
+        _steeringQueue = [
+          if (steeringList is List)
+            for (final s in steeringList)
+              if (s != null) s.toString(),
+        ];
+        _followUpQueue = [
+          if (followUpList is List)
+            for (final s in followUpList)
+              if (s != null) s.toString(),
+        ];
+      });
+    } catch (_) {
+      // Transient (host restart etc.); the next tick retries.
+    }
+  }
+
+  Future<void> _clearQueue() async {
+    if (_clearingQueue) return;
+    setState(() => _clearingQueue = true);
+    try {
+      final result = await widget.connection.agentCommand(_sessionId, {'type': 'clear_queue'});
+      final steeringList = result['steering'];
+      final followUpList = result['followUp'];
+      if (!mounted) return;
+      setState(() {
+        _steeringQueue = [
+          if (steeringList is List)
+            for (final s in steeringList)
+              if (s != null) s.toString(),
+        ];
+        _followUpQueue = [
+          if (followUpList is List)
+            for (final s in followUpList)
+              if (s != null) s.toString(),
+        ];
+        _clearingQueue = false;
+      });
+    } catch (err) {
+      if (mounted) {
+        setState(() {
+          _error = err.toString();
+          _clearingQueue = false;
+        });
+      }
     }
   }
 
@@ -320,7 +420,10 @@ class _ChatPageState extends State<ChatPage> {
     _promptController.clear();
     _throttledScroll();
     try {
-      await widget.connection.agentCommand(_sessionId, {'type': 'prompt', 'message': text});
+      // PC parity: while a turn is running, Enter steers (queued into the
+      // current turn); when idle the message starts a fresh turn.
+      final type = _turnRunning ? 'steer' : 'prompt';
+      await widget.connection.agentCommand(_sessionId, {'type': type, 'message': text});
     } catch (err) {
       setState(() {
         _sendingText = null;
@@ -342,8 +445,10 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void dispose() {
     _renderThrottle?.cancel();
+    _stopQueuePolling();
     _events?.cancel();
     widget.connection.unsubscribe('agent.events', _sessionId);
+    widget.connection.unsubscribe('agent.running', _sessionId);
     _promptController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -422,6 +527,13 @@ class _ChatPageState extends State<ChatPage> {
             ),
           for (final approval in _approvals)
             _ApprovalCard(approval: approval, onRespond: _respondApproval),
+          if (_turnRunning && (_steeringQueue.isNotEmpty || _followUpQueue.isNotEmpty))
+            _QueueBar(
+              steering: _steeringQueue,
+              followUp: _followUpQueue,
+              clearing: _clearingQueue,
+              onClear: _clearQueue,
+            ),
           if (_slashOpen)
             Container(
               margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
@@ -523,9 +635,20 @@ class _ChatPageState extends State<ChatPage> {
                       enabled: ready,
                       onChanged: _onPromptChanged,
                       onSubmitted: (_) => _send(),
-                      decoration: const InputDecoration(
-                        hintText: '发送指令到 PC 会话…（/ 唤起命令）',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        hintText: _turnRunning ? '回合进行中，发送将插队…' : '发送指令到 PC 会话…（/ 唤起命令）',
+                        border: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: _turnRunning ? const Color(0xFFEAB836) : Colors.black12,
+                            width: _turnRunning ? 1.4 : 1,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: _turnRunning ? const Color(0xFFEAB836) : Colors.black12,
+                            width: _turnRunning ? 1.4 : 1,
+                          ),
+                        ),
                         isDense: true,
                       ),
                     ),
@@ -547,6 +670,92 @@ class _ChatPageState extends State<ChatPage> {
 
 /// Collapsible thinking card (desktop-aligned): shows the model's reasoning
 /// dimmed and collapsed by default, expandable to the full text.
+/// Queued steering / follow-up messages bar (PC ChatInput parity): shows
+/// what is queued while a turn is running, with a clear-all action.
+class _QueueBar extends StatelessWidget {
+  final List<String> steering;
+  final List<String> followUp;
+  final bool clearing;
+  final VoidCallback onClear;
+
+  const _QueueBar({
+    required this.steering,
+    required this.followUp,
+    required this.clearing,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final total = steering.length + followUp.length;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFEAB836)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.bolt, size: 14, color: Color(0xFFB8860B)),
+                const SizedBox(width: 5),
+                Text(
+                  '已排队 $total 条（回合中送达）',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF8D6E00),
+                  ),
+                ),
+                const Spacer(),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  onPressed: clearing ? null : onClear,
+                  child: clearing
+                      ? const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 1.6),
+                        )
+                      : const Text('清空', style: TextStyle(fontSize: 12, color: Color(0xFFB8860B))),
+                ),
+              ],
+            ),
+            for (final text in steering)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  '⚡ 插队：$text',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF8D6E00)),
+                ),
+              ),
+            for (final text in followUp)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  '⏭ 排队：$text',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ThinkingCard extends StatelessWidget {
   final ChatLine line;
   final bool expanded;

@@ -16,6 +16,7 @@ export const ALLOWED_REQUEST_METHODS: readonly string[] = [
   "sessions.executionContent",
   "agent.new",
   "agent.command",
+  "agent.state",
   "files.list",
   "files.meta",
   "files.read",
