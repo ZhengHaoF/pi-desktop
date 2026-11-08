@@ -202,6 +202,9 @@ void app.whenReady().then(async () => {
       credentialVault.set(`channel:${payload.channel}:${payload.accountId}`, payload.credential),
     getBrowserService: () => null,
     getManagedProcessCapability: capability,
+    getRemoteStatus: () => null,
+    getRelayServiceStatus: () => ({ state: "stopped" as const, port: 8787 }),
+    listLanAddresses: () => [],
     updateManager,
   });
 

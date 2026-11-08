@@ -120,9 +120,30 @@ test("policy: wildcard subscriptions and unknown methods are denied", async () =
   assert.equal(mod.isSubscriptionAllowed("agent.events", "*"), false);
   assert.equal(mod.isSubscriptionAllowed("herdr.fleet", "s1"), false);
   assert.equal(mod.isMethodAllowed("sessions.list"), true);
-  assert.equal(mod.isMethodAllowed("sessions.delete"), false);
+  assert.equal(mod.isMethodAllowed("sessions.export"), false);
   assert.equal(mod.isAgentCommandPayloadAllowed({ sessionId: "s", command: { type: "abort" } }), true);
   assert.equal(mod.isAgentCommandPayloadAllowed({ sessionId: "s", command: { type: "set_tools" } }), false);
+});
+
+test("policy: read-only model preferences are allowed; mutating models.* stay denied", async () => {
+  const mod = await loadRemoteModule();
+  assert.equal(mod.isMethodAllowed("models.preferences.get"), true);
+  assert.equal(mod.isMethodAllowed("models.list"), false);
+  assert.equal(mod.isMethodAllowed("models.refresh"), false);
+  assert.equal(mod.isMethodAllowed("models.preferences.set"), false);
+  assert.equal(mod.isMethodAllowed("models.default.set"), false);
+  assert.equal(mod.isMethodAllowed("models.routing.set"), false);
+});
+
+test("policy: skill catalog is read-only; session rename/delete allowed", async () => {
+  const mod = await loadRemoteModule();
+  assert.equal(mod.isMethodAllowed("skills.list"), true);
+  assert.equal(mod.isMethodAllowed("skills.search"), false);
+  assert.equal(mod.isMethodAllowed("skills.install"), false);
+  assert.equal(mod.isMethodAllowed("skills.set"), false);
+  assert.equal(mod.isMethodAllowed("skills.getContent"), false);
+  assert.equal(mod.isMethodAllowed("sessions.rename"), true);
+  assert.equal(mod.isMethodAllowed("sessions.delete"), true);
 });
 
 test("gateway: sends hello on open and bridges allowlisted RPC", async () => {
@@ -142,10 +163,10 @@ test("gateway: sends hello on open and bridges allowlisted RPC", async () => {
 test("gateway: denies non-allowlisted method without touching RPC", async () => {
   const mod = await loadRemoteModule();
   const { socket, gateway } = await makeGateway(mod);
-  socket.deliver({ kind: "request", id: "r2", method: "sessions.delete", params: { id: "s1" } });
+  socket.deliver({ kind: "request", id: "r2", method: "sessions.export", params: { id: "s1" } });
   await new Promise((resolve) => setTimeout(resolve, 80));
   const denied = socket.responsesFor("r2")[0];
-  assert.ok(denied, "sessions.delete must be answered with a denial");
+  assert.ok(denied, "sessions.export must be answered with a denial");
   assert.equal(denied.payload.ok, false);
   assert.equal(denied.payload.error.code, "FORBIDDEN");
   gateway.dispose();

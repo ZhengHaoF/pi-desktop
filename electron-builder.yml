@@ -47,6 +47,8 @@ extraResources:
     to: toolchains/core/${platform}-${arch}
   - from: build/herdr/runtime-catalog.json
     to: herdr/runtime-catalog.json
+  - from: out/relay
+    to: relay
 
 mac:
   extraResources:

@@ -9,6 +9,7 @@ import { appendMainLog, appendMainLogs } from "./logger";
 import type { ToolchainSnapshot } from "../shared/toolchains/types";
 import type { BrowserCapabilitySnapshot } from "../contract/browser";
 import type { HerdrRuntimeDescriptor } from "../contract/herdr";
+import type { RemoteControlConfig } from "../contract/desktop";
 import { BrowserError } from "./browser/browser-error";
 import { createHostExitSignal, reserveHostRestart, trySpawnHost, type HostExitSignal } from "./host-restart-core";
 import { HostOutputLineBuffer } from "./logger-core";
@@ -55,6 +56,7 @@ export class HostManager {
   private herdrRuntimeDescriptor: HerdrRuntimeDescriptor | null = null;
   private herdrAckRevision = -1;
   private herdrDeliveryTimer: ReturnType<typeof setTimeout> | null = null;
+  private remoteControlConfig: RemoteControlConfig | null = null;
   private piVersion: string | null = null;
   private hostInstanceId: string | null = null;
   private hostGeneration = 0;
@@ -116,6 +118,18 @@ export class HostManager {
   setHerdrRuntimeDescriptor(descriptor: HerdrRuntimeDescriptor): void {
     this.herdrRuntimeDescriptor = structuredClone(descriptor);
     if (this.child && this.status === "ready") this.postHerdrSnapshot("herdr:runtime:changed");
+  }
+
+  setRemoteControlConfig(config: RemoteControlConfig): void {
+    this.remoteControlConfig = {
+      enabled: config.enabled,
+      relayUrl: config.relayUrl,
+      hostId: config.hostId,
+      name: config.name,
+      mode: config.mode ?? "lan",
+      lanPort: config.lanPort,
+    };
+    if (this.child && this.status === "ready") this.postRemoteSnapshot("remote:changed");
   }
 
   getHerdrAckRevision(): number {
@@ -294,6 +308,7 @@ export class HostManager {
         this.postToolchainSnapshot("toolchain:init");
         this.postBrowserSnapshot("browser:init");
         this.postHerdrSnapshot("herdr:runtime:init");
+        this.postRemoteSnapshot("remote:init");
         this.postManagedProcessOwnerIdentity();
         this.setStatus("ready");
         this.startPing();
@@ -335,6 +350,10 @@ export class HostManager {
           this.managedProcessOwnerReady = true;
           appendMainLog("agent-host managed process owner identity acknowledged");
         }
+      } else if (m?.type === "remote-config-request") {
+        // Child (re)started and wants the current 自建托管 config — covers any
+        // delivery race around the ready handshake.
+        this.postRemoteSnapshot("remote:init");
       } else if (m?.type === "host-rpc") {
         const request = m as HostMessage & { id?: string; method?: string; params?: unknown };
         const id = String(request.id ?? "");
@@ -484,6 +503,16 @@ export class HostManager {
       appendMainLog(`Herdr runtime delivery failed: ${error instanceof Error ? error.message : String(error)}`);
     }
     this.scheduleHerdrDeliveryRetry(child);
+  }
+
+  private postRemoteSnapshot(type: "remote:init" | "remote:changed"): void {
+    const child = this.child;
+    if (!child || !this.remoteControlConfig) return;
+    try {
+      child.postMessage({ type, config: this.remoteControlConfig });
+    } catch (error) {
+      appendMainLog(`remote config delivery failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   private scheduleHerdrDeliveryRetry(child: UtilityProcess): void {

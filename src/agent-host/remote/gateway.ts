@@ -30,6 +30,10 @@ const GLOBAL_MIRROR_TOPICS: readonly string[] = ["agent.running", "sessions.chan
 export interface GatewayOptions {
   /** Outbound relay endpoint, e.g. wss://relay.example.com/ws?role=host */
   relayUrl: string;
+  /** Stable host identity for the multi-PC device selector. */
+  hostId?: string;
+  /** Display name shown on device selectors. */
+  hostLabel?: string;
   /** Injected for tests; defaults to a lazy dynamic import of "ws". */
   connectWebSocket?: (url: string) => Promise<GatewaySocket>;
 }
@@ -109,6 +113,11 @@ export class RemoteGateway {
     return this.state;
   }
 
+  /** Devices seen on this relay session (for status display). */
+  getDeviceCount(): number {
+    return this.knownDevices.size;
+  }
+
   /** Outbound-only connection. Never binds a port. */
   async start(): Promise<void> {
     if (this.state !== "stopped") return;
@@ -136,7 +145,14 @@ export class RemoteGateway {
           ts: Date.now(),
           nonce: randomUUID(),
           role: "host",
-          payload: { kind: "hello", protocolVersion: 1, appVersion: "gateway", auth: {} },
+          payload: {
+            kind: "hello",
+            protocolVersion: 1,
+            appVersion: "gateway",
+            ...(this.options.hostId ? { hostId: this.options.hostId } : {}),
+            ...(this.options.hostLabel ? { label: this.options.hostLabel } : {}),
+            auth: {},
+          },
         });
       });
     } catch (err) {

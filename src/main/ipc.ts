@@ -5,6 +5,9 @@ import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
 import type {
   ChannelCredentialWrite,
   DesktopUpdateState,
+  LanAddress,
+  RemoteControlStatus,
+  RelayServiceStatus,
   SaveBinaryFileOptions,
   SaveTextFileOptions,
 } from "../contract/desktop";
@@ -58,6 +61,9 @@ export type DesktopIpcOptions = {
   setChannelCredential: (payload: ChannelCredentialWrite) => void;
   getBrowserService: () => BrowserService | null;
   getManagedProcessCapability: () => ManagedProcessCapability;
+  getRemoteStatus: () => RemoteControlStatus | null;
+  getRelayServiceStatus: () => RelayServiceStatus;
+  listLanAddresses: () => LanAddress[];
   onUiStatePatch?: (patch: ReturnType<typeof validateDesktopUiStatePatch>) => void | Promise<void>;
   updateManager: {
     getState: () => DesktopUpdateState;
@@ -81,6 +87,9 @@ export function installDesktopIpc(options: DesktopIpcOptions): void {
     setChannelCredential,
     getBrowserService,
     getManagedProcessCapability,
+    getRemoteStatus,
+    getRelayServiceStatus,
+    listLanAddresses,
     onUiStatePatch,
     updateManager,
   } = options;
@@ -303,6 +312,9 @@ export function installDesktopIpc(options: DesktopIpcOptions): void {
   trustedOn("desktop:set-badge-count", (_event, count: number) => applyBadgeCount(count));
   trustedHandle("desktop:get-ui-state", () => loadUiState());
   trustedHandle("desktop:managed-process-capability", () => getManagedProcessCapability());
+  trustedHandle("desktop:get-remote-status", () => getRemoteStatus());
+  trustedHandle("desktop:get-relay-service-status", () => getRelayServiceStatus());
+  trustedHandle("desktop:list-lan-addresses", () => listLanAddresses());
   trustedHandle("desktop:set-ui-state", async (_event, patch: unknown) => {
     const validated = validateDesktopUiStatePatch(patch);
     saveUiStateStrict(validated);
