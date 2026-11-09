@@ -151,7 +151,7 @@ export function ProviderModelDiscovery({
         <span style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.6 }}>
           {t(
             "modelDiscoverHint",
-            "Fetch models from an OpenAI-compatible /models endpoint using this URL and API key. Pick the ones to add; existing settings are kept. Save below to apply.",
+            "Fetch models from an OpenAI-compatible /models endpoint using this URL and API key, then pick the ones to add. Existing settings are kept; save below to apply.",
           )}
         </span>
       ) : (

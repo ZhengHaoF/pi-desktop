@@ -537,7 +537,7 @@ export function RemoteControlCard() {
         <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, display: "grid", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>
-              {t("remotePairingTitle", "设备配对（手机扫码）")}
+              {t("remotePairingTitle", "Device pairing (scan with phone)")}
             </span>
             <button
               type="button"
@@ -545,7 +545,7 @@ export function RemoteControlCard() {
               style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 }}
               onClick={() => void createPairingQr()}
             >
-              {pairingBusy ? t("remotePairingCreating", "生成中…") : t("remotePairingAdd", "添加设备")}
+              {pairingBusy ? t("remotePairingCreating", "Generating…") : t("remotePairingAdd", "Add device")}
             </button>
             <button
               type="button"
@@ -553,11 +553,11 @@ export function RemoteControlCard() {
               style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 }}
               onClick={() => void loadDevices()}
             >
-              {t("remotePairingRefresh", "刷新设备")}
+              {t("remotePairingRefresh", "Refresh devices")}
             </button>
             {!draft.enabled && (
               <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
-                {t("remotePairingEnableFirst", "先启用远程控制")}
+                {t("remotePairingEnableFirst", "Enable remote control first")}
               </span>
             )}
           </div>
@@ -568,9 +568,14 @@ export function RemoteControlCard() {
                 <QrCode value={pairingQrValue} size={144} />
               </div>
               <div style={{ display: "grid", gap: 6, fontSize: 11, color: "var(--text-dim)" }}>
-                <span>{t("remotePairingHint", "手机 App 连接页 → 扫码连接；令牌一次性、10 分钟内有效。")}</span>
                 <span>
-                  {t("remotePairingExpires", "过期时间")}: {new Date(pairing.expiresAt).toLocaleTimeString()}
+                  {t(
+                    "remotePairingHint",
+                    "In the phone app, open the connect page and scan this QR code. The token is one-time and valid for 10 minutes.",
+                  )}
+                </span>
+                <span>
+                  {t("remotePairingExpires", "Expires at")}: {new Date(pairing.expiresAt).toLocaleTimeString()}
                 </span>
                 <button
                   type="button"
@@ -583,7 +588,7 @@ export function RemoteControlCard() {
                   }}
                   onClick={() => copy(pairingQrValue, "pairing-qr")}
                 >
-                  {copied === "pairing-qr" ? t("copied", "已复制") : t("remotePairingCopy", "复制配对载荷")}
+                  {copied === "pairing-qr" ? t("copied", "Copied") : t("remotePairingCopy", "Copy pairing payload")}
                 </button>
               </div>
             </div>
@@ -604,13 +609,15 @@ export function RemoteControlCard() {
                     style={{ padding: "4px 9px", borderRadius: 7, border: "1px solid var(--border)", fontSize: 11.5 }}
                     onClick={() => void revokeDevice(device.deviceId)}
                   >
-                    {t("remotePairingRevoke", "撤销")}
+                    {t("remotePairingRevoke", "Revoke")}
                   </button>
                 </div>
               ))}
             </div>
           ) : (
-            <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{t("remotePairingEmpty", "暂无已配对设备")}</span>
+            <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
+              {t("remotePairingEmpty", "No paired devices yet")}
+            </span>
           )}
           {pairingError && <div style={{ fontSize: 11, color: "#f56c6c" }}>{pairingError}</div>}
         </div>
