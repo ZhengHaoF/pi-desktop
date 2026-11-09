@@ -1,8 +1,17 @@
+import java.io.File
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Release signing: CI restores the upload keystore from base64 secrets into
+// ANDROID_KEYSTORE_PATH and passes the credentials through env. Without those
+// (local dev), release builds fall back to the debug key so `flutter run
+// --release` keeps working.
+val releaseSigningActive = !System.getenv("ANDROID_KEYSTORE_PATH").isNullOrBlank()
+val keystoreFile: File? = System.getenv("ANDROID_KEYSTORE_PATH")?.let { File(it) }
 
 android {
     namespace = "dev.pidesktop.pi_remote"
@@ -29,11 +38,26 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (releaseSigningActive && keystoreFile != null) {
+            create("release") {
+                storeFile = keystoreFile
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: "pi-remote"
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD") ?: storePassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Real upload keystore when CI provides it; debug keys otherwise so
+            // local `flutter run --release` still works without secrets.
+            signingConfig = if (releaseSigningActive) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

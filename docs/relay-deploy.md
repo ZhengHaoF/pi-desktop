@@ -2,6 +2,22 @@
 
 > 以北京腾讯云 `82.156.168.149`（ssh 别名 `tencent-bj`，Ubuntu 26.04 / Node 22 / pm2 7）为例。
 > 产物是单文件，服务器不需要仓库和 node_modules。
+> CI 发布：打 `v*` tag 后 `release-mobile-relay` job 会把 `pi-relay-<version>.mjs` 与 APK 一起放进 draft release。
+
+## GitHub Actions 发布 secrets（一次性配置）
+
+打 tag 前先在 GitHub 仓库 → Settings → Secrets and variables → Actions 配置 4 个 secret：
+
+| Secret | 值 | 说明 |
+|---|---|---|
+| `ANDROID_KEYSTORE_BASE64` | `scratch/keystore/keystore.base64` 文件内容 | 发布 keystore（base64） |
+| `ANDROID_KEYSTORE_PASSWORD` | `scratch/keystore/password.txt` 内容 | keystore 口令 |
+| `ANDROID_KEY_ALIAS` | `pi-remote` | 别名固定 |
+| `ANDROID_KEY_PASSWORD` | 同 `ANDROID_KEYSTORE_PASSWORD` | key 口令（与 store 相同） |
+
+> ⚠️ `scratch/keystore/` 整个目录已被 gitignore（jks + password + base64），**务必自行另存备份**（密码管理器/离线盘）。keystore 丢失后无法为已发布应用续签名升级。
+> 本地无这些 env 时，release 构建自动回退 debug 签名（`flutter run --release` 不受影响）。
+
 
 ## 产物
 
