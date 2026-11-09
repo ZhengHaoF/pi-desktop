@@ -1,0 +1,1703 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pi Agent Desktop — 本地优先 · 端到端加密 · 手机远程控制</title>
+    <meta
+      name="description"
+      content="Pi Agent Desktop 社区增强版：在本地优先的 AI 工作台上加入端到端加密与手机远程控制，出门也能安全连回你的电脑。"
+    />
+    <style>
+      :root {
+        --bg: #f7f6f3;
+        --bg-panel: #fcfbf9;
+        --bg-hover: #f0eeea;
+        --bg-selected: #eeecfb;
+        --border: #e4e1da;
+        --text: #1c1a17;
+        --text-muted: #57534a;
+        --text-dim: #746f66;
+        --accent: #534ab7;
+        --accent-hover: #443d99;
+        --accent-soft: #eeecfb;
+        --accent-soft-border: #d9d4f0;
+        --accent-chip-bg: #eeecfb;
+        --accent-chip-fg: #4a4394;
+        --tool-bg: #1c1a17;
+        --tool-fg: #c9c5bb;
+        --tool-border: #33302a;
+        --bg-subtle: rgba(28, 26, 23, 0.035);
+        --grid-line: #ece9e2;
+        --success: #16a34a;
+        --shadow-color: rgba(28, 26, 23, 0.16);
+        --font-sans:
+          "Inter", -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui,
+          sans-serif;
+        --font-mono: "Noto Sans Mono", ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+        color-scheme: light;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-sans);
+        line-height: 1.65;
+        -webkit-font-smoothing: antialiased;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      .container {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--bg-subtle);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 1px 6px;
+      }
+
+      /* ===== nav ===== */
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        border-bottom: 1px solid var(--border);
+        background: color-mix(in srgb, var(--bg) 84%, transparent);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+      .nav-inner {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        height: 60px;
+      }
+      .nav-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 650;
+        font-size: 15px;
+        color: var(--text);
+        letter-spacing: -0.01em;
+        flex-shrink: 0;
+      }
+      .nav-logo {
+        width: 28px;
+        height: 28px;
+        border-radius: 7px;
+        background: var(--accent);
+        color: #fff;
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+        font-size: 15px;
+      }
+      .nav-links {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+      .nav-links a {
+        padding: 7px 12px;
+        border-radius: 8px;
+        font-size: 13.5px;
+        color: var(--text-muted);
+        transition: all 0.15s;
+        white-space: nowrap;
+      }
+      .nav-links a:hover {
+        color: var(--text);
+        background: var(--bg-hover);
+      }
+      .nav-cta {
+        margin-left: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        background: var(--accent);
+        color: #ffffff !important;
+        font-weight: 650;
+        font-size: 13.5px;
+        padding: 8px 16px;
+        border-radius: 9px;
+        transition: background 0.15s;
+        flex-shrink: 0;
+      }
+      .nav-cta:hover {
+        background: var(--accent-hover);
+        color: #ffffff !important;
+      }
+      .nav-cta .ext {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        opacity: 1;
+        color: #ffffff;
+      }
+      @media (max-width: 860px) {
+        .nav-links a.opt {
+          display: none;
+        }
+      }
+      @media (max-width: 640px) {
+        .nav-links a {
+          display: none;
+        }
+      }
+
+      /* ===== hero ===== */
+      .hero {
+        position: relative;
+        padding: 96px 0 80px;
+        text-align: center;
+        overflow: hidden;
+        background-image:
+          linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+          linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+        background-size: 44px 44px;
+        background-position: center top;
+      }
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: auto 0 0;
+        height: 140px;
+        background: linear-gradient(to bottom, transparent, var(--bg));
+        pointer-events: none;
+      }
+      .hero > .container {
+        position: relative;
+        z-index: 1;
+      }
+      .hero-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--bg-panel);
+        font-size: 12.5px;
+        color: var(--text-dim);
+        margin-bottom: 24px;
+      }
+      .hero-chip .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--success);
+      }
+      .hero-icon {
+        width: 88px;
+        height: 88px;
+        border-radius: 22px;
+        background: var(--accent);
+        color: #fff;
+        display: grid;
+        place-items: center;
+        font-size: 44px;
+        font-weight: 800;
+        margin: 0 auto 28px;
+        box-shadow: 0 20px 48px -16px var(--shadow-color);
+      }
+      .hero h1 {
+        font-size: clamp(32px, 5.6vw, 52px);
+        font-weight: 750;
+        letter-spacing: -0.035em;
+        line-height: 1.16;
+        margin: 0 0 18px;
+      }
+      .hero-sub {
+        font-size: 17px;
+        color: var(--text-muted);
+        max-width: 620px;
+        margin: 0 auto 14px;
+      }
+      .hero-sub strong {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .hero-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+        margin: 0 0 30px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--bg-panel);
+        font-size: 12.5px;
+        color: var(--text-dim);
+      }
+      .chip .chip-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+      }
+      .chip .chip-dot.orange {
+        background: var(--accent);
+      }
+      .chip .chip-dot.green {
+        background: var(--success);
+      }
+      .chip.accent {
+        border-color: var(--accent-soft-border);
+        background: var(--accent-chip-bg);
+        color: var(--accent-chip-fg);
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        padding: 11px 24px;
+        border-radius: 10px;
+        font-size: 14.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+        border: 1px solid transparent;
+      }
+      .btn:active {
+        transform: translateY(1px);
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+      }
+      .btn-primary:hover {
+        background: var(--accent-hover);
+      }
+      .btn-secondary {
+        background: var(--bg-panel);
+        color: var(--text);
+        border-color: var(--border);
+      }
+      .btn-secondary:hover {
+        border-color: var(--accent-soft-border);
+        background: var(--bg-hover);
+      }
+      .btn .ext {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        opacity: 0.65;
+        font-weight: 500;
+      }
+      .hero-ctas {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+      .hero-note {
+        font-size: 13px;
+        color: var(--text-dim);
+      }
+      .hero-note code {
+        font-size: 12px;
+      }
+
+      /* ===== sections ===== */
+      .section {
+        padding: 88px 0;
+      }
+      .section + .section,
+      .section + div.section-wrap,
+      .show + .section {
+        border-top: 1px solid var(--border);
+      }
+      .section-title {
+        font-size: clamp(26px, 3.6vw, 34px);
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        line-height: 1.25;
+        margin: 0 0 14px;
+      }
+      .section-desc {
+        color: var(--text-muted);
+        max-width: 640px;
+        margin: 0 0 48px;
+        font-size: 15.5px;
+      }
+      .section-desc strong {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .section-head-center {
+        text-align: center;
+      }
+      .section-head-center .section-desc {
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .kicker {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 12px;
+      }
+
+      /* ===== remote showcase ===== */
+      .show-grid {
+        display: grid;
+        grid-template-columns: 1fr 400px;
+        gap: 64px;
+        align-items: center;
+      }
+      @media (max-width: 960px) {
+        .show-grid {
+          grid-template-columns: 1fr;
+          gap: 48px;
+        }
+      }
+      .feats {
+        display: grid;
+        gap: 14px;
+      }
+      .feat {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .feat-tick {
+        width: 22px;
+        height: 22px;
+        border-radius: 7px;
+        flex-shrink: 0;
+        background: var(--accent-soft);
+        border: 1px solid var(--accent-soft-border);
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+        margin-top: 2px;
+      }
+      .feat div {
+        font-size: 14.5px;
+        color: var(--text-muted);
+      }
+      .feat b {
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      .phone-wrap {
+        display: flex;
+        justify-content: center;
+        position: relative;
+      }
+      .phone {
+        width: 330px;
+        border-radius: 42px;
+        padding: 9px;
+        background: #1c1a17;
+        box-shadow:
+          0 32px 70px -20px var(--shadow-color),
+          0 0 0 1px var(--tool-border);
+      }
+      .screen {
+        border-radius: 34px;
+        background: #f7f7fa;
+        overflow: hidden;
+        height: 620px;
+        display: flex;
+        flex-direction: column;
+      }
+      .notch {
+        height: 28px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #1c1a17;
+        border-radius: 34px 34px 0 0;
+      }
+      .notch::after {
+        content: "";
+        width: 88px;
+        height: 20px;
+        border-radius: 10px;
+        background: #05070b;
+      }
+      .pstatus {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 20px 6px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: #8a867c;
+        background: #fff;
+      }
+      .pstatus .enc {
+        color: #16a34a;
+      }
+      .pbar {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 10px 14px 12px;
+        background: #fff;
+        border-bottom: 1px solid #eceaf2;
+      }
+      .pbar .avatar {
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        background: #534ab7;
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+      }
+      .pbar .t1 {
+        font-size: 12.5px;
+        font-weight: 650;
+        color: #1a1830;
+      }
+      .pbar .t2 {
+        font-family: var(--font-mono);
+        font-size: 9.5px;
+        color: #8a86a0;
+      }
+      .pbar .live {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 10px;
+        color: #16a34a;
+        background: rgba(22, 163, 74, 0.1);
+        border: 1px solid rgba(22, 163, 74, 0.3);
+        padding: 3px 9px;
+        border-radius: 999px;
+      }
+      .pbar .live::before {
+        content: "";
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #16a34a;
+      }
+      .pchat {
+        flex: 1;
+        padding: 13px 13px 9px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow: hidden;
+      }
+      .msg {
+        max-width: 88%;
+        border-radius: 13px;
+        padding: 9px 12px;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .msg.ai {
+        align-self: flex-start;
+        background: #fff;
+        border: 1px solid #e8e6f0;
+        border-bottom-left-radius: 5px;
+        color: #2a2840;
+      }
+      .msg.ai .who {
+        font-size: 9.5px;
+        color: #534ab7;
+        font-weight: 700;
+        margin-bottom: 3px;
+        letter-spacing: 0.4px;
+      }
+      .msg.user {
+        align-self: flex-end;
+        background: #e3dffb;
+        color: #2f2a5e;
+        border-bottom-right-radius: 5px;
+      }
+      .think {
+        align-self: flex-start;
+        border-left: 2px solid #b9b0f0;
+        background: #f1eefc;
+        border-radius: 4px 10px 10px 4px;
+        padding: 7px 10px;
+        font-size: 10.5px;
+        color: #6e678f;
+        max-width: 88%;
+      }
+      .tool {
+        align-self: flex-start;
+        width: 88%;
+        border: 1px solid #e8e6f0;
+        border-radius: 11px;
+        background: #fff;
+        padding: 8px 10px;
+      }
+      .tool .th {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 4px;
+      }
+      .tool .ti {
+        width: 17px;
+        height: 17px;
+        border-radius: 5px;
+        display: grid;
+        place-items: center;
+        font-size: 9px;
+      }
+      .tool .ti.ok {
+        background: rgba(22, 163, 74, 0.12);
+        color: #16a34a;
+      }
+      .tool .ti.warn {
+        background: rgba(217, 119, 6, 0.12);
+        color: #b45309;
+      }
+      .tool .tn {
+        font-size: 11px;
+        font-weight: 600;
+        color: #2a2840;
+      }
+      .tool .tc {
+        font-family: var(--font-mono);
+        font-size: 9.5px;
+        color: #8a86a0;
+      }
+      .approve {
+        display: flex;
+        gap: 6px;
+        margin-top: 7px;
+      }
+      .approve span {
+        flex: 1;
+        text-align: center;
+        font-size: 10.5px;
+        font-weight: 650;
+        padding: 5.5px 0;
+        border-radius: 7px;
+      }
+      .approve .a-ok {
+        background: rgba(22, 163, 74, 0.1);
+        color: #16a34a;
+        border: 1px solid rgba(22, 163, 74, 0.35);
+      }
+      .approve .a-no {
+        background: #f4f3f8;
+        color: #5a5775;
+        border: 1px solid #e8e6f0;
+      }
+      .queue {
+        align-self: stretch;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        border: 1px solid #eadfb0;
+        background: #fff8e1;
+        border-radius: 10px;
+        padding: 7px 11px;
+        font-size: 10.5px;
+        color: #8d6e00;
+      }
+      .pinput {
+        margin: 0 12px 13px;
+        border: 1px solid #d9d4f0;
+        border-radius: 13px;
+        background: #fff;
+        padding: 9px 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 2px 8px rgba(83, 74, 183, 0.06);
+      }
+      .pinput .ph {
+        font-size: 10.5px;
+        color: #8d6e00;
+        flex: 1;
+      }
+      .pinput .go {
+        background: #534ab7;
+        color: #fff;
+        font-size: 10.5px;
+        font-weight: 700;
+        padding: 6px 13px;
+        border-radius: 8px;
+      }
+
+      /* ===== e2ee ===== */
+      .e2ee-flow {
+        display: grid;
+        grid-template-columns: 1fr 200px 1fr;
+        gap: 22px;
+        align-items: center;
+        margin-bottom: 22px;
+      }
+      @media (max-width: 860px) {
+        .e2ee-flow {
+          grid-template-columns: 1fr;
+        }
+      }
+      .endpoint {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: var(--bg-panel);
+        padding: 26px;
+        transition: all 0.18s;
+      }
+      .endpoint:hover {
+        border-color: var(--accent-soft-border);
+        box-shadow: 0 14px 34px -18px var(--shadow-color);
+      }
+      .endpoint .e-ico {
+        font-size: 26px;
+        margin-bottom: 10px;
+      }
+      .endpoint h4 {
+        font-size: 16.5px;
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+      .endpoint .e-tag {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--accent);
+        margin-bottom: 10px;
+      }
+      .endpoint p {
+        font-size: 13.5px;
+        color: var(--text-muted);
+      }
+      .endpoint p b {
+        color: var(--text);
+      }
+      .mid {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+      .mid .flow-line {
+        width: 1px;
+        height: 40px;
+        background: linear-gradient(var(--accent-soft-border), transparent);
+      }
+      .relay {
+        text-align: center;
+        border: 1.5px dashed var(--accent-soft-border);
+        border-radius: 14px;
+        padding: 14px 20px;
+        background: var(--accent-soft);
+      }
+      .relay .r1 {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .relay .r2 {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        color: var(--text-dim);
+        margin-top: 3px;
+      }
+      .crypto-cards {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+      @media (max-width: 760px) {
+        .crypto-cards {
+          grid-template-columns: 1fr;
+        }
+      }
+      .ccard {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--bg-panel);
+        padding: 24px;
+        transition: all 0.18s;
+      }
+      .ccard:hover {
+        border-color: var(--accent-soft-border);
+        box-shadow: 0 14px 34px -18px var(--shadow-color);
+        transform: translateY(-2px);
+      }
+      .ccard .n {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--accent-chip-fg);
+        background: var(--accent-chip-bg);
+        border: 1px solid var(--accent-soft-border);
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 999px;
+        margin-bottom: 12px;
+      }
+      .ccard h4 {
+        font-size: 15.5px;
+        margin-bottom: 7px;
+      }
+      .ccard p {
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+
+      /* ===== features ===== */
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+      @media (max-width: 960px) {
+        .feature-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      @media (max-width: 600px) {
+        .feature-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .feature-card {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--bg-panel);
+        padding: 24px;
+        transition:
+          border-color 0.18s ease,
+          box-shadow 0.18s ease,
+          transform 0.18s ease;
+      }
+      .feature-card:hover {
+        border-color: var(--accent-soft-border);
+        box-shadow: 0 14px 34px -18px var(--shadow-color);
+        transform: translateY(-2px);
+      }
+      .feature-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        background: var(--accent-soft);
+        border: 1px solid var(--accent-soft-border);
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+        margin-bottom: 14px;
+      }
+      .feature-card h4 {
+        font-size: 15.5px;
+        font-weight: 650;
+        margin-bottom: 7px;
+        letter-spacing: -0.01em;
+      }
+      .feature-card p {
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+
+      /* ===== architecture ===== */
+      .procs {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+      @media (max-width: 960px) {
+        .procs {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      @media (max-width: 520px) {
+        .procs {
+          grid-template-columns: 1fr;
+        }
+      }
+      .proc {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--bg-panel);
+        padding: 22px;
+      }
+      .proc .pr {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        color: var(--accent);
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+      }
+      .proc h4 {
+        font-size: 15.5px;
+        font-weight: 700;
+        margin: 7px 0 10px;
+      }
+      .proc li {
+        list-style: none;
+        font-size: 12.5px;
+        color: var(--text-muted);
+        padding: 3px 0 3px 15px;
+        position: relative;
+      }
+      .proc li::before {
+        content: "›";
+        position: absolute;
+        left: 0;
+        color: var(--accent);
+      }
+      .tech-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+        justify-content: center;
+      }
+      .tpill {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-dim);
+        border: 1px solid var(--border);
+        background: var(--bg-panel);
+        border-radius: 999px;
+        padding: 6px 15px;
+        transition: all 0.15s;
+      }
+      .tpill:hover {
+        color: var(--accent);
+        border-color: var(--accent-soft-border);
+      }
+
+      /* ===== privacy ===== */
+      .privs {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+      }
+      @media (max-width: 1000px) {
+        .privs {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      @media (max-width: 520px) {
+        .privs {
+          grid-template-columns: 1fr;
+        }
+      }
+      .priv {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--bg-panel);
+        padding: 20px;
+      }
+      .priv .pi2 {
+        font-size: 19px;
+        margin-bottom: 10px;
+      }
+      .priv h4 {
+        font-size: 14px;
+        font-weight: 650;
+        margin-bottom: 5px;
+      }
+      .priv p {
+        font-size: 12.5px;
+        color: var(--text-muted);
+        line-height: 1.55;
+      }
+
+      /* ===== steps ===== */
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+      @media (max-width: 800px) {
+        .steps {
+          grid-template-columns: 1fr;
+        }
+      }
+      .step {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--bg-panel);
+        padding: 26px;
+        transition: all 0.18s;
+      }
+      .step:hover {
+        border-color: var(--accent-soft-border);
+        box-shadow: 0 14px 34px -18px var(--shadow-color);
+      }
+      .step .sn {
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 700;
+        font-family: var(--font-mono);
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+        margin-bottom: 15px;
+      }
+      .step h4 {
+        font-size: 16px;
+        margin-bottom: 7px;
+      }
+      .step p {
+        font-size: 13.5px;
+        color: var(--text-muted);
+      }
+
+      /* ===== compare ===== */
+      .tbl-wrap {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        overflow: hidden;
+        background: var(--bg-panel);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+      thead th {
+        text-align: left;
+        padding: 14px 22px;
+        font-size: 11.5px;
+        font-weight: 650;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        background: var(--bg-hover);
+        border-bottom: 1px solid var(--border);
+      }
+      thead th:last-child {
+        color: var(--accent);
+      }
+      tbody td {
+        padding: 14px 22px;
+        border-bottom: 1px solid var(--border);
+        color: var(--text-muted);
+      }
+      tbody tr:last-child td {
+        border-bottom: none;
+      }
+      tbody tr:hover td {
+        background: var(--bg-hover);
+      }
+      td:last-child,
+      th:last-child {
+        text-align: center;
+        width: 130px;
+      }
+      .yes {
+        display: inline-grid;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 7px;
+        background: rgba(22, 163, 74, 0.1);
+        color: var(--success);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .no {
+        display: inline-grid;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 7px;
+        background: var(--bg-hover);
+        color: var(--text-dim);
+        font-size: 12px;
+      }
+      .newtag {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--accent-chip-fg);
+        background: var(--accent-chip-bg);
+        border: 1px solid var(--accent-soft-border);
+        border-radius: 5px;
+        padding: 1px 7px;
+        margin-left: 8px;
+        vertical-align: 1.5px;
+        letter-spacing: 0.5px;
+      }
+      .tbl-note {
+        font-size: 12.5px;
+        color: var(--text-dim);
+        margin-top: 14px;
+      }
+
+      /* ===== footer ===== */
+      .footer {
+        border-top: 1px solid var(--border);
+        padding: 52px 0 36px;
+        background: var(--bg-panel);
+      }
+      .footer-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr;
+        gap: 32px;
+        margin-bottom: 40px;
+      }
+      @media (max-width: 820px) {
+        .footer-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .footer-grid h5 {
+        font-size: 11.5px;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        margin-bottom: 12px;
+      }
+      .footer-grid a {
+        display: block;
+        font-size: 13.5px;
+        color: var(--text-muted);
+        padding: 4px 0;
+        transition: color 0.15s;
+      }
+      .footer-grid a:hover {
+        color: var(--accent);
+      }
+      .f-about p {
+        color: var(--text-muted);
+        font-size: 13.5px;
+        margin-top: 12px;
+        max-width: 300px;
+      }
+      .footer-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 650;
+      }
+      .f-bottom {
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding-top: 22px;
+        border-top: 1px solid var(--border);
+        font-size: 12.5px;
+        color: var(--text-dim);
+      }
+      .f-bottom .mono {
+        font-family: var(--font-mono);
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="nav">
+      <div class="container nav-inner">
+        <a class="nav-brand" href="#"><span class="nav-logo">π</span> Pi Agent Desktop</a>
+        <div class="nav-links">
+          <a href="#remote">远程控制</a>
+          <a href="#e2ee">加密</a>
+          <a href="#caps">功能</a>
+          <a href="#compare">对比</a>
+          <a href="#enhancements" class="opt">增强</a>
+          <a href="#arch" class="opt">架构</a>
+          <a href="#privacy" class="opt">隐私</a>
+          <a class="nav-cta" href="https://github.com/ZhengHaoF/pi-desktop/releases" target="_blank" rel="noopener"
+            >下载 <span class="ext">v0.5.1</span></a
+          >
+        </div>
+      </div>
+    </nav>
+
+    <!-- ============ HERO ============ -->
+    <header class="hero">
+      <div class="container">
+        <div class="hero-chip"><span class="dot"></span> v0.5.1 已发布 · 内置 Pi Coding Agent 1.5.0</div>
+        <div class="hero-icon">π</div>
+        <h1>本地优先的 AI 工作台，<br />出门在外也连得回来。</h1>
+        <p class="hero-sub">
+          在 Pi Agent Desktop
+          之上加入<strong>端到端加密</strong>与<strong>手机远程控制</strong>。桌面上的会话、工具审批、项目操作——握在手机里，转发服务器一个字也读不到。
+        </p>
+        <div class="hero-chips">
+          <span class="chip accent"><span class="chip-dot orange"></span> 端到端加密 · 服务器读不到内容</span>
+          <span class="chip"><span class="chip-dot green"></span> 手机远程控制</span>
+          <span class="chip">一键部署云 Relay</span>
+          <span class="chip">Windows + Android 安装包</span>
+        </div>
+        <div class="hero-ctas">
+          <a
+            class="btn btn-primary"
+            href="https://github.com/ZhengHaoF/pi-desktop/releases"
+            target="_blank"
+            rel="noopener"
+            >下载 Windows 版 <span class="ext">.exe</span></a
+          >
+          <a
+            class="btn btn-secondary"
+            href="https://github.com/ZhengHaoF/pi-desktop/releases"
+            target="_blank"
+            rel="noopener"
+            >下载 Android 版 <span class="ext">.apk</span></a
+          >
+        </div>
+        <p class="hero-note">本地优先 · 零内部服务器 · 跨平台应用 · 社区增强版（非官方）· <code>Apache-2.0</code></p>
+      </div>
+    </header>
+
+    <!-- ============ REMOTE SHOWCASE ============ -->
+    <section class="section" id="remote">
+      <div class="container">
+        <div class="show-grid">
+          <div>
+            <div class="kicker">Remote Control</div>
+            <h2 class="section-title">把整台电脑，装进手机。</h2>
+            <p class="section-desc">
+              局域网一键内置
+              Relay，或云服务器一键部署——手机与桌面建立<strong>端到端加密</strong>连接。人在外面，一切照常。
+            </p>
+            <div class="feats">
+              <div class="feat">
+                <span class="feat-tick">✓</span>
+                <div><b>扫码即配对</b> · 一次性 token 换发长期凭证，X25519 公钥钉扎，重连免扫码</div>
+              </div>
+              <div class="feat">
+                <span class="feat-tick">✓</span>
+                <div><b>完整会话</b> · 项目分组浏览、流式回复、Markdown 与工具卡片完整还原</div>
+              </div>
+              <div class="feat">
+                <span class="feat-tick">✓</span>
+                <div><b>回合中插队</b> · steer / follow-up 队列透明可见，对齐桌面操作习惯</div>
+              </div>
+              <div class="feat">
+                <span class="feat-tick">✓</span>
+                <div><b>审批随身带</b> · 工具调用在手机上批准或拒绝，安全不经第三方</div>
+              </div>
+              <div class="feat">
+                <span class="feat-tick">✓</span>
+                <div><b>息屏保活</b> · Android 前台服务 + WakeLock，锁屏、口袋里都不断连</div>
+              </div>
+              <div class="feat">
+                <span class="feat-tick">✓</span>
+                <div><b>多电脑切换</b> · 主机目录记住所有 PC，一台手机控制全部</div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-wrap">
+            <div class="phone">
+              <div class="screen">
+                <div class="notch"></div>
+                <div class="pstatus"><span>14:32</span><span class="enc">🔒 E2EE · 5G</span></div>
+                <div class="pbar">
+                  <div class="avatar">💻</div>
+                  <div>
+                    <div class="t1">HOME-PC</div>
+                    <div class="t2">host-7f3a… · work</div>
+                  </div>
+                  <div class="live">在线</div>
+                </div>
+                <div class="pchat">
+                  <div class="msg ai">
+                    <div class="who">PI · ASSISTANT</div>
+                    已扫描当前分支改动，3 个文件涉及远程控制链路的配置更新…
+                  </div>
+                  <div class="think">💭 正在分析会话缓存为何在多主机间相互覆盖…</div>
+                  <div class="tool">
+                    <div class="th"><span class="ti ok">✓</span><span class="tn">读文件</span></div>
+                    <div class="tc">readFile(session_cache.dart) · 412ms</div>
+                  </div>
+                  <div class="tool">
+                    <div class="th"><span class="ti warn">⚠</span><span class="tn">修改配置</span></div>
+                    <div class="tc">writeFile(remote-features.md)</div>
+                    <div class="approve"><span class="a-ok">批准</span><span class="a-no">拒绝</span></div>
+                  </div>
+                  <div class="queue">⚡ 已排队 1 条（回合中送达）</div>
+                  <div class="msg user">改用局域网模式，端口迁到 8788，确认下</div>
+                </div>
+                <div class="pinput"><span class="ph">回合进行中，发送将插队…</span><span class="go">发送</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ E2EE ============ -->
+    <section class="section" id="e2ee">
+      <div class="container">
+        <div class="section-head-center" style="text-align: center">
+          <div class="kicker">End-to-End Encryption</div>
+          <h2 class="section-title">中间人只能看到乱码</h2>
+          <p class="section-desc">
+            手机和电脑之间的消息，要经过服务器转发。但转发服务器<b>只能看到加密后的乱码</b>——你的聊天内容、文件路径、审批操作，它一样也读不到。
+          </p>
+        </div>
+        <div class="e2ee-flow">
+          <div class="endpoint">
+            <div class="e-ico">📱</div>
+            <h4>你的手机</h4>
+            <div class="e-tag">发送前加密</div>
+            <p>
+              消息在<b>离开手机之前</b>就已加密。扫码配对时记住了你电脑的"钥匙指纹"，以后每次连接都先核对，防止有人冒充你的电脑。
+            </p>
+          </div>
+          <div class="mid">
+            <div class="flow-line"></div>
+            <div class="relay">
+              <div class="r1">转发服务器</div>
+              <div class="r2">只见乱码 · 无法解读</div>
+            </div>
+            <div class="flow-line"></div>
+          </div>
+          <div class="endpoint">
+            <div class="e-ico">🖥️</div>
+            <h4>你的电脑</h4>
+            <div class="e-tag">收到后才解密</div>
+            <p>解密钥匙只存在你电脑本地，<b>不写进界面、不发给任何程序</b>——连桌面应用的界面代码都拿不到它。</p>
+          </div>
+        </div>
+        <div class="crypto-cards">
+          <div class="ccard">
+            <span class="n">第一道防线</span>
+            <h4>冒充不了</h4>
+            <p>
+              第一次扫码时，手机就记住了电脑密钥的"指纹"。之后哪怕有人架起假服务器、假电脑，对不上指纹，手机直接拒绝连接。
+            </p>
+          </div>
+          <div class="ccard">
+            <span class="n">第二道防线</span>
+            <h4>篡改不了</h4>
+            <p>
+              每条消息都带"防伪封条"，封条覆盖了消息内容和收件地址。转发服务器想偷偷改个目标、改一个标点，电脑收到后立刻发现并丢弃。
+            </p>
+          </div>
+          <div class="ccard">
+            <span class="n">第三道防线</span>
+            <h4>重放不了</h4>
+            <p>
+              就算有人录下一段加密消息、原样重发一百遍，每条消息都有唯一编号，见过的编号再出现就直接扔掉，不会被执行两次。
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CAPABILITIES ============ -->
+    <section class="section" id="caps">
+      <div class="container">
+        <div class="section-head-center" style="text-align: center">
+          <div class="kicker">Core Capabilities</div>
+          <h2 class="section-title">一个完整的 Agent 工作台</h2>
+          <p class="section-desc">从会话、浏览器、Agent 舰队到模型与消息渠道，日常工作都在同一个窗口完成。</p>
+        </div>
+        <div class="feature-grid">
+          <div class="feature-card">
+            <div class="feature-icon">🎯</div>
+            <h4>Auto 自动路由</h4>
+            <p>配置快模型和强模型，Auto 按任务复杂度为每次提问选择模型，并显示实际作答的模型。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🔌</div>
+            <h4>MCP 服务管理</h4>
+            <p>stdio 或 Streamable HTTP 连接本地与远程工具，OAuth 登录、测试连接、预览资源。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🎨</div>
+            <h4>图片生成与决策模型</h4>
+            <p>通过 Codemode 生成图片、分类内容、是非判断或评分，重开会话仍可查看。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🌳</div>
+            <h4>工具执行历史树</h4>
+            <p>按会话分支查看直接与嵌套调用的执行树，检查状态、耗时、输入与完整结果。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">💬</div>
+            <h4>完整会话体验</h4>
+            <p>字号与宽度调节、任意附件、Steer / Follow-up，长会话分页与滚动跟随依然流畅。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🌐</div>
+            <h4>共享浏览器</h4>
+            <p>真实 Chromium，多标签页、Profile 与登录态完整保留；Agent 经独立授权后可操作同一页面。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🤖</div>
+            <h4>Herdr Agent 舰队</h4>
+            <p>主对话中管理本机 Agent 舰队，右侧 ANSI 终端可观察、排查与显式键盘接管。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">📁</div>
+            <h4>项目文件体验</h4>
+            <p>Git 分支与 Worktree 管理，Markdown 文件操作，代码高亮、Mermaid 与 KaTeX 稳定渲染。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🧩</div>
+            <h4>模型与扩展管理</h4>
+            <p>内置 Pi Coding Agent 1.5.0，API Key 与订阅登录、模型配置与高级运行设置。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🛠️</div>
+            <h4>跨平台开发工具</h4>
+            <p>发现并验证系统工具，按需安装私有 Node.js、Python、Git、Bun，不改系统 PATH。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">📡</div>
+            <h4>消息传递渠道</h4>
+            <p>个人微信、Telegram、飞书 / Lark 接入，官方扫码创建机器人或连接自建应用。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🩺</div>
+            <h4>可观察受管进程</h4>
+            <p>开发服务器、文件监视器持续运行；状态、就绪情况与脱敏日志尽在掌握。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ARCHITECTURE ============ -->
+    <section class="section" id="arch">
+      <div class="container">
+        <div class="section-head-center" style="text-align: center">
+          <div class="kicker">Architecture</div>
+          <h2 class="section-title">三进程隔离，网页独立承载</h2>
+          <p class="section-desc">高权限桌面能力、Agent 运行时和 UI 相互隔离，控制面零本地端口。</p>
+        </div>
+        <div class="procs">
+          <div class="proc">
+            <div class="pr">Main</div>
+            <h4>主进程</h4>
+            <li>窗口 · 托盘 · 更新</li>
+            <li>Browser View 与网络策略</li>
+          </div>
+          <div class="proc">
+            <div class="pr">Agent Host</div>
+            <h4>代理主机</h4>
+            <li>utilityProcess 运行 Pi Agent</li>
+            <li>Browser · Processes · Herdr</li>
+          </div>
+          <div class="proc">
+            <div class="pr">Renderer</div>
+            <h4>渲染器</h4>
+            <li>React 19 界面</li>
+            <li>受控 preload 桥接</li>
+          </div>
+          <div class="proc">
+            <div class="pr">Browser</div>
+            <h4>浏览器视图</h4>
+            <li>真实 Chromium 页面</li>
+            <li>沙箱 · Profile · 独立授权</li>
+          </div>
+        </div>
+        <div class="tech-pills">
+          <span class="tpill">类型化 MessagePort IPC</span>
+          <span class="tpill">revisioned Browser RPC</span>
+          <span class="tpill">控制面零本地端口</span>
+          <span class="tpill">POSIX group / Windows Job Object</span>
+          <span class="tpill">配置保存在 ~/.pi/agent/</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PRIVACY ============ -->
+    <section class="section" id="privacy">
+      <div class="container">
+        <div class="section-head-center" style="text-align: center">
+          <div class="kicker">Privacy &amp; Security</div>
+          <h2 class="section-title">你的数据，留在你的机器上</h2>
+          <p class="section-desc">本地优先不是口号，而是默认行为。</p>
+        </div>
+        <div class="privs">
+          <div class="priv">
+            <div class="pi2">🖥️</div>
+            <h4>本地数据</h4>
+            <p>会话和 Pi 配置默认保留在您的计算机上 ~/.pi/agent/</p>
+          </div>
+          <div class="priv">
+            <div class="pi2">🔌</div>
+            <h4>零内部端口</h4>
+            <p>UI 和控制平面不开放本地端口；项目服务可能监听环回</p>
+          </div>
+          <div class="priv">
+            <div class="pi2">🛡️</div>
+            <h4>最小暴露面</h4>
+            <p>渲染器沙箱 + 严格 CSP + 受控预加载桥</p>
+          </div>
+          <div class="priv">
+            <div class="pi2">🧱</div>
+            <h4>浏览器隔离</h4>
+            <p>远程页面不接收应用预加载、Node.js 或主渲染器桥</p>
+          </div>
+          <div class="priv">
+            <div class="pi2">🔑</div>
+            <h4>权限相互独立</h4>
+            <p>编码、浏览器、Herdr 与受管进程永不隐式相互启用</p>
+          </div>
+          <div class="priv">
+            <div class="pi2">⏱️</div>
+            <h4>运行时默认关闭</h4>
+            <p>Herdr 和托管流程提供生命周期控制，而非安全沙箱</p>
+          </div>
+          <div class="priv">
+            <div class="pi2">🔐</div>
+            <h4>凭证加密</h4>
+            <p>通道令牌经 Electron safeStorage 加密，永不返回渲染器</p>
+          </div>
+          <div class="priv">
+            <div class="pi2">📦</div>
+            <h4>可信更新</h4>
+            <p>更新设置在生产版本中已固化，不接受外部更新 URL</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DESKTOP ENHANCEMENTS ============ -->
+    <section class="section" id="enhancements">
+      <div class="container">
+        <div class="section-head-center" style="text-align: center">
+          <div class="kicker">Desktop Enhancements</div>
+          <h2 class="section-title">桌面端，也打磨了 20+ 处</h2>
+          <p class="section-desc">不只是远程控制——日常使用的聊天、侧栏、模型管理，都按真实使用习惯做了增强。</p>
+        </div>
+        <div class="feature-grid">
+          <div class="feature-card">
+            <div class="feature-icon">🔍</div>
+            <h4>联网搜索工具</h4>
+            <p>内置 web_search / web_fetch，Agent 能直接查资料、抓网页，配独立设置页管理来源与开关。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">📚</div>
+            <h4>会话按项目聚合</h4>
+            <p>侧栏可按项目折叠分组会话，找历史对话不再大海捞针；打开中的会话所在分组可单独收起。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">📐</div>
+            <h4>侧栏可拖拽调宽</h4>
+            <p>侧栏宽度随手拖，长项目名、长会话名完整显示，不用再悬停等气泡。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🖼️</div>
+            <h4>宽版对话 + 图片预览</h4>
+            <p>对话列更宽更适合读代码；点会话里的图片直接全屏预览，不用另存。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">⭕</div>
+            <h4>上下文用量圆环</h4>
+            <p>当前上下文占用一眼可见，压缩后无缝衔接阅读位置，长会话心里有数。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🧠</div>
+            <h4>思考等级全局默认</h4>
+            <p>为每个模型或全局设定默认思考等级，新会话不再逐个手调；DeepSeek 兼容 Profile 一键套用。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🗃️</div>
+            <h4>完整模型目录</h4>
+            <p>从服务商与 models.dev 拉取完整模型列表填入信息，模型选择器不再只有几个预设。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">⚙️</div>
+            <h4>默认工具预设</h4>
+            <p>新会话统一应用一套工具开关组合，不用每个会话重复配置。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🌐</div>
+            <h4>通知本地化</h4>
+            <p>桌面通知跟随应用语言显示，细节体验完整。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ STEPS ============ -->
+    <section class="section" id="start">
+      <div class="container">
+        <div class="section-head-center" style="text-align: center">
+          <div class="kicker">Quick Start</div>
+          <h2 class="section-title">三步，开始远程</h2>
+          <p class="section-desc">不需要公网 IP、不需要 Docker、不需要懂加密。</p>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div class="sn">1</div>
+            <h4>桌面端开启远程</h4>
+            <p>
+              安装 Windows 版，在「设置 → 消息渠道 → 自建托管」打开开关。默认 <code>局域网模式</code>，内置 Relay
+              一键可用。
+            </p>
+          </div>
+          <div class="step">
+            <div class="sn">2</div>
+            <h4>手机扫码配对</h4>
+            <p>安装 Android APK，扫描电脑屏幕上的配对二维码。一次性 token 换发长期凭证，X25519 公钥同步钉扎。</p>
+          </div>
+          <div class="step">
+            <div class="sn">3</div>
+            <h4>随时连回</h4>
+            <p>在公司、在地铁，4G / 5G 直连你的云 Relay。会话按项目分组，聊天、审批、插队全在手机上。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ COMPARE ============ -->
+    <section class="section" id="compare">
+      <div class="container">
+        <div class="section-head-center" style="text-align: center">
+          <div class="kicker">Why This Fork</div>
+          <h2 class="section-title">相对上游，多了什么</h2>
+          <p class="section-desc">
+            本仓库是 <code>DLYZZT/pi-desktop</code> 的社区增强分支——上游功能完整保留，另有 20+ 项增强。
+          </p>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>能力</th>
+                <th>上游</th>
+                <th>本分支</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><b>手机远程控制</b>（Flutter 客户端 · 扫码配对 · 审批 · 插队 · 息屏保活）</td>
+                <td><span class="no">—</span></td>
+                <td><span class="yes">✓</span><span class="newtag">新增</span></td>
+              </tr>
+              <tr>
+                <td><b>端到端加密</b>（配对凭证 + X25519，转发服务器读不到内容）</td>
+                <td><span class="no">—</span></td>
+                <td><span class="yes">✓</span><span class="newtag">新增</span></td>
+              </tr>
+              <tr>
+                <td><b>联网搜索</b>（内置 web_search / web_fetch 工具 + 独立设置页）</td>
+                <td><span class="no">—</span></td>
+                <td><span class="yes">✓</span><span class="newtag">新增</span></td>
+              </tr>
+              <tr>
+                <td><b>会话侧栏增强</b>（按项目聚合 · 可拖拽调宽 · 随项目删除会话）</td>
+                <td><span class="no">—</span></td>
+                <td><span class="yes">✓</span><span class="newtag">新增</span></td>
+              </tr>
+              <tr>
+                <td><b>聊天界面增强</b>（宽版对话列 · 上下文用量圆环 · 图片全屏预览 · 中止回合不进历史）</td>
+                <td><span class="no">—</span></td>
+                <td><span class="yes">✓</span><span class="newtag">新增</span></td>
+              </tr>
+              <tr>
+                <td>
+                  <b>模型管理增强</b>（拉取服务商完整模型目录 · 全局默认思考等级 · DeepSeek 兼容 Profile ·
+                  会话默认模型）
+                </td>
+                <td><span class="no">—</span></td>
+                <td><span class="yes">✓</span><span class="newtag">新增</span></td>
+              </tr>
+              <tr>
+                <td><b>默认工具预设</b>（新会话统一工具开关）+ 应用语言通知本地化</td>
+                <td><span class="no">—</span></td>
+                <td><span class="yes">✓</span><span class="newtag">新增</span></td>
+              </tr>
+              <tr>
+                <td><b>云 Relay 一键部署</b>（pm2 单文件）+ Android 官方签名安装包</td>
+                <td><span class="no">—</span></td>
+                <td><span class="yes">✓</span><span class="newtag">新增</span></td>
+              </tr>
+              <tr>
+                <td>三进程隔离 · 本地优先 · 零内部端口</td>
+                <td><span class="yes">✓</span></td>
+                <td><span class="yes">✓</span></td>
+              </tr>
+              <tr>
+                <td>共享浏览器 / Herdr / MCP / 消息渠道</td>
+                <td><span class="yes">✓</span></td>
+                <td><span class="yes">✓</span></td>
+              </tr>
+              <tr>
+                <td>8 项隐私与安全默认</td>
+                <td><span class="yes">✓</span></td>
+                <td><span class="yes">✓</span></td>
+              </tr>
+              <tr>
+                <td>Pi Coding Agent 1.5.0 运行时</td>
+                <td><span class="yes">✓</span></td>
+                <td><span class="yes">✓</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="tbl-note">※ 上游为「手机控 PC」之外的纯被控端模型；本分支已规划「电脑控电脑」双身份扩展。</p>
+      </div>
+    </section>
+
+    <!-- ============ FOOTER ============ -->
+    <footer class="footer">
+      <div class="container">
+        <div class="footer-grid">
+          <div class="f-about">
+            <div class="footer-brand">
+              <span class="nav-logo" style="width: 26px; height: 26px; font-size: 13px">π</span> Pi Agent Desktop
+            </div>
+            <p>把 Pi Coding Agent 变成真正的桌面工作台——本地优先，端到端加密，手机直达。</p>
+          </div>
+          <div>
+            <h5>产品</h5>
+            <a href="#remote">手机远程控制</a>
+            <a href="#e2ee">端到端加密</a>
+            <a href="#start">快速开始</a>
+            <a href="#enhancements">桌面增强</a>
+            <a href="https://github.com/ZhengHaoF/pi-desktop/releases" target="_blank" rel="noopener">下载中心</a>
+          </div>
+          <div>
+            <h5>资源</h5>
+            <a href="https://github.com/ZhengHaoF/pi-desktop" target="_blank" rel="noopener">GitHub 仓库</a>
+            <a
+              href="https://github.com/ZhengHaoF/pi-desktop/blob/main/docs/remote-features.md"
+              target="_blank"
+              rel="noopener"
+              >远程功能文档</a
+            >
+            <a
+              href="https://github.com/ZhengHaoF/pi-desktop/blob/main/docs/relay-deploy.md"
+              target="_blank"
+              rel="noopener"
+              >Relay 部署手册</a
+            >
+            <a href="https://github.com/ZhengHaoF/pi-desktop/issues" target="_blank" rel="noopener">Issues</a>
+          </div>
+          <div>
+            <h5>致谢</h5>
+            <a href="https://github.com/DLYZZT/pi-desktop" target="_blank" rel="noopener">上游 DLYZZT/pi-desktop</a>
+            <a href="https://pi-desktop.app/" target="_blank" rel="noopener">上游官网</a>
+            <a href="https://github.com/earendil-works/pi-coding-agent" target="_blank" rel="noopener"
+              >Pi Coding Agent</a
+            >
+          </div>
+        </div>
+        <div class="f-bottom">
+          <span>© 2026 社区增强版 · 基于 Apache License 2.0 开源</span>
+          <span class="mono">v0.5.1 · Windows x64 + Android · 非官方</span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
