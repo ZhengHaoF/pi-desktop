@@ -11,6 +11,8 @@ function testConfig(overrides: Partial<RelayConfig> = {}): RelayConfig {
   return {
     port: 0,
     cipherRequired: true,
+    // 既有用例走诊断路径（无配对凭证）；配对专项测试显式开启。
+    pairingRequired: false,
     replayWindowMs: 120_000,
     rateLimitMax: 1_000,
     rateLimitWindowMs: 60_000,
@@ -250,6 +252,102 @@ test("relay: zero-knowledge — payloads never appear in audit log", { timeout: 
   }
 });
 
+function helloEnvelopeWithHost(hostId: string, label?: string): string {
+  return JSON.stringify({
+    v: 1,
+    traceId: "t1",
+    ts: Date.now(),
+    nonce: "n1",
+    role: "host",
+    payload: {
+      kind: "hello",
+      protocolVersion: 1,
+      appVersion: "0.1.0",
+      ...(label ? { label } : {}),
+      hostId,
+      auth: {},
+    },
+  });
+}
+
+test("relay: multi-PC — host declares stable hostId + label; device sees directory", { timeout: 10000 }, async () => {
+  const relay = await startRelay();
+  try {
+    const hostA = await connect(relay.url, "host");
+    hostA.send(helloEnvelopeWithHost("host-stable-a", "ZHF-WORK"));
+    const ackA = JSON.parse(await nextMessage(hostA)) as { payload: { hostId?: string } };
+    assert.equal(ackA.payload.hostId, "host-stable-a", "host keeps its declared stable hostId");
+
+    const device = await connect(relay.url, "device");
+    device.send(helloEnvelope("device", "dev-1"));
+    const ack2 = JSON.parse(await nextMessage(device)) as {
+      payload: { hostId?: string; hosts?: Array<{ id: string; label?: string; online: boolean }> };
+    };
+    assert.equal(ack2.payload.hostId, "host-stable-a");
+    const entry = ack2.payload.hosts?.find((h) => h.id === "host-stable-a");
+    assert.ok(entry, "device hello_ack carries the host directory");
+    assert.equal(entry?.online, true);
+    assert.equal(entry?.label, "ZHF-WORK");
+
+    // Envelope-level control: hosts.list answered relay-locally.
+    device.send(
+      JSON.stringify({
+        v: 1,
+        traceId: "tl",
+        ts: Date.now(),
+        nonce: "n2",
+        role: "device",
+        deviceId: "dev-1",
+        control: "hosts.list",
+        payload: { kind: "ping" },
+      }),
+    );
+    const listing = JSON.parse(await nextMessage(device)) as {
+      payload: { kind: string; hosts: Array<{ id: string; online: boolean }> };
+    };
+    assert.equal(listing.payload.kind, "hosts.list.result");
+    assert.equal(listing.payload.hosts.length, 1);
+    assert.equal(listing.payload.hosts[0]!.id, "host-stable-a");
+    hostA.close();
+    device.close();
+  } finally {
+    await relay.close();
+  }
+});
+
+test("relay: multi-PC — offline hosts keep label + lastSeenAt; reconnect replaces", { timeout: 10000 }, async () => {
+  const relay = await startRelay();
+  try {
+    const host = await connect(relay.url, "host");
+    host.send(helloEnvelopeWithHost("host-stable-b", "ZHF-Home-PC"));
+    await nextMessage(host);
+    host.close();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    const device = await connect(relay.url, "device");
+    device.send(helloEnvelope("device", "dev-1"));
+    const ack = JSON.parse(await nextMessage(device)) as {
+      payload: { hosts?: Array<{ id: string; online: boolean; lastSeenAt?: number; label?: string }> };
+    };
+    const offline = ack.payload.hosts?.find((h) => h.id === "host-stable-b");
+    assert.ok(offline, "offline host still listed");
+    assert.equal(offline?.online, false);
+    assert.equal(offline?.label, "ZHF-Home-PC");
+    assert.ok(typeof offline?.lastSeenAt === "number", "lastSeenAt recorded on disconnect");
+
+    // Reconnect with the same stable hostId replaces the registry entry.
+    const hostAgain = await connect(relay.url, "host");
+    hostAgain.send(helloEnvelopeWithHost("host-stable-b", "ZHF-Home-PC"));
+    const ackAgain = JSON.parse(await nextMessage(hostAgain)) as { payload: { hostId?: string } };
+    assert.equal(ackAgain.payload.hostId, "host-stable-b");
+    assert.equal(relay.hub.registry.onlineHosts().filter((h) => h.id === "host-stable-b").length, 1);
+    hostAgain.close();
+    device.close();
+  } finally {
+    await relay.close();
+  }
+});
+
 test("pairing: token lifecycle + attempt lockout", () => {
   const audit = new AuditLog();
   const service = new PairingService(testConfig(), audit);
@@ -283,4 +381,334 @@ test("pairing: hash verification is timing-safe and deterministic", () => {
   assert.notEqual(hash, PairingService.hashToken("abd"));
   assert.equal(PairingService.verifyToken("abc", hash), true);
   assert.equal(PairingService.verifyToken("abd", hash), false);
+});
+
+// ---------------------------------------------------------------------------
+// Pairing (token → credential → revoke)
+// ---------------------------------------------------------------------------
+
+function pairingHello(
+  role: "host" | "device",
+  opts: { deviceId?: string; hostId?: string; auth?: Record<string, unknown> } = {},
+): string {
+  return JSON.stringify({
+    v: 1,
+    traceId: "hello-pair",
+    ts: Date.now(),
+    nonce: "n-pair",
+    role,
+    ...(opts.deviceId ? { deviceId: opts.deviceId } : {}),
+    ...(opts.hostId ? { hostId: opts.hostId } : {}),
+    payload: {
+      kind: "hello",
+      protocolVersion: 1,
+      appVersion: "0.1.0",
+      ...(opts.hostId ? { hostId: opts.hostId } : {}),
+      auth: opts.auth ?? {},
+    },
+  });
+}
+
+async function helloHostWithId(url: string, hostId: string): Promise<{ ws: WebSocket; ack: Record<string, unknown> }> {
+  const ws = await connect(url, "host");
+  ws.send(pairingHello("host", { hostId }));
+  const ack = JSON.parse(await nextMessage(ws));
+  return { ws, ack };
+}
+
+test("relay: pairing issues a credential, re-connect works, revoke cuts access", { timeout: 15000 }, async () => {
+  const relay = await startRelay(testConfig({ pairingRequired: true }));
+  try {
+    const { ws: host } = await helloHostWithId(relay.url, "host-pair-1");
+
+    // 1. Host requests a one-time token.
+    host.send(
+      JSON.stringify({
+        v: 1,
+        traceId: "pc-1",
+        ts: Date.now(),
+        nonce: "n-c",
+        role: "host",
+        control: "pair.create",
+        payload: { kind: "pair.create" },
+      }),
+    );
+    const created = JSON.parse(await nextMessage(host)) as {
+      traceId: string;
+      payload: { kind: string; token: string; expiresAt: number };
+    };
+    assert.equal(created.traceId, "pc-1");
+    assert.equal(created.payload.kind, "pair.create.result");
+    assert.ok(created.payload.token.length > 20);
+
+    // 2. Device pairs with the token and receives its credential.
+    const device = await connect(relay.url, "device");
+    device.send(
+      pairingHello("device", {
+        deviceId: "dev-pair-1",
+        hostId: "host-pair-1",
+        auth: { pairingToken: created.payload.token },
+      }),
+    );
+    const ack = JSON.parse(await nextMessage(device)) as { payload: { kind: string; deviceSecret?: string } };
+    assert.equal(ack.payload.kind, "hello_ack");
+    const secret = ack.payload.deviceSecret;
+    assert.ok(secret && secret.length > 20);
+    device.close();
+
+    // 3. Reconnect with the stored credential (no token).
+    const again = await connect(relay.url, "device");
+    again.send(
+      pairingHello("device", { deviceId: "dev-pair-1", hostId: "host-pair-1", auth: { deviceSecret: secret } }),
+    );
+    const ack2 = JSON.parse(await nextMessage(again)) as { payload: { kind: string } };
+    assert.equal(ack2.payload.kind, "hello_ack");
+
+    // 4. Device list shows the binding.
+    host.send(
+      JSON.stringify({
+        v: 1,
+        traceId: "pd-1",
+        ts: Date.now(),
+        nonce: "n-d",
+        role: "host",
+        control: "pair.devices",
+        payload: { kind: "pair.devices" },
+      }),
+    );
+    const listed = JSON.parse(await nextMessage(host)) as {
+      payload: { kind: string; devices: Array<{ deviceId: string }> };
+    };
+    assert.equal(listed.payload.kind, "pair.devices.result");
+    assert.deepEqual(
+      listed.payload.devices.map((d) => d.deviceId),
+      ["dev-pair-1"],
+    );
+
+    // 5. Revoke → live connection is closed and the credential stops working.
+    const closed = nextClose(again);
+    host.send(
+      JSON.stringify({
+        v: 1,
+        traceId: "pr-1",
+        ts: Date.now(),
+        nonce: "n-r",
+        role: "host",
+        control: "pair.revoke",
+        deviceId: "dev-pair-1",
+        payload: { kind: "pair.revoke" },
+      }),
+    );
+    const revoked = JSON.parse(await nextMessage(host)) as { payload: { kind: string; revoked: boolean } };
+    assert.equal(revoked.payload.kind, "pair.revoke.result");
+    assert.equal(revoked.payload.revoked, true);
+    const closedResult = await closed;
+    assert.equal(closedResult.code, 4003);
+
+    const afterRevoke = await connect(relay.url, "device");
+    const rejected = nextClose(afterRevoke);
+    afterRevoke.send(
+      pairingHello("device", { deviceId: "dev-pair-1", hostId: "host-pair-1", auth: { deviceSecret: secret } }),
+    );
+    assert.equal((await rejected).code, 4003);
+    host.close();
+  } finally {
+    await relay.close();
+  }
+});
+
+test("relay: unpaired device is rejected when pairing is required", { timeout: 10000 }, async () => {
+  const relay = await startRelay(testConfig({ pairingRequired: true }));
+  try {
+    const { ws: host } = await helloHostWithId(relay.url, "host-pair-2");
+    const device = await connect(relay.url, "device");
+    const closed = nextClose(device);
+    device.send(pairingHello("device", { deviceId: "dev-unpaired", hostId: "host-pair-2" }));
+    assert.equal((await closed).code, 4003);
+    host.close();
+  } finally {
+    await relay.close();
+  }
+});
+
+test("relay: invalid and reused pairing tokens are rejected", { timeout: 10000 }, async () => {
+  const relay = await startRelay(testConfig({ pairingRequired: true }));
+  try {
+    const { ws: host } = await helloHostWithId(relay.url, "host-pair-3");
+
+    const bogus = await connect(relay.url, "device");
+    const bogusClosed = nextClose(bogus);
+    bogus.send(pairingHello("device", { deviceId: "dev-b", hostId: "host-pair-3", auth: { pairingToken: "nope" } }));
+    assert.equal((await bogusClosed).code, 4003);
+
+    host.send(
+      JSON.stringify({
+        v: 1,
+        traceId: "pc-3",
+        ts: Date.now(),
+        nonce: "n-c3",
+        role: "host",
+        control: "pair.create",
+        payload: { kind: "pair.create" },
+      }),
+    );
+    const created = JSON.parse(await nextMessage(host)) as { payload: { token: string } };
+
+    const first = await connect(relay.url, "device");
+    first.send(
+      pairingHello("device", {
+        deviceId: "dev-first",
+        hostId: "host-pair-3",
+        auth: { pairingToken: created.payload.token },
+      }),
+    );
+    await nextMessage(first);
+    first.close();
+
+    // Token is single-use: a second device presenting it is rejected.
+    const second = await connect(relay.url, "device");
+    const secondClosed = nextClose(second);
+    second.send(
+      pairingHello("device", {
+        deviceId: "dev-second",
+        hostId: "host-pair-3",
+        auth: { pairingToken: created.payload.token },
+      }),
+    );
+    assert.equal((await secondClosed).code, 4003);
+    host.close();
+  } finally {
+    await relay.close();
+  }
+});
+
+test("relay: host e2eePub flows into host directory + pairing binding", { timeout: 10000 }, async () => {
+  const relay = await startRelay();
+  try {
+    const hostPub = "B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9_AsrhtHHw";
+    const host = await connect(relay.url, "host");
+    host.send(
+      JSON.stringify({
+        v: 1,
+        traceId: "t-e2ee",
+        ts: Date.now(),
+        nonce: "n-e2ee",
+        role: "host",
+        payload: {
+          kind: "hello",
+          protocolVersion: 1,
+          appVersion: "0.1.0",
+          label: "PC-e2ee",
+          e2eePub: hostPub,
+          auth: {},
+        },
+      }),
+    );
+    await nextMessage(host);
+
+    const device = await connect(relay.url, "device");
+    device.send(helloEnvelope("device", "dev-e2ee"));
+    const ack = JSON.parse(await nextMessage(device)) as {
+      payload: { hosts?: Array<{ id: string; e2eePub?: string }> };
+    };
+    const online = (ack.payload.hosts ?? []).find((h) => h.online);
+    assert.ok(online, "online host present in directory");
+    assert.equal(online.e2eePub, hostPub);
+
+    // hosts.list control frame: same directory, same key.
+    device.send(
+      JSON.stringify({
+        v: 1,
+        traceId: "t-hl",
+        ts: Date.now(),
+        nonce: "n-hl",
+        role: "device",
+        deviceId: "dev-e2ee",
+        control: "hosts.list",
+        payload: { kind: "hosts.list" },
+      }),
+    );
+    const listing = JSON.parse(await nextMessage(device)) as { payload: { hosts: Array<{ e2eePub?: string }> } };
+    assert.equal(listing.payload.hosts.find((h) => h.online)?.e2eePub, hostPub);
+
+    // Invalid e2eePub (not canonical base64url of 32 bytes) is ignored.
+    const host2 = await connect(relay.url, "host");
+    host2.send(
+      JSON.stringify({
+        v: 1,
+        traceId: "t-bad",
+        ts: Date.now(),
+        nonce: "n-bad",
+        role: "host",
+        payload: {
+          kind: "hello",
+          protocolVersion: 1,
+          appVersion: "0.1.0",
+          hostId: "host-bad",
+          e2eePub: "not-a-key!!",
+          auth: {},
+        },
+      }),
+    );
+    await nextMessage(host2);
+    device.send(
+      JSON.stringify({
+        v: 1,
+        traceId: "t-hl2",
+        ts: Date.now(),
+        nonce: "n-hl2",
+        role: "device",
+        deviceId: "dev-e2ee",
+        control: "hosts.list",
+        payload: { kind: "hosts.list" },
+      }),
+    );
+    const listing2 = JSON.parse(await nextMessage(device)) as {
+      payload: { hosts: Array<{ id: string; e2eePub?: string }> };
+    };
+    assert.equal(listing2.payload.hosts.find((h) => h.id === "host-bad")?.e2eePub, undefined);
+    host.close();
+    host2.close();
+    device.close();
+  } finally {
+    await relay.close();
+  }
+});
+
+test("relay: stale-timestamp envelope dropped without closing the link", { timeout: 10000 }, async () => {
+  const relay = await startRelay();
+  try {
+    const host = await connect(relay.url, "host");
+    host.send(helloEnvelope("host"));
+    await nextMessage(host);
+    host.send(
+      JSON.stringify({
+        v: 1,
+        traceId: "t-stale",
+        ts: Date.now() - 600_000,
+        nonce: "n-stale",
+        role: "host",
+        deviceId: "dev-1",
+        cipher: { alg: "x25519-aes-gcm", keyId: "k", iv: "i", tag: "t" },
+        payload: "x",
+      }),
+    );
+    // Link must stay alive: a subsequent fresh control frame is answered.
+    host.send(
+      JSON.stringify({
+        v: 1,
+        traceId: "t-fresh",
+        ts: Date.now(),
+        nonce: "n-fresh",
+        role: "host",
+        control: "hosts.list",
+        payload: { kind: "hosts.list" },
+      }),
+    );
+    const listing = JSON.parse(await nextMessage(host)) as { payload: { kind: string } };
+    assert.equal(listing.payload.kind, "hosts.list.result");
+    host.close();
+  } finally {
+    await relay.close();
+  }
 });

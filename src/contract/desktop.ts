@@ -122,6 +122,57 @@ export interface LocalFileInspection {
   insideCwd: boolean;
 }
 
+export interface RemoteControlConfig {
+  enabled: boolean;
+  /** Outbound relay endpoint, e.g. ws://127.0.0.1:8788/ws */
+  relayUrl: string;
+  /**
+   * lan: the desktop app hosts the bundled relay locally (zero setup on a
+   * trusted LAN). custom: the user points at an external relay (VPS etc).
+   */
+  mode: "lan" | "custom";
+  /** TCP port for the hosted relay in lan mode (default 8788). */
+  lanPort?: number;
+  /** Display name shown on device selectors (defaults to hostname). */
+  name?: string;
+  /** Stable host identity so devices remember this PC across restarts. */
+  hostId?: string;
+  /** Host's static X25519 public key (base64url) — E2EE + QR pairing anchor. */
+  e2eePublicKey?: string;
+  /**
+   * Host's X25519 private key (PKCS8 DER base64). Main-only: injected into
+   * the gateway-bound copy of the config, never persisted to uiState and
+   * never sent to the renderer.
+   */
+  e2eePrivateKey?: string;
+}
+
+export interface RelayServiceStatus {
+  /** stopped: not requested; running: healthz OK; crashed/port-conflict need UI hints. */
+  state: "stopped" | "starting" | "running" | "port-conflict" | "crashed";
+  port: number;
+  pid?: number;
+  detail?: string;
+}
+
+export interface LanAddress {
+  /** Interface name for disambiguation (e.g. "WLAN", "以太网"). */
+  iface: string;
+  /** Full relay endpoint reachable from LAN devices: ws://<ip>:<port>/ws */
+  url: string;
+  /** True for the best-guess physical interface (sorted first in the UI). */
+  preferred: boolean;
+}
+
+export interface RemoteControlStatus {
+  /** disabled: switch off; connecting/ready/stopped: gateway link states. */
+  state: "disabled" | "connecting" | "ready" | "stopped";
+  relayUrl: string;
+  /** Devices currently seen by the gateway on this relay session. */
+  deviceCount: number;
+  lastError?: string;
+}
+
 export interface DesktopUiState {
   language?: AppLanguage;
   backgroundMode?: boolean;
@@ -129,6 +180,7 @@ export interface DesktopUiState {
   chatAppearance?: ChatAppearancePreferences;
   herdrSettings?: HerdrSettings;
   sessionListMode?: SessionListMode;
+  remoteControl?: RemoteControlConfig;
 }
 
 export type DesktopUiStatePatch = Partial<DesktopUiState>;
@@ -166,6 +218,11 @@ export interface PiBridge {
   getUiState: () => Promise<DesktopUiState>;
   getManagedProcessCapability: () => Promise<ManagedProcessCapability>;
   setUiState: (patch: DesktopUiStatePatch) => Promise<void>;
+  getRemoteStatus: () => Promise<RemoteControlStatus | null>;
+  onRemoteStatus: (cb: (status: RemoteControlStatus) => void) => () => void;
+  getRelayServiceStatus: () => Promise<RelayServiceStatus>;
+  onRelayServiceStatus: (cb: (status: RelayServiceStatus) => void) => () => void;
+  listLanAddresses: () => Promise<LanAddress[]>;
   getThemeSource: () => Promise<"system" | "light" | "dark">;
   setThemeSource: (source: "system" | "light" | "dark") => Promise<void>;
   openLogs: () => Promise<void>;

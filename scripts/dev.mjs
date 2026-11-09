@@ -89,6 +89,9 @@ export async function runDev(projectRoot = root) {
 
   console.log("[dev] building main/preload/host…");
   const initialBuild = runtime.run("initial build", process.execPath, ["scripts/build-main.mjs"], { fatal: false });
+  // The relay ships as a single bundled file the app can host as a child
+  // process; build it once per dev start (it changes rarely).
+  runtime.run("relay build", process.execPath, ["scripts/build-relay.mjs"], { fatal: false });
   try {
     await waitForSuccessfulBuild(initialBuild);
     const tsupCli = resolvePackageFile(projectRoot, "tsup", "dist/cli-default.js");

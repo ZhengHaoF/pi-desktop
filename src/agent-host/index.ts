@@ -5,6 +5,8 @@
 import { createRpcServer } from "../contract/rpc";
 import { registerHandlers } from "./handlers";
 import { startSessionWatcher } from "./session-watcher";
+import { RemoteControlController } from "./remote/controller.ts";
+import type { RemoteControlConfig } from "../contract/desktop.ts";
 import { toolchainRuntime } from "./toolchain-runtime";
 import type { ToolchainSnapshot } from "../shared/toolchains/types";
 import { installToolchainGitRunner } from "./toolchain-git";
@@ -28,8 +30,26 @@ const restoreGitRunner = installToolchainGitRunner(toolchainRuntime, () => {
   // Chat histories are unchanged; only project metadata needs reconciliation.
   server.emit("sessions.changed", "*", { cwd: null, projectInfoChanged: true });
 });
-const stopHandlers = registerHandlers(server);
+
+// Remote control plane: outbound-only gateway to the user-configured relay.
+// Off by default; main pushes "remote:init"/"remote:changed" when the user
+// toggles 自建托管 in settings. Created before registerHandlers because the
+// remote.pair.* RPC methods delegate to it.
+const remoteControl = new RemoteControlController({
+  server,
+  postStatus: (status) => {
+    try {
+      process.parentPort?.postMessage({ type: "remote-status", status });
+    } catch {
+      /* best-effort */
+    }
+  },
+  log: (message) => log(`remote: ${message}`),
+});
+
+const stopHandlers = registerHandlers(server, { remoteControl });
 const stopWatcher = startSessionWatcher(server);
+process.parentPort?.postMessage({ type: "remote-config-request" });
 
 function log(message: string): void {
   try {
@@ -47,6 +67,7 @@ if (parentPort) {
       type?: string;
       snapshot?: ToolchainSnapshot | BrowserCapabilitySnapshot;
       descriptor?: HerdrRuntimeDescriptor;
+      config?: RemoteControlConfig;
       version?: unknown;
       mainPid?: unknown;
       mainStartFingerprint?: unknown;
@@ -81,6 +102,16 @@ if (parentPort) {
         });
       } catch (error) {
         log(`managed process owner identity rejected: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      return;
+    }
+    if (msg?.type === "remote:init" || msg?.type === "remote:changed") {
+      try {
+        if (!msg.config) throw new Error("missing config");
+        remoteControl.applyConfig(msg.config as RemoteControlConfig);
+        log(`remote control ${msg.type === "remote:init" ? "initialized" : "updated"}`);
+      } catch (error) {
+        log(`remote config rejected: ${error instanceof Error ? error.message : String(error)}`);
       }
       return;
     }

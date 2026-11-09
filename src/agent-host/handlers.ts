@@ -50,7 +50,17 @@ import { peekWebSearchRuntime } from "./web-search/runtime";
 import { HerdrBridgeError } from "./herdr/errors";
 import { clearHerdrBridge, initializeHerdrBridge } from "./herdr/runtime";
 
-export function registerHandlers(server: RpcServer): () => Promise<void> {
+/** Remote pairing surface (fulfilled by RemoteControlController in the app). */
+export interface RemotePairingPort {
+  createPairingToken(): Promise<{ token: string; expiresAt: number }>;
+  revokeDevice(deviceId: string): Promise<boolean>;
+  listDevices(): Promise<Array<{ deviceId: string; label?: string; pairedAt: number }>>;
+}
+
+export function registerHandlers(
+  server: RpcServer,
+  deps: { remoteControl?: RemotePairingPort } = {},
+): () => Promise<void> {
   const bindings = createSessionEventBindings(server);
   let closing = false;
   const pendingCalls = new Set<Promise<unknown>>();
@@ -387,6 +397,24 @@ export function registerHandlers(server: RpcServer): () => Promise<void> {
     "system.allowRoot": guard(systemHandlers.allowRoot),
 
     "system.runningCount": guard(systemHandlers.runningCount),
+
+    // Remote pairing: relay control frames (desktop settings card devices).
+    "remote.pair.create": guard(() => {
+      if (!deps.remoteControl) throw new RpcError({ code: "UNAVAILABLE", message: "Remote control is disabled" });
+      return deps.remoteControl.createPairingToken();
+    }),
+    "remote.pair.revoke": guard((params: unknown) => {
+      if (!deps.remoteControl) throw new RpcError({ code: "UNAVAILABLE", message: "Remote control is disabled" });
+      const deviceId = (params as { deviceId?: unknown } | undefined)?.deviceId;
+      if (typeof deviceId !== "string" || deviceId.length === 0) {
+        throw new RpcError({ code: "INVALID_ARGUMENT", message: "deviceId is required" });
+      }
+      return deps.remoteControl.revokeDevice(deviceId).then((revoked) => ({ revoked }));
+    }),
+    "remote.pair.devices": guard(() => {
+      if (!deps.remoteControl) throw new RpcError({ code: "UNAVAILABLE", message: "Remote control is disabled" });
+      return deps.remoteControl.listDevices().then((devices) => ({ devices }));
+    }),
   });
 
   const shutdown = createHostShutdown([

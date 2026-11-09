@@ -20,8 +20,30 @@ interface EnvelopeLike {
   role?: unknown;
   deviceId?: unknown;
   hostId?: unknown;
+  e2eePub?: unknown;
   cipher?: unknown;
+  /** Envelope-level control kind (relay-local, payload stays untouched). */
+  control?: unknown;
   payload?: unknown;
+}
+
+export interface HostDirectoryEntry {
+  id: string;
+  label?: string;
+  online: boolean;
+  lastSeenAt?: number;
+  /** Host's base64url X25519 public key for E2EE key agreement. */
+  e2eePub?: string;
+}
+
+/** Canonical base64url encoding of exactly 32 bytes (a raw X25519 public key). */
+function isValidE2eePub(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  try {
+    return Buffer.from(value, "base64url").toString("base64url") === value;
+  } catch {
+    return false;
+  }
 }
 
 export class RelayHub {
@@ -30,6 +52,8 @@ export class RelayHub {
   readonly pairing: PairingService;
   readonly audit: AuditLog;
   private readonly config: RelayConfig;
+  /** Known hosts for the multi-PC device selector: label + last disconnect. */
+  private readonly hostDirectory = new Map<string, { label?: string; lastSeenAt: number; e2eePub?: string }>();
 
   constructor(config: RelayConfig = loadConfig()) {
     this.config = config;
@@ -55,13 +79,15 @@ export class RelayHub {
   /** Wire a newly connected socket through hello validation. */
   attach(ws: WebSocket, role: "host" | "device"): void {
     let peer: PeerMeta | undefined;
+    let hostE2eePub: string | undefined;
     let helloDone = false;
 
     ws.on("message", (raw: Buffer) => {
       if (!helloDone) {
         const decision = this.handleHello(ws, role, raw);
         if (decision) {
-          peer = decision;
+          peer = decision.peer;
+          hostE2eePub = decision.e2eePub;
           helloDone = true;
         }
         return;
@@ -75,10 +101,16 @@ export class RelayHub {
     });
 
     ws.on("close", () => {
-      if (peer) this.registry.unregister(peer);
+      if (peer) {
+        if (peer.role === "host") this.recordHostOffline(peer.id, peer.label, hostE2eePub);
+        this.registry.unregister(peer);
+      }
     });
     ws.on("error", () => {
-      if (peer) this.registry.unregister(peer);
+      if (peer) {
+        if (peer.role === "host") this.recordHostOffline(peer.id, peer.label, hostE2eePub);
+        this.registry.unregister(peer);
+      }
     });
   }
 
@@ -100,7 +132,11 @@ export class RelayHub {
     ws.close(code, reason);
   }
 
-  private handleHello(ws: WebSocket, role: "host" | "device", raw: Buffer): PeerMeta | undefined {
+  private handleHello(
+    ws: WebSocket,
+    role: "host" | "device",
+    raw: Buffer,
+  ): { peer: PeerMeta; e2eePub?: string } | undefined {
     let envelope: EnvelopeLike;
     try {
       envelope = JSON.parse(raw.toString("utf8")) as EnvelopeLike;
@@ -113,7 +149,15 @@ export class RelayHub {
       return undefined;
     }
     const payload = envelope.payload as
-      { kind?: unknown; protocolVersion?: unknown; appVersion?: unknown; label?: unknown; auth?: unknown } | undefined;
+      | {
+          kind?: unknown;
+          protocolVersion?: unknown;
+          appVersion?: unknown;
+          label?: unknown;
+          hostId?: unknown;
+          auth?: unknown;
+        }
+      | undefined;
     if (!payload || payload.kind !== "hello" || payload.protocolVersion !== 1) {
       this.fail(ws, 4002, "first payload must be hello v1", role, "hello.reject", "hello");
       return undefined;
@@ -121,9 +165,16 @@ export class RelayHub {
     // NOTE: hello itself may be a plaintext object — it carries only auth
     // material (challenge signature), never session content. The cipher
     // requirement is enforced on every post-hello envelope (routeEnvelope).
+    // Hosts may declare a stable hostId so devices can remember/switch them
+    // across reconnects (multi-PC); unauthenticated reuse of another online
+    // host's id is accepted in diagnostic mode and gated by pairing later.
+    const declaredHostId =
+      typeof payload.hostId === "string" && payload.hostId.length > 0 && payload.hostId.length <= 64
+        ? payload.hostId
+        : "";
     const id =
       role === "host"
-        ? `host-${randomUUID().slice(0, 8)}`
+        ? declaredHostId || `host-${randomUUID().slice(0, 8)}`
         : typeof envelope.deviceId === "string" && envelope.deviceId.length > 0
           ? envelope.deviceId
           : "";
@@ -131,10 +182,51 @@ export class RelayHub {
       this.fail(ws, 4001, "deviceId required", role, "hello.reject", "hello");
       return undefined;
     }
+    const label = typeof payload.label === "string" && payload.label.length > 0 ? payload.label : undefined;
+    // E2EE: hosts announce their static X25519 public key in hello; devices
+    // announce an ephemeral one. The relay only relays it (hello_ack hosts
+    // directory) — it never holds private keys or session keys.
+    const e2eePub = isValidE2eePub(payload.e2eePub) ? payload.e2eePub : undefined;
+
+    // Pairing gate (device role): a paired device presents its credential on
+    // every reconnect; a first-time device presents the one-time token from
+    // the desktop QR code. Token → auto-approved binding → issued credential.
+    let issuedDeviceSecret: string | undefined;
+    if (role === "device") {
+      const auth = payload.auth as { pairingToken?: unknown; deviceSecret?: unknown } | undefined;
+      const deviceSecret = typeof auth?.deviceSecret === "string" ? auth.deviceSecret : "";
+      const pairingToken = typeof auth?.pairingToken === "string" ? auth.pairingToken : "";
+      let paired = false;
+      // A fresh scan token wins over a stale credential (re-pair replaces the
+      // old binding). Expired/bad tokens fall back to the stored credential.
+      if (pairingToken) {
+        const targetHostId = typeof envelope.hostId === "string" ? envelope.hostId : "";
+        const submitted = this.pairing.submit(pairingToken, targetHostId, id, e2eePub ?? "");
+        if (submitted.ok) {
+          this.pairing.approve(pairingToken);
+          this.pairing.consume(pairingToken);
+          issuedDeviceSecret = this.pairing.pairDevice(targetHostId, id, label, e2eePub).secret;
+          paired = true;
+        }
+      }
+      if (!paired && deviceSecret) {
+        paired = this.pairing.verifyDevice(id, deviceSecret) !== undefined;
+      }
+      if (!paired && pairingToken) {
+        // The token was present but did not produce a binding: reject with the
+        // submit reason instead of the generic "pairing required".
+        this.fail(ws, 4003, "pairing token rejected", id, "pair.reject", "pair");
+        return undefined;
+      }
+      if (this.config.pairingRequired && !paired) {
+        this.fail(ws, 4003, "pairing required", id, "pair.reject", "pair");
+        return undefined;
+      }
+    }
     const peer: PeerMeta = {
       id,
       role,
-      label: typeof payload.label === "string" ? payload.label : undefined,
+      label,
       appVersion: typeof payload.appVersion === "string" ? payload.appVersion : undefined,
       protocolVersion: 1,
       connectedAt: Date.now(),
@@ -143,6 +235,14 @@ export class RelayHub {
       },
       close: (code, reason) => ws.close(code, reason),
     };
+    if (role === "host") {
+      const previous = this.hostDirectory.get(id);
+      this.hostDirectory.set(id, {
+        label,
+        lastSeenAt: previous?.lastSeenAt ?? Date.now(),
+        e2eePub: e2eePub ?? previous?.e2eePub,
+      });
+    }
     this.registry.register(peer);
     this.audit.append({
       actor: id,
@@ -152,8 +252,11 @@ export class RelayHub {
       traceId: typeof envelope.traceId === "string" ? envelope.traceId : "hello",
     });
     // Spec §4: hello_ack carries hostId — the host learns its assigned id and
-    // a device learns which host to address (M1a: single-host topology).
-    const ackHostId = role === "host" ? id : this.registry.onlineHosts()[0]?.id;
+    // a device learns which host to address. Multi-PC: devices also receive
+    // the full known-host directory so they can pick/switch.
+    const onlineHosts = this.registry.onlineHosts();
+    const ackHostId = role === "host" ? id : onlineHosts[0]?.id;
+    const hosts = role === "device" ? this.hostDirectorySnapshot() : undefined;
     peer.send(
       JSON.stringify({
         v: 1,
@@ -165,11 +268,32 @@ export class RelayHub {
           kind: "hello_ack",
           protocolVersion: 1,
           ...(ackHostId ? { hostId: ackHostId } : {}),
+          ...(hosts && hosts.length > 0 ? { hosts } : {}),
+          ...(issuedDeviceSecret ? { deviceSecret: issuedDeviceSecret } : {}),
           cipherRequired: this.config.cipherRequired,
         },
       }),
     );
-    return peer;
+    return { peer, e2eePub };
+  }
+
+  /** Online hosts first, then known offline hosts with their last disconnect. */
+  private hostDirectorySnapshot(): HostDirectoryEntry[] {
+    const out: HostDirectoryEntry[] = [];
+    const seen = new Set<string>();
+    for (const host of this.registry.onlineHosts()) {
+      seen.add(host.id);
+      out.push({ id: host.id, label: host.label, online: true, e2eePub: this.hostDirectory.get(host.id)?.e2eePub });
+    }
+    for (const [id, info] of this.hostDirectory) {
+      if (seen.has(id)) continue;
+      out.push({ id, label: info.label, online: false, lastSeenAt: info.lastSeenAt, e2eePub: info.e2eePub });
+    }
+    return out;
+  }
+
+  private recordHostOffline(hostId: string, label?: string, e2eePub?: string): void {
+    this.hostDirectory.set(hostId, { label, lastSeenAt: Date.now(), e2eePub });
   }
 
   private routeEnvelope(from: PeerMeta, raw: Buffer): void {
@@ -182,6 +306,95 @@ export class RelayHub {
     }
     if (envelope.v !== 1) {
       from.close(4000, "protocol version mismatch");
+      return;
+    }
+    // Header-level replay window: the relay cannot verify crypto, but a stale
+    // or future timestamp is never legitimate — drop it without tearing down
+    // the link (a skewed clock would otherwise break reconnect loops).
+    const ts = typeof envelope.ts === "number" ? envelope.ts : NaN;
+    if (!Number.isFinite(ts) || Math.abs(Date.now() - ts) > this.config.replayWindowMs) {
+      this.audit.append({
+        actor: from.id,
+        action: "replay.drop",
+        targetDigest: this.audit.digest(from.id),
+        outcome: "denied",
+        traceId: typeof envelope.traceId === "string" ? envelope.traceId : "route",
+      });
+      return;
+    }
+    // Envelope-level control: device asks for the host directory (multi-PC
+    // selector). Handled relay-locally BEFORE the cipher gate — the kind
+    // lives on the envelope header and carries no payload, so zero-knowledge
+    // is preserved (formal mode: gated by pairing later).
+    if (envelope.control === "hosts.list") {
+      from.send(
+        JSON.stringify({
+          v: 1,
+          traceId: typeof envelope.traceId === "string" ? envelope.traceId : "hosts.list",
+          ts: Date.now(),
+          nonce: randomUUID(),
+          role: "relay",
+          payload: { kind: "hosts.list.result", hosts: this.hostDirectorySnapshot() },
+        }),
+      );
+      return;
+    }
+    // Pairing control frames (host → relay): issue/revoke device credentials.
+    // Header-only, handled before the cipher gate, payloads are metadata.
+    if (envelope.control === "pair.create") {
+      if (from.role !== "host") {
+        from.close(4002, "only hosts may create pairing tokens");
+        return;
+      }
+      const created = this.pairing.create(from.id);
+      from.send(
+        JSON.stringify({
+          v: 1,
+          traceId: typeof envelope.traceId === "string" ? envelope.traceId : "pair.create",
+          ts: Date.now(),
+          nonce: randomUUID(),
+          role: "relay",
+          payload: { kind: "pair.create.result", token: created.token, expiresAt: created.expiresAt },
+        }),
+      );
+      return;
+    }
+    if (envelope.control === "pair.revoke") {
+      if (from.role !== "host") {
+        from.close(4002, "only hosts may revoke devices");
+        return;
+      }
+      const deviceId = typeof envelope.deviceId === "string" ? envelope.deviceId : "";
+      const revoked = this.pairing.revokeDevice(from.id, deviceId);
+      // Revocation is immediate: drop the live device connection if online.
+      if (revoked) this.registry.get(deviceId)?.close(4003, "device revoked");
+      from.send(
+        JSON.stringify({
+          v: 1,
+          traceId: typeof envelope.traceId === "string" ? envelope.traceId : "pair.revoke",
+          ts: Date.now(),
+          nonce: randomUUID(),
+          role: "relay",
+          payload: { kind: "pair.revoke.result", deviceId, revoked },
+        }),
+      );
+      return;
+    }
+    if (envelope.control === "pair.devices") {
+      if (from.role !== "host") {
+        from.close(4002, "only hosts may list paired devices");
+        return;
+      }
+      from.send(
+        JSON.stringify({
+          v: 1,
+          traceId: typeof envelope.traceId === "string" ? envelope.traceId : "pair.devices",
+          ts: Date.now(),
+          nonce: randomUUID(),
+          role: "relay",
+          payload: { kind: "pair.devices.result", devices: this.pairing.listDevices(from.id) },
+        }),
+      );
       return;
     }
     if (this.config.cipherRequired && (typeof envelope.payload !== "string" || !envelope.cipher)) {
@@ -199,6 +412,19 @@ export class RelayHub {
       from.role === "device" ? (envelope.hostId as string | undefined) : (envelope.deviceId as string | undefined);
     const decision = this.registry.route(from, targetId);
     if (!decision.ok || !decision.target) {
+      // A momentarily-absent peer (device reconnect window, stale deviceId)
+      // must not tear down the sender's long-lived connection: drop the
+      // frame and audit it. Real protocol violations still close the link.
+      if (decision.reason === "peer not connected") {
+        this.audit.append({
+          actor: from.id,
+          action: "route.drop",
+          targetDigest: this.audit.digest(targetId),
+          outcome: "error",
+          traceId: typeof envelope.traceId === "string" ? envelope.traceId : "route",
+        });
+        return;
+      }
       from.close((decision.code ?? 4002) as 4002, decision.reason ?? "routing denied");
       return;
     }

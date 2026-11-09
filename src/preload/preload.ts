@@ -89,6 +89,19 @@ if (typeof preloadLocation === "string" && isTrustedPreloadLocation(preloadLocat
     getUiState: () => ipcRenderer.invoke("desktop:get-ui-state"),
     getManagedProcessCapability: () => ipcRenderer.invoke("desktop:managed-process-capability"),
     setUiState: (patch) => ipcRenderer.invoke("desktop:set-ui-state", patch),
+    getRemoteStatus: () => ipcRenderer.invoke("desktop:get-remote-status"),
+    getRelayServiceStatus: () => ipcRenderer.invoke("desktop:get-relay-service-status"),
+    listLanAddresses: () => ipcRenderer.invoke("desktop:list-lan-addresses"),
+    onRemoteStatus: (cb) => {
+      const handler = (_: Electron.IpcRendererEvent, status: unknown) => cb(status as never);
+      ipcRenderer.on("desktop:remote-status", handler);
+      return () => ipcRenderer.removeListener("desktop:remote-status", handler);
+    },
+    onRelayServiceStatus: (cb) => {
+      const handler = (_: Electron.IpcRendererEvent, status: unknown) => cb(status as never);
+      ipcRenderer.on("desktop:relay-service-status", handler);
+      return () => ipcRenderer.removeListener("desktop:relay-service-status", handler);
+    },
     getThemeSource: () => ipcRenderer.invoke("desktop:get-theme-source"),
     setThemeSource: (source) => ipcRenderer.invoke("desktop:set-theme-source", source),
     openLogs: () => ipcRenderer.invoke("desktop:open-logs"),

@@ -16,7 +16,19 @@ import { notificationLabels } from "./notification-labels";
 import { handleAppProtocol, registerAppProtocol, rendererRootPath } from "./protocol";
 import { acquireSingleInstanceLock } from "./single-instance";
 import { loadUiState, saveUiStateStrict } from "./window-state";
-import { createTray, destroyTray, updateTrayMenu, setTrayManagedProcessCount, setTrayRunningCount } from "./tray";
+import { randomUUID } from "node:crypto";
+import { RelayService, type RelayServiceStatus } from "./relay-service";
+import { loadHostE2eeIdentity } from "./remote-e2ee-identity";
+import { listLanAddresses } from "./lan-addresses";
+import type { RemoteControlConfig, RemoteControlStatus } from "../contract/desktop";
+import {
+  createTray,
+  destroyTray,
+  updateTrayMenu,
+  setTrayManagedProcessCount,
+  setTrayRunningCount,
+  setTrayRemoteControl,
+} from "./tray";
 import { createMainWindow } from "./window";
 import { installDesktopIpc } from "./ipc";
 import { createCredentialRequestHandler, CredentialVault } from "./credential-vault";
@@ -77,6 +89,85 @@ let lastNotifiedUpdateVersion: string | null = null;
 let lastToolchainFocusScanAt = 0;
 let runningAgentSessionCount = 0;
 let runningManagedProcessCount = 0;
+let latestRemoteStatus: RemoteControlStatus | null = null;
+let relayService: RelayService | null = null;
+let latestRelayServiceStatus: RelayServiceStatus | null = null;
+/** Last applied (normalized) remote-control config — no side effects to read. */
+let currentRemoteConfig: RemoteControlConfig | null = null;
+
+/**
+ * 多 PC：补齐远程身份（持久 hostId + 展示名 + E2EE 公钥），写回 uiState 供设备记忆。
+ * 私钥只在 host-bound 副本里附加（见 withRemoteE2eeSecrets），uiState/渲染器不可见。
+ */
+function ensureRemoteIdentity(config: RemoteControlConfig): RemoteControlConfig {
+  const identity = loadHostE2eeIdentity();
+  const needsPersist = !config.hostId || !config.name || !config.e2eePublicKey;
+  const next: RemoteControlConfig = {
+    ...config,
+    hostId: config.hostId || `host-${randomUUID().slice(0, 8)}`,
+    name: config.name?.trim() ? config.name.trim() : os.hostname(),
+    // Main is authoritative for the public key: always the identity file.
+    e2eePublicKey: identity.publicKey,
+    // Never persist the private key with ui state.
+    e2eePrivateKey: undefined,
+  };
+  if (needsPersist) saveUiStateStrict({ remoteControl: next });
+  return next;
+}
+
+/** Host-bound copy: the gateway needs the private key; the renderer never sees it. */
+function withRemoteE2eeSecrets(config: RemoteControlConfig): RemoteControlConfig {
+  const identity = loadHostE2eeIdentity();
+  return { ...config, e2eePublicKey: identity.publicKey, e2eePrivateKey: identity.privateKey };
+}
+
+/**
+ * 局域网/自定义模式归一化：lan 模式下 gateway 拨本机内置 relay
+ * （ws://127.0.0.1:<port>/ws），并同步 RelayService 的启停与端口。
+ * 归一化结果持久化，保证渲染器、main、gateway 三处一致。
+ */
+function applyRemoteControlConfig(input: RemoteControlConfig | undefined): RemoteControlConfig {
+  const withIdentity = ensureRemoteIdentity(
+    input ?? {
+      enabled: false,
+      relayUrl: "ws://127.0.0.1:8788/ws",
+      mode: "lan",
+      lanPort: 8788,
+    },
+  );
+  const mode = withIdentity.mode ?? "lan";
+  const lanPort = withIdentity.lanPort ?? 8788;
+  const next: RemoteControlConfig = {
+    ...withIdentity,
+    mode,
+    lanPort,
+    relayUrl: mode === "lan" ? `ws://127.0.0.1:${lanPort}/ws` : withIdentity.relayUrl,
+  };
+  // RelayService lifecycle mirrors lan mode + enabled.
+  if (relayService) {
+    if (next.enabled && mode === "lan") relayService.start(lanPort);
+    else relayService.stop();
+  }
+  const persisted =
+    next.enabled !== input?.enabled ||
+    next.mode !== input?.mode ||
+    next.lanPort !== input?.lanPort ||
+    next.relayUrl !== input?.relayUrl ||
+    next.hostId !== input?.hostId ||
+    next.name !== input?.name;
+  if (persisted) saveUiStateStrict({ remoteControl: next });
+  currentRemoteConfig = next;
+  setTrayRemoteControl(next.enabled, getMainWindow);
+  return next;
+}
+
+/** Tray click → flip the remote-control master switch through the same chain as the settings card. */
+function toggleRemoteControlFromTray(): void {
+  if (!currentRemoteConfig) return;
+  const next = applyRemoteControlConfig({ ...currentRemoteConfig, enabled: !currentRemoteConfig.enabled });
+  hostManager?.setRemoteControlConfig(withRemoteE2eeSecrets(next));
+}
+
 let startupRendererReady = false;
 let startupHostReady = false;
 let startupToolchainSnapshot: ToolchainSnapshot | null = null;
@@ -693,6 +784,9 @@ function startMainProcess(): void {
       getMainWindow,
       getUnreadBadge: () => unreadBadge,
       applyBadgeCount,
+      getRemoteStatus: () => latestRemoteStatus,
+      getRelayServiceStatus: () => relayService?.status ?? latestRelayServiceStatus ?? { state: "stopped", port: 8788 },
+      listLanAddresses: () => listLanAddresses(currentRemoteConfig?.lanPort ?? 8788),
       getToolchainState: (cwd) =>
         cwd ? toolchainManager!.getPublicStateForProject(cwd) : toolchainManager!.getPublicState(),
       rescanToolchains: async (cwd) => {
@@ -716,12 +810,18 @@ function startMainProcess(): void {
             appendMainLog(`Herdr settings refresh failed: ${error instanceof Error ? error.message : String(error)}`);
           });
         }
+        if (patch.remoteControl) {
+          latestRemoteStatus = null;
+          hostManager?.setRemoteControlConfig(withRemoteE2eeSecrets(applyRemoteControlConfig(patch.remoteControl)));
+        }
       },
       updateManager,
     });
     installAppMenu(getMainWindow, () => openUpdateSettings(true), isDev);
 
     createTray(getMainWindow, () => void stopAllManagedProcessesFromTray());
+    // enabled 值随后由 applyRemoteControlConfig 覆盖；这里只注册托盘点击回调。
+    setTrayRemoteControl(false, getMainWindow, toggleRemoteControlFromTray);
 
     // Apply persisted theme preference
     if (ui.theme === "light" || ui.theme === "dark" || ui.theme === "system") {
@@ -741,6 +841,16 @@ function startMainProcess(): void {
     hostManager.setToolchainSnapshot(toolchainManager.getSnapshot());
     hostManager.setBrowserCapabilitySnapshot(browserService.getCapabilitySnapshot());
     hostManager.setHerdrRuntimeDescriptor(herdrRuntimeManager.getDescriptor());
+    relayService = new RelayService({
+      log: (message) => appendMainLog(`[relay-service] ${message}`),
+      onStatus: (status) => {
+        latestRelayServiceStatus = status;
+        for (const win of BrowserWindow.getAllWindows()) {
+          win.webContents.send("desktop:relay-service-status", status);
+        }
+      },
+    });
+    hostManager.setRemoteControlConfig(withRemoteE2eeSecrets(applyRemoteControlConfig(ui.remoteControl)));
     const credentialRequestHandler = createCredentialRequestHandler(credentialVault);
     hostManager.setRequestHandler(async (method, params) => {
       if (method.startsWith("channelSecrets.")) return credentialRequestHandler(method, params);
@@ -875,6 +985,12 @@ function startMainProcess(): void {
     hostManager.setMessageListener((msg) => {
       if (packagedStartupValidation && (msg.type === "toolchain:ack" || msg.type === "managed-process-owner:ack"))
         finishPackagedStartupValidation();
+      if (msg.type === "remote-status") {
+        latestRemoteStatus = (msg.status as RemoteControlStatus) ?? null;
+        for (const win of BrowserWindow.getAllWindows()) {
+          win.webContents.send("desktop:remote-status", latestRemoteStatus);
+        }
+      }
       if (msg.type === "running-sessions") {
         const ids = (msg.sessionIds as string[]) ?? [];
         runningAgentSessionCount = ids.length;

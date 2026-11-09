@@ -12,6 +12,7 @@ export type AuditAction =
   | "pair.reject"
   | "device.revoke"
   | "route.forward"
+  | "route.drop"
   | "policy.deny"
   | "rate.limit"
   | "replay.deny"

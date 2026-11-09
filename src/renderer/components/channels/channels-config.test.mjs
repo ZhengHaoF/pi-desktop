@@ -16,7 +16,9 @@ const { AccountCard, FEISHU_PERMISSION_IMPORT_JSON, FeishuCredentialDialog, Logi
       loader: "tsx",
     },
     tsconfig: path.join(import.meta.dirname, "../../../../tsconfig.renderer.json"),
-    external: ["react", "react-dom", "react-dom/*", "@rc-component/qrcode"],
+    // qrcode 的 CJS 主入口 require("fs")（png renderer）；external 让 node
+    // 运行时自行加载，bundle 内 ESM 无法 dynamic require。
+    external: ["react", "react-dom", "react-dom/*", "@rc-component/qrcode", "qrcode"],
   });
 
 test("a PowerShell-only channel grant requires the elevated-capability confirmation", async (t) => {

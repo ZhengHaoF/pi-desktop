@@ -1,0 +1,4 @@
+# scratch 里只保留可复跑的验收脚本；日志 / UI dump 均为会话期产物
+*
+!.gitignore
+!e2ee-e2e.mjs

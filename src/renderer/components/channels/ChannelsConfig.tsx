@@ -18,6 +18,7 @@ import type { SessionInfo } from "@contract/types";
 import { call, listSessions, subscribe } from "@/lib/api-client";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/i18n";
+import { RemoteControlCard } from "./RemoteControlCard";
 
 const EMPTY: ChannelsSnapshot = { accounts: [], statuses: [], pairings: [], bindings: [], activities: [] };
 const TELEGRAM_BASE_URL = "https://api.telegram.org";
@@ -399,6 +400,8 @@ export function ChannelsConfig({ onSnapshotChange }: { onSnapshotChange?: (snaps
             {error}
           </div>
         )}
+
+        <RemoteControlCard />
 
         <section style={{ marginTop: 20 }}>
           <div

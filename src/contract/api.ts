@@ -586,6 +586,14 @@ export interface Api {
   "system.defaultCwd": { params: void; result: { cwd: string } };
   "system.allowRoot": { params: { path: string }; result: { ok: true } };
   "system.runningCount": { params: void; result: { count: number; sessionIds: string[] } };
+
+  // Remote control pairing (desktop → relay control frames)
+  "remote.pair.create": { params: void; result: { token: string; expiresAt: number } };
+  "remote.pair.revoke": { params: { deviceId: string }; result: { revoked: boolean } };
+  "remote.pair.devices": {
+    params: void;
+    result: { devices: Array<{ deviceId: string; label?: string; pairedAt: number }> };
+  };
 }
 
 /** Server-push streams delivered over MessagePort RPC. */

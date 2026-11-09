@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pi_remote/core/remote_connection.dart';
 import 'package:pi_remote/protocol/wire.dart';
@@ -6,7 +8,9 @@ void main() {
   test('protocol: allowlist mirrors the TypeScript source of truth', () {
     expect(isMethodAllowed('agent.command'), isTrue);
     expect(isMethodAllowed('sessions.contextPage'), isTrue);
-    expect(isMethodAllowed('sessions.delete'), isFalse);
+    // 会话管理已在白名单（与 src/agent-host/remote/policy.ts 镜像）。
+    expect(isMethodAllowed('sessions.rename'), isTrue);
+    expect(isMethodAllowed('sessions.delete'), isTrue);
     expect(isMethodAllowed('mcp.oauth.submit'), isFalse);
     expect(isAgentCommandTypeAllowed('abort'), isTrue);
     expect(isAgentCommandTypeAllowed('extension_ui_response'), isTrue);
@@ -56,5 +60,37 @@ void main() {
       connection.request('sessions.delete', {'id': 'x'}),
       throwsA(isA<StateError>()),
     );
+  });
+
+  // E2EE wire-shape coverage (Step 2).
+  test('cipher envelope round-trips through encode/fromJson', () {
+    final envelope = RemoteEnvelope(
+      traceId: 'trace-c',
+      nonce: 'nonce-c',
+      role: 'device',
+      deviceId: 'dev-1',
+      hostId: 'host-1',
+      e2eePub: 'B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9_AsrhtHHw',
+      cipher: const {'alg': 'x25519-aes-gcm', 'keyId': 'k1', 'iv': 'aXY=', 'tag': 'dGFn'},
+      ts: 1700000000000,
+      payload: 'YWJjZA==',
+    );
+    final decoded = RemoteEnvelope.fromJson(jsonDecode(envelope.encode()));
+    expect(decoded.payload, 'YWJjZA==');
+    expect(decoded.e2eePub, 'B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9_AsrhtHHw');
+    expect(decoded.cipher?['alg'], 'x25519-aes-gcm');
+    expect(decoded.cipher?['tag'], 'dGFn');
+    // AAD header excludes payload/cipher but keeps identity fields.
+    final aad = decoded.aadHeader();
+    expect(aad.containsKey('payload'), isFalse);
+    expect(aad.containsKey('cipher'), isFalse);
+    expect(aad['deviceId'], 'dev-1');
+    expect(aad['e2eePub'], decoded.e2eePub);
+  });
+
+  test('hello payload carries the device e2ee public key', () {
+    final hello = helloPayload(role: 'device', label: 'Pixel', e2eePub: 'PUB');
+    expect(hello['e2eePub'], 'PUB');
+    expect(helloPayload(role: 'device', label: 'Pixel').containsKey('e2eePub'), isFalse);
   });
 }

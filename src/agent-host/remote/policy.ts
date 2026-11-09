@@ -16,11 +16,21 @@ export const ALLOWED_REQUEST_METHODS: readonly string[] = [
   "sessions.executionContent",
   "agent.new",
   "agent.command",
+  "agent.state",
   "files.list",
   "files.meta",
   "files.read",
   "files.preview",
   "system.runningCount",
+  // Read-only model preferences for the already-allowlisted `set_model`
+  // command; mutating / network models.* methods stay forbidden (mirrored in
+  // packages/protocol/src/allowlist.ts FORBIDDEN_REQUEST_METHODS).
+  "models.preferences.get",
+  // Read-only skill catalog for the "/" command palette.
+  "skills.list",
+  // Session management parity with the desktop.
+  "sessions.rename",
+  "sessions.delete",
 ];
 
 export const ALLOWED_AGENT_COMMAND_TYPES: readonly string[] = [
