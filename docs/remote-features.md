@@ -119,6 +119,7 @@ cd mobile && flutter run -d 192.168.31.118:38043 # 真机无线调试
 ### 桌面设置 UI
 - [x] 消息渠道 → 「自建托管」卡片：总开关 + **模式单选（局域网内置 / 自定义 Relay）** + 端口（可改）+ **局域网地址（网卡枚举，虚拟网卡过滤，点标签切换）+ 一键复制 + 二维码**（矩阵直绘 SVG）+ 服务状态灯（运行中/启动中/端口冲突/意外停止 + 明细）+ PC 名称 + 已连设备数
 - [x] **托盘菜单快捷开关** ✅ 新增：托盘 checkbox「手机远程控制」，点击走与设置卡片同一链路（applyRemoteControlConfig 归一化 + RelayService 启停 + gateway 热生效）；设置卡片改开关时托盘勾选同步，托盘切换后设置卡片经 onRemoteStatus(state=disabled) 镜像回本地草稿
+- [x] **手动重连按钮** ✅ 新增：状态行「重连」（启用时显示）→ `desktop:reconnect-remote` IPC → main 拉起内置 relay（lan 模式，start 对 running 幂等）+ host-manager 转发 `remote:reconnect` → controller `reconnectNow()`（dispose 旧 gateway + 立即重拨，不等 3s 自动重连轮；也解救卡在 connecting 的假死连接）；按钮 1.5s busy 反馈
 
 ### 内置 Relay（局域网服务）✅ 新增
 - [x] `server/` esbuild 单文件打包（`scripts/build-relay.mjs` → `out/relay/relay.mjs`，147KB 含 ws），build/dev 流程接入，打包版经 extraResources 分发

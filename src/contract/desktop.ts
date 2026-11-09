@@ -223,6 +223,7 @@ export interface PiBridge {
   getRelayServiceStatus: () => Promise<RelayServiceStatus>;
   onRelayServiceStatus: (cb: (status: RelayServiceStatus) => void) => () => void;
   listLanAddresses: () => Promise<LanAddress[]>;
+  reconnectRemote: () => Promise<void>;
   getThemeSource: () => Promise<"system" | "light" | "dark">;
   setThemeSource: (source: "system" | "light" | "dark") => Promise<void>;
   openLogs: () => Promise<void>;

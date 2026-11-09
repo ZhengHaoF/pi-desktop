@@ -100,6 +100,7 @@ export function RemoteControlCard() {
   const [pairingBusy, setPairingBusy] = useState(false);
   const [pairingError, setPairingError] = useState("");
   const [devices, setDevices] = useState<Array<{ deviceId: string; label?: string; pairedAt: number }>>([]);
+  const [reconnecting, setReconnecting] = useState(false);
 
   const loadLanAddresses = useCallback(async () => {
     try {
@@ -182,6 +183,16 @@ export function RemoteControlCard() {
       window.setTimeout(() => setCopied(null), 1500);
     });
   };
+
+  // 手动重连：main 会拉起内置 relay（lan 模式）并让 gateway 立即重拨。
+  // 状态翻转经 onRemoteStatus 推送回来；这里短暂保持 busy 让点击有反馈。
+  const reconnect = useCallback(() => {
+    if (reconnecting || !draft.enabled) return;
+    setReconnecting(true);
+    void window.piBridge.reconnectRemote().finally(() => {
+      window.setTimeout(() => setReconnecting(false), 1500);
+    });
+  }, [reconnecting, draft.enabled]);
 
   const loadDevices = useCallback(async () => {
     try {
@@ -279,6 +290,16 @@ export function RemoteControlCard() {
           <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
             {t("remoteConnectedDevices", "Connected devices")}: {remoteStatus?.deviceCount ?? 0}
           </span>
+          {draft.enabled && (
+            <button
+              type="button"
+              disabled={reconnecting}
+              style={{ padding: "4px 10px", borderRadius: 7, border: "1px solid var(--border)", fontSize: 11 }}
+              onClick={reconnect}
+            >
+              {reconnecting ? t("remoteReconnecting", "Reconnecting…") : t("remoteReconnect", "Reconnect")}
+            </button>
+          )}
           <label style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
             <input
               type="checkbox"

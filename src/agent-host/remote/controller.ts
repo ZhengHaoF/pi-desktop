@@ -88,6 +88,16 @@ export class RemoteControlController {
     this.ensureStatusPolling();
   }
 
+  /** Manual reconnect (settings card): discard the current gateway and dial fresh now. */
+  reconnectNow(): void {
+    if (this.disposed || !this.config?.enabled) return;
+    this.gateway?.dispose();
+    this.gateway = this.createGateway(this.config.relayUrl);
+    this.emitStatus("connecting");
+    void this.startGateway();
+    this.ensureStatusPolling();
+  }
+
   /** Issue a one-time pairing token (desktop QR) via the relay. */
   async createPairingToken(): Promise<{ token: string; expiresAt: number }> {
     const gateway = this.gateway;

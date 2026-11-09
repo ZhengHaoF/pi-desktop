@@ -168,6 +168,17 @@ function toggleRemoteControlFromTray(): void {
   hostManager?.setRemoteControlConfig(withRemoteE2eeSecrets(next));
 }
 
+/**
+ * 设置卡片手动重连：lan 模式下若内置 relay 没在跑就拉起（start 对 running 幂等），
+ * 然后让 gateway 立即拆掉旧连接重新拨号，不等 3s 自动重连轮。
+ */
+function reconnectRemoteControlNow(): void {
+  if (currentRemoteConfig?.enabled && (currentRemoteConfig.mode ?? "lan") === "lan") {
+    relayService?.start(currentRemoteConfig.lanPort ?? 8788);
+  }
+  hostManager?.reconnectRemoteControl();
+}
+
 let startupRendererReady = false;
 let startupHostReady = false;
 let startupToolchainSnapshot: ToolchainSnapshot | null = null;
@@ -787,6 +798,7 @@ function startMainProcess(): void {
       getRemoteStatus: () => latestRemoteStatus,
       getRelayServiceStatus: () => relayService?.status ?? latestRelayServiceStatus ?? { state: "stopped", port: 8788 },
       listLanAddresses: () => listLanAddresses(currentRemoteConfig?.lanPort ?? 8788),
+      reconnectRemote: reconnectRemoteControlNow,
       getToolchainState: (cwd) =>
         cwd ? toolchainManager!.getPublicStateForProject(cwd) : toolchainManager!.getPublicState(),
       rescanToolchains: async (cwd) => {

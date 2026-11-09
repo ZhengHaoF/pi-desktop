@@ -132,6 +132,11 @@ export class HostManager {
     if (this.child && this.status === "ready") this.postRemoteSnapshot("remote:changed");
   }
 
+  /** Manual reconnect from the settings card: tear down the gateway and dial now. */
+  reconnectRemoteControl(): void {
+    if (this.child && this.status === "ready") this.child.postMessage({ type: "remote:reconnect" });
+  }
+
   getHerdrAckRevision(): number {
     return this.herdrAckRevision;
   }

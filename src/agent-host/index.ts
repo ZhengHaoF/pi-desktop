@@ -115,6 +115,11 @@ if (parentPort) {
       }
       return;
     }
+    if (msg?.type === "remote:reconnect") {
+      remoteControl.reconnectNow();
+      log("remote control reconnect requested");
+      return;
+    }
     if (msg?.type === "toolchain:init" || msg?.type === "toolchain:changed") {
       try {
         if (!msg.snapshot) throw new Error("missing snapshot");

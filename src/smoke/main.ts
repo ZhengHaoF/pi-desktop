@@ -205,6 +205,7 @@ void app.whenReady().then(async () => {
     getRemoteStatus: () => null,
     getRelayServiceStatus: () => ({ state: "stopped" as const, port: 8788 }),
     listLanAddresses: () => [],
+    reconnectRemote: () => {},
     updateManager,
   });
 

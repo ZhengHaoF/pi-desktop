@@ -64,6 +64,7 @@ export type DesktopIpcOptions = {
   getRemoteStatus: () => RemoteControlStatus | null;
   getRelayServiceStatus: () => RelayServiceStatus;
   listLanAddresses: () => LanAddress[];
+  reconnectRemote: () => void;
   onUiStatePatch?: (patch: ReturnType<typeof validateDesktopUiStatePatch>) => void | Promise<void>;
   updateManager: {
     getState: () => DesktopUpdateState;
@@ -90,6 +91,7 @@ export function installDesktopIpc(options: DesktopIpcOptions): void {
     getRemoteStatus,
     getRelayServiceStatus,
     listLanAddresses,
+    reconnectRemote,
     onUiStatePatch,
     updateManager,
   } = options;
@@ -315,6 +317,7 @@ export function installDesktopIpc(options: DesktopIpcOptions): void {
   trustedHandle("desktop:get-remote-status", () => getRemoteStatus());
   trustedHandle("desktop:get-relay-service-status", () => getRelayServiceStatus());
   trustedHandle("desktop:list-lan-addresses", () => listLanAddresses());
+  trustedHandle("desktop:reconnect-remote", () => reconnectRemote());
   trustedHandle("desktop:set-ui-state", async (_event, patch: unknown) => {
     const validated = validateDesktopUiStatePatch(patch);
     saveUiStateStrict(validated);

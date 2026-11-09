@@ -92,6 +92,7 @@ if (typeof preloadLocation === "string" && isTrustedPreloadLocation(preloadLocat
     getRemoteStatus: () => ipcRenderer.invoke("desktop:get-remote-status"),
     getRelayServiceStatus: () => ipcRenderer.invoke("desktop:get-relay-service-status"),
     listLanAddresses: () => ipcRenderer.invoke("desktop:list-lan-addresses"),
+    reconnectRemote: () => ipcRenderer.invoke("desktop:reconnect-remote"),
     onRemoteStatus: (cb) => {
       const handler = (_: Electron.IpcRendererEvent, status: unknown) => cb(status as never);
       ipcRenderer.on("desktop:remote-status", handler);
