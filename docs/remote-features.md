@@ -149,5 +149,6 @@ cd mobile && flutter run -d 192.168.31.118:38043 # 真机无线调试
 
 - [x] ~~配对凭证 + 设备密钥~~ ✅ Step 1（扫码 token → deviceSecret）+ Step 2（X25519 密钥钉扎）
 - [x] ~~E2EE（每设备 X25519 密钥，relay 零知识）~~ ✅ Step 2：host 静态 + 设备临时密钥、AAD 绑定、重放防护、relay 强制密文
-- [ ] Relay 部署 VPS（Docker + TLS，手机 4G 可连；配合 custom 模式与扫码配对）
+- [ ] ~~Relay 部署 VPS~~ ✅ 北京腾讯云已部署（pm2 :8788，强制 E2EE + 配对，见 [relay-deploy.md](relay-deploy.md)）；剩安全组放行 + 客户端接入验收
 - [x] ~~托盘菜单快捷开关~~ ✅ 托盘 checkbox「手机远程控制」，与设置卡片同链路（applyRemoteControlConfig + RelayService + gateway 热生效）
+- [x] ~~端口迁移~~ ✅ 默认端口 8787 → 8788（VPS 上 8787/8443 被占；桌面/relay/手机占位符已同步）
