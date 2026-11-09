@@ -7,7 +7,7 @@
 
 ```
 手机 App (Flutter)  ──┐
-                      ├──► Relay (server/, :8787, 独立进程) ──► 桌面应用内置 gateway
+                      ├──► Relay (server/, :8788, 独立进程) ──► 桌面应用内置 gateway
 MuMu 模拟器 (10.0.2.2)┘      E2EE + 配对强制（诊断模式需显式 env）     │ 出站 WS，不监听端口
                                                                     ▼
                                                     agent-host utilityProcess（真实 handlers）
@@ -16,7 +16,7 @@ MuMu 模拟器 (10.0.2.2)┘      E2EE + 配对强制（诊断模式需显式 en
 - **gateway 已接入桌面应用**：随桌面应用启动（设置里启用后），设置开关热生效，宿主崩溃自动拉起后自动恢复
 - 独立宿主脚本 `scratch/remote-real-host.mjs` 为会话期调试工具，未入库（无 UI 场景也走桌面 gateway；启用时注意避免双宿主）
 - **Relay 可由桌面应用内置托管（局域网模式）**：esbuild 单文件 `out/relay/relay.mjs`（147KB，含 ws），RelayService 以 ELECTRON_RUN_AS_NODE 子进程托管，健康探测 + 退避重启 + 端口冲突探测（exclusive bind，Windows 双绑定陷阱）；打包经 extraResources 分发。自定义 Relay 模式仍支持手动/VPS
-- PC 端唯一监听端口 8787（局域网模式默认，可在设置中改）
+- PC 端唯一监听端口 8788（局域网模式默认，可在设置中改；2026-11-09 起从 8787 迁移，与北京 VPS 的 pi-relay 端口一致）
 
 ## 启动命令速查
 

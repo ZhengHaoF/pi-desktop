@@ -41,7 +41,7 @@ const MAX_RESTARTS = 3;
 export class RelayService {
   private child: ChildProcess | null = null;
   private state: RelayServiceState = "stopped";
-  private port = 8787;
+  private port = 8788;
   private restarts = 0;
   private restartTimer: NodeJS.Timeout | null = null;
   private disposed = false;

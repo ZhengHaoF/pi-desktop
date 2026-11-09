@@ -130,13 +130,13 @@ function applyRemoteControlConfig(input: RemoteControlConfig | undefined): Remot
   const withIdentity = ensureRemoteIdentity(
     input ?? {
       enabled: false,
-      relayUrl: "ws://127.0.0.1:8787/ws",
+      relayUrl: "ws://127.0.0.1:8788/ws",
       mode: "lan",
-      lanPort: 8787,
+      lanPort: 8788,
     },
   );
   const mode = withIdentity.mode ?? "lan";
-  const lanPort = withIdentity.lanPort ?? 8787;
+  const lanPort = withIdentity.lanPort ?? 8788;
   const next: RemoteControlConfig = {
     ...withIdentity,
     mode,
@@ -785,8 +785,8 @@ function startMainProcess(): void {
       getUnreadBadge: () => unreadBadge,
       applyBadgeCount,
       getRemoteStatus: () => latestRemoteStatus,
-      getRelayServiceStatus: () => relayService?.status ?? latestRelayServiceStatus ?? { state: "stopped", port: 8787 },
-      listLanAddresses: () => listLanAddresses(currentRemoteConfig?.lanPort ?? 8787),
+      getRelayServiceStatus: () => relayService?.status ?? latestRelayServiceStatus ?? { state: "stopped", port: 8788 },
+      listLanAddresses: () => listLanAddresses(currentRemoteConfig?.lanPort ?? 8788),
       getToolchainState: (cwd) =>
         cwd ? toolchainManager!.getPublicStateForProject(cwd) : toolchainManager!.getPublicState(),
       rescanToolchains: async (cwd) => {

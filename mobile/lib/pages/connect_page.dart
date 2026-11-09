@@ -17,7 +17,7 @@ class ConnectPage extends StatefulWidget {
 }
 
 class _ConnectPageState extends State<ConnectPage> {
-  final _urlController = TextEditingController(text: 'ws://10.0.2.2:8787/ws');
+  final _urlController = TextEditingController(text: 'ws://10.0.2.2:8788/ws');
   final _deviceController = TextEditingController();
   /// 扫码载荷带入的配对材料：一次性 token 与目标 PC（hostId）。
   String? _pairingToken;
@@ -105,7 +105,7 @@ class _ConnectPageState extends State<ConnectPage> {
               controller: _urlController,
               decoration: InputDecoration(
                 labelText: 'Relay 地址',
-                hintText: 'ws://192.168.x.x:8787/ws',
+                hintText: 'ws://192.168.x.x:8788/ws',
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
                   tooltip: '扫描电脑二维码',

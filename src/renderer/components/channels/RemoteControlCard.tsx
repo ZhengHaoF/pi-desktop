@@ -4,7 +4,7 @@ import { call } from "@/lib/api-client";
 import { useI18n } from "@/i18n";
 import type { LanAddress, RemoteControlConfig, RemoteControlStatus, RelayServiceStatus } from "@contract/desktop";
 
-const DEFAULT_PORT = 8787;
+const DEFAULT_PORT = 8788;
 const DEFAULT_RELAY_URL = `ws://127.0.0.1:${DEFAULT_PORT}/ws`;
 
 type Draft = {

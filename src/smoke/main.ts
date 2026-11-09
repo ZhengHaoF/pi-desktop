@@ -203,7 +203,7 @@ void app.whenReady().then(async () => {
     getBrowserService: () => null,
     getManagedProcessCapability: capability,
     getRemoteStatus: () => null,
-    getRelayServiceStatus: () => ({ state: "stopped" as const, port: 8787 }),
+    getRelayServiceStatus: () => ({ state: "stopped" as const, port: 8788 }),
     listLanAddresses: () => [],
     updateManager,
   });

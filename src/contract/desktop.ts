@@ -124,14 +124,14 @@ export interface LocalFileInspection {
 
 export interface RemoteControlConfig {
   enabled: boolean;
-  /** Outbound relay endpoint, e.g. ws://127.0.0.1:8787/ws */
+  /** Outbound relay endpoint, e.g. ws://127.0.0.1:8788/ws */
   relayUrl: string;
   /**
    * lan: the desktop app hosts the bundled relay locally (zero setup on a
    * trusted LAN). custom: the user points at an external relay (VPS etc).
    */
   mode: "lan" | "custom";
-  /** TCP port for the hosted relay in lan mode (default 8787). */
+  /** TCP port for the hosted relay in lan mode (default 8788). */
   lanPort?: number;
   /** Display name shown on device selectors (defaults to hostname). */
   name?: string;
