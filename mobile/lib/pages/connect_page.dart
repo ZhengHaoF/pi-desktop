@@ -3,6 +3,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../core/host_store.dart';
+import '../core/keep_alive.dart';
 import '../core/remote_connection.dart';
 import 'home_page.dart';
 import 'scan_page.dart';
@@ -17,25 +19,36 @@ class ConnectPage extends StatefulWidget {
 class _ConnectPageState extends State<ConnectPage> {
   final _urlController = TextEditingController(text: 'ws://10.0.2.2:8787/ws');
   final _deviceController = TextEditingController();
+  /// 扫码载荷带入的配对材料：一次性 token 与目标 PC（hostId）。
+  String? _pairingToken;
+  String? _targetHostId;
   LinkState _state = LinkState.disconnected;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _deviceController.text = 'android-${DateTime.now().millisecondsSinceEpoch % 100000}';
+    loadOrCreateDeviceId().then((id) {
+      if (mounted) _deviceController.text = id;
+    });
   }
 
   Future<void> _scanQr() async {
     FocusScope.of(context).unfocus();
-    final scanned = await Navigator.of(context).push<String>(
+    final scanned = await Navigator.of(context).push<RelayQrTarget>(
       MaterialPageRoute(builder: (_) => const ScanPage()),
     );
-    if (!mounted || scanned == null || scanned.isEmpty) return;
+    if (!mounted || scanned == null || scanned.url.isEmpty) return;
     setState(() {
-      _urlController.text = scanned;
+      _urlController.text = scanned.url;
+      _pairingToken = scanned.pairingToken;
+      _targetHostId = scanned.hostId;
       _error = null;
     });
+    // 配对二维码带的主机公钥是带外锚点：先钉扎，hello_ack 不符即拒连。
+    if (scanned.e2eePub != null && scanned.hostId != null) {
+      await savePinnedHostPub(scanned.hostId!, scanned.e2eePub!);
+    }
     // Scanning is an explicit intent to connect — go straight through.
     await _connect();
   }
@@ -50,9 +63,16 @@ class _ConnectPageState extends State<ConnectPage> {
       relayUrl: _urlController.text.trim(),
       deviceId: _deviceController.text.trim(),
       deviceLabel: 'Pi Remote (Android)',
+      pairingToken: _pairingToken,
+      targetHostId: _targetHostId,
     );
     try {
       await connection.connect();
+      if (!mounted) return;
+      // 连接成功且用户开启保活 → 前台服务 + WifiLock，息屏不断链。
+      if (await keepAliveEnabled()) {
+        await startKeepAlive();
+      }
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => HomePage(connection: connection)),

@@ -93,6 +93,8 @@ export const RemoteEnvelope = Type.Object({
   role: Type.Union([Type.Literal("host"), Type.Literal("device")]),
   deviceId: Type.Optional(Type.String({ minLength: 1 })),
   hostId: Type.Optional(Type.String({ minLength: 1 })),
+  /** Sender's base64 X25519 public key — binds the E2EE shared secret. */
+  e2eePub: Type.Optional(Type.String({ minLength: 1 })),
   cipher: Type.Optional(CipherBlock),
   payload: Type.Union([WireMessage, Type.String({ minLength: 1 })]),
 });

@@ -71,7 +71,12 @@ class _ChatPageState extends State<ChatPage> {
     try {
       await widget.connection.subscribe('agent.events', _sessionId);
       await widget.connection.subscribe('agent.running', _sessionId);
-      final detail = await widget.connection.request('sessions.get', {'id': _sessionId});
+      // includeState is required or the PC omits agentState entirely,
+      // which would break the running-mirror restore below.
+      final detail = await widget.connection.request(
+        'sessions.get',
+        {'id': _sessionId, 'includeState': true},
+      );
       setState(() {
         _lines
           ..clear()
@@ -157,8 +162,11 @@ class _ChatPageState extends State<ChatPage> {
     }
     if (event.topic == 'agent.running') {
       // Turn lifecycle from the PC: refresh running state + queue bar.
-      final running = event.data is Map ? (event.data as Map)['running'] : null;
-      final nowRunning = running == true;
+      // PC emits a global payload: {type, sessionIds, runningSessionIds}.
+      final data = event.data is Map ? event.data as Map : const {};
+      final raw = data['runningSessionIds'] ?? data['sessionIds'];
+      final ids = raw is List ? raw.map((e) => e.toString()).toSet() : const <String>{};
+      final nowRunning = ids.contains(_sessionId);
       if (nowRunning != _turnRunning || nowRunning) {
         setState(() => _turnRunning = nowRunning);
         if (nowRunning) {
@@ -240,10 +248,25 @@ class _ChatPageState extends State<ChatPage> {
     if (role == 'user') _sendingText = null;
   }
 
+  /// 流式 upsert 的行查找：从尾向前找同 role 同 kind 且未完结的行。
+  /// 只看 last 会在 thinking/text 交替的消息里每轮 update 追加新行
+  /// （同一条回复渲染 2-3 份的根因）。任何 done 行或不同 role 行都是
+  /// 消息边界，停止扫描。
+  ChatLine? _findOpenLine(String role, String kind) {
+    for (var i = _lines.length - 1; i >= 0; i--) {
+      final line = _lines[i];
+      if (line.done) return null;
+      if (line.role != role) return null;
+      if (line.kind == kind) return line;
+    }
+    return null;
+  }
+
   void _upsertThinkingLine(String role, String chunk, {required bool done}) {
-    if (_lines.isNotEmpty && _lines.last.kind == 'thinking' && _lines.last.role == role && !_lines.last.done) {
-      _lines.last.text = chunk;
-      _lines.last.done = done;
+    final open = _findOpenLine(role, 'thinking');
+    if (open != null) {
+      open.text = chunk;
+      open.done = done;
     } else {
       _lines.add(ChatLine.thinking(role: role, text: chunk, done: done));
     }
@@ -374,9 +397,10 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _upsertTextLine(String role, String blockText, {required bool done}) {
-    if (_lines.isNotEmpty && _lines.last.kind == 'text' && _lines.last.role == role && !_lines.last.done) {
-      _lines.last.text = blockText;
-      _lines.last.done = done;
+    final open = _findOpenLine(role, 'text');
+    if (open != null) {
+      open.text = blockText;
+      open.done = done;
     } else {
       _lines.add(ChatLine.text(role: role, text: blockText, done: done));
     }

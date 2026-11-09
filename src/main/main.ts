@@ -18,9 +18,17 @@ import { acquireSingleInstanceLock } from "./single-instance";
 import { loadUiState, saveUiStateStrict } from "./window-state";
 import { randomUUID } from "node:crypto";
 import { RelayService, type RelayServiceStatus } from "./relay-service";
+import { loadHostE2eeIdentity } from "./remote-e2ee-identity";
 import { listLanAddresses } from "./lan-addresses";
 import type { RemoteControlConfig, RemoteControlStatus } from "../contract/desktop";
-import { createTray, destroyTray, updateTrayMenu, setTrayManagedProcessCount, setTrayRunningCount } from "./tray";
+import {
+  createTray,
+  destroyTray,
+  updateTrayMenu,
+  setTrayManagedProcessCount,
+  setTrayRunningCount,
+  setTrayRemoteControl,
+} from "./tray";
 import { createMainWindow } from "./window";
 import { installDesktopIpc } from "./ipc";
 import { createCredentialRequestHandler, CredentialVault } from "./credential-vault";
@@ -88,17 +96,29 @@ let latestRelayServiceStatus: RelayServiceStatus | null = null;
 let currentRemoteConfig: RemoteControlConfig | null = null;
 
 /**
- * 多 PC：补齐远程身份（持久 hostId + 展示名），写回 uiState 供设备记忆。
+ * 多 PC：补齐远程身份（持久 hostId + 展示名 + E2EE 公钥），写回 uiState 供设备记忆。
+ * 私钥只在 host-bound 副本里附加（见 withRemoteE2eeSecrets），uiState/渲染器不可见。
  */
 function ensureRemoteIdentity(config: RemoteControlConfig): RemoteControlConfig {
-  const needsPersist = !config.hostId || !config.name;
+  const identity = loadHostE2eeIdentity();
+  const needsPersist = !config.hostId || !config.name || !config.e2eePublicKey;
   const next: RemoteControlConfig = {
     ...config,
     hostId: config.hostId || `host-${randomUUID().slice(0, 8)}`,
     name: config.name?.trim() ? config.name.trim() : os.hostname(),
+    // Main is authoritative for the public key: always the identity file.
+    e2eePublicKey: identity.publicKey,
+    // Never persist the private key with ui state.
+    e2eePrivateKey: undefined,
   };
   if (needsPersist) saveUiStateStrict({ remoteControl: next });
   return next;
+}
+
+/** Host-bound copy: the gateway needs the private key; the renderer never sees it. */
+function withRemoteE2eeSecrets(config: RemoteControlConfig): RemoteControlConfig {
+  const identity = loadHostE2eeIdentity();
+  return { ...config, e2eePublicKey: identity.publicKey, e2eePrivateKey: identity.privateKey };
 }
 
 /**
@@ -137,8 +157,17 @@ function applyRemoteControlConfig(input: RemoteControlConfig | undefined): Remot
     next.name !== input?.name;
   if (persisted) saveUiStateStrict({ remoteControl: next });
   currentRemoteConfig = next;
+  setTrayRemoteControl(next.enabled, getMainWindow);
   return next;
 }
+
+/** Tray click → flip the remote-control master switch through the same chain as the settings card. */
+function toggleRemoteControlFromTray(): void {
+  if (!currentRemoteConfig) return;
+  const next = applyRemoteControlConfig({ ...currentRemoteConfig, enabled: !currentRemoteConfig.enabled });
+  hostManager?.setRemoteControlConfig(withRemoteE2eeSecrets(next));
+}
+
 let startupRendererReady = false;
 let startupHostReady = false;
 let startupToolchainSnapshot: ToolchainSnapshot | null = null;
@@ -783,7 +812,7 @@ function startMainProcess(): void {
         }
         if (patch.remoteControl) {
           latestRemoteStatus = null;
-          hostManager?.setRemoteControlConfig(applyRemoteControlConfig(patch.remoteControl));
+          hostManager?.setRemoteControlConfig(withRemoteE2eeSecrets(applyRemoteControlConfig(patch.remoteControl)));
         }
       },
       updateManager,
@@ -791,6 +820,8 @@ function startMainProcess(): void {
     installAppMenu(getMainWindow, () => openUpdateSettings(true), isDev);
 
     createTray(getMainWindow, () => void stopAllManagedProcessesFromTray());
+    // enabled 值随后由 applyRemoteControlConfig 覆盖；这里只注册托盘点击回调。
+    setTrayRemoteControl(false, getMainWindow, toggleRemoteControlFromTray);
 
     // Apply persisted theme preference
     if (ui.theme === "light" || ui.theme === "dark" || ui.theme === "system") {
@@ -819,7 +850,7 @@ function startMainProcess(): void {
         }
       },
     });
-    hostManager.setRemoteControlConfig(applyRemoteControlConfig(ui.remoteControl));
+    hostManager.setRemoteControlConfig(withRemoteE2eeSecrets(applyRemoteControlConfig(ui.remoteControl)));
     const credentialRequestHandler = createCredentialRequestHandler(credentialVault);
     hostManager.setRequestHandler(async (method, params) => {
       if (method.startsWith("channelSecrets.")) return credentialRequestHandler(method, params);

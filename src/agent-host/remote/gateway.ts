@@ -14,6 +14,14 @@ import { randomUUID } from "node:crypto";
 import type { AnyMessagePort, RpcServer, WireMessage } from "../../contract/rpc.ts";
 import { isAgentCommandPayloadAllowed, isMethodAllowed, isSubscriptionAllowed } from "./policy.ts";
 import { ApprovalBridge, type ApprovalDecision } from "./approval-bridge.ts";
+import {
+  openContext,
+  restoreKeyPair,
+  sealContext,
+  type CipherBlock,
+  type OpenedContext,
+  type SealedContext,
+} from "./cipher.ts";
 
 /** Topics the Gateway may mirror to the relay after a validated subscribe. */
 const ALLOWED_EVENT_TOPICS: readonly string[] = [
@@ -34,6 +42,11 @@ export interface GatewayOptions {
   hostId?: string;
   /** Display name shown on device selectors. */
   hostLabel?: string;
+  /**
+   * Host's static X25519 key pair (E2EE). Announced in hello and used to
+   * derive per-device session keys; required on relays with cipherRequired.
+   */
+  e2ee?: { publicKey: string; privateKey: string };
   /** Injected for tests; defaults to a lazy dynamic import of "ws". */
   connectWebSocket?: (url: string) => Promise<GatewaySocket>;
 }
@@ -56,11 +69,27 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
+/** In-flight pair.* control request awaiting the relay's *.result frame. */
+interface PendingControl {
+  resolve: (payload: Record<string, unknown>) => void;
+  reject: (err: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 const REQUEST_TIMEOUT_MS = 30_000;
+const CONTROL_TIMEOUT_MS = 5_000;
+
+/** Per-device E2EE contexts; re-derived when the device rotates its key. */
+interface DeviceCipher {
+  pub: string;
+  seal: SealedContext;
+  open: OpenedContext;
+}
 
 export class RemoteGateway {
   private readonly channel = new MessageChannel();
   private readonly pending = new Map<string, PendingRequest>();
+  private readonly pendingControls = new Map<string, PendingControl>();
   /** Remote-plane subscriptions: topic → Set<key> (keys are sessionIds). */
   private readonly remoteSubscriptions = new Map<string, Set<string>>();
   /** Devices seen on this relay session (envelope header), used for frame routing. */
@@ -70,6 +99,12 @@ export class RemoteGateway {
   private socket: GatewaySocket | undefined;
   private state: GatewayState = "stopped";
   private readonly options: GatewayOptions;
+  /** Restored key objects (null until start with an E2EE key pair). */
+  private hostKeys:
+    { publicKey: import("node:crypto").KeyObject; privateKey: import("node:crypto").KeyObject } | undefined;
+  /** True once hello_ack reports cipherRequired and a key pair is configured. */
+  private cipherMode = false;
+  private readonly deviceCiphers = new Map<string, DeviceCipher>();
 
   constructor(
     private readonly server: Pick<RpcServer, "attachPort" | "detachPort">,
@@ -122,6 +157,11 @@ export class RemoteGateway {
   async start(): Promise<void> {
     if (this.state !== "stopped") return;
     this.state = "connecting";
+    this.cipherMode = false;
+    this.deviceCiphers.clear();
+    if (this.options.e2ee) {
+      this.hostKeys = restoreKeyPair(this.options.e2ee.publicKey, this.options.e2ee.privateKey);
+    }
     try {
       const connect = this.options.connectWebSocket ?? defaultConnect;
       const socket = await connect(this.options.relayUrl);
@@ -151,6 +191,7 @@ export class RemoteGateway {
             appVersion: "gateway",
             ...(this.options.hostId ? { hostId: this.options.hostId } : {}),
             ...(this.options.hostLabel ? { label: this.options.hostLabel } : {}),
+            ...(this.options.e2ee ? { e2eePub: this.options.e2ee.publicKey } : {}),
             auth: {},
           },
         });
@@ -168,6 +209,11 @@ export class RemoteGateway {
       pending.reject(new Error("gateway stopped"));
       this.pending.delete(id);
     }
+    for (const [traceId, pending] of this.pendingControls) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error("gateway stopped"));
+      this.pendingControls.delete(traceId);
+    }
     this.socket?.close(1000, "gateway stopped");
     this.socket = undefined;
     this.state = "stopped";
@@ -184,6 +230,39 @@ export class RemoteGateway {
   /** Test/diagnostic hook: subscribe to the approval mirror topic. */
   onApproval(listener: (decision: ApprovalDecision) => void): () => void {
     return this.approvalBridge.onDecision(listener);
+  }
+
+  /**
+   * Host-side control frame with request/response correlation (pair.create,
+   * pair.revoke, pair.devices). The relay answers with a payload whose kind is
+   * `<control>.result` and whose traceId echoes the request.
+   */
+  sendControl(
+    control: string,
+    header: Record<string, unknown> = {},
+    payload: object = { kind: control },
+  ): Promise<Record<string, unknown>> {
+    if (!this.socket || this.state !== "ready") {
+      return Promise.reject(new Error("remote control relay is not connected"));
+    }
+    const traceId = randomUUID();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingControls.delete(traceId);
+        reject(new Error(`relay control timeout: ${control}`));
+      }, CONTROL_TIMEOUT_MS);
+      this.pendingControls.set(traceId, { resolve, reject, timer });
+      this.sendRaw({
+        v: 1,
+        traceId,
+        ts: Date.now(),
+        nonce: randomUUID(),
+        role: "host",
+        control,
+        ...header,
+        payload,
+      });
+    });
   }
 
   private onPortMessage(raw: unknown): void {
@@ -225,10 +304,39 @@ export class RemoteGateway {
 
   private onRelayMessage(data: unknown): void {
     const text = typeof data === "string" ? data : Buffer.isBuffer(data) ? data.toString("utf8") : "";
-    let envelope: { deviceId?: unknown; payload?: unknown };
+    let envelope: { deviceId?: unknown; traceId?: unknown; payload?: unknown; cipher?: unknown; e2eePub?: unknown };
     try {
-      envelope = JSON.parse(text) as { deviceId?: unknown; payload?: unknown };
+      envelope = JSON.parse(text) as {
+        deviceId?: unknown;
+        traceId?: unknown;
+        payload?: unknown;
+        cipher?: unknown;
+        e2eePub?: unknown;
+      };
     } catch {
+      return;
+    }
+    // Relay replies to host control frames (pair.*.result) carry a traceId and
+    // no routed payload semantics — resolve the pending control request.
+    const controlPayload = envelope.payload as { kind?: unknown } | undefined;
+    if (
+      typeof controlPayload?.kind === "string" &&
+      controlPayload.kind.startsWith("pair.") &&
+      controlPayload.kind.endsWith(".result")
+    ) {
+      const traceId = typeof envelope.traceId === "string" ? envelope.traceId : "";
+      const pending = this.pendingControls.get(traceId);
+      if (pending) {
+        clearTimeout(pending.timer);
+        this.pendingControls.delete(traceId);
+        pending.resolve(controlPayload as Record<string, unknown>);
+      }
+      return;
+    }
+    // hello_ack: relay-side cipher policy for this session (Step 2 E2EE).
+    if (typeof controlPayload?.kind === "string" && controlPayload.kind === "hello_ack") {
+      const ack = controlPayload as { kind: string; cipherRequired?: unknown };
+      this.cipherMode = ack.cipherRequired === true && this.hostKeys !== undefined;
       return;
     }
     // The relay routes host→device frames by the envelope's deviceId; remember
@@ -237,7 +345,13 @@ export class RemoteGateway {
     const fromDevice =
       typeof envelope.deviceId === "string" && envelope.deviceId.length > 0 ? envelope.deviceId : undefined;
     if (fromDevice) this.knownDevices.add(fromDevice);
-    const payload = envelope.payload as WireMessage | undefined;
+    let payload = envelope.payload as WireMessage | undefined;
+    if (typeof envelope.payload === "string") {
+      // Ciphertext routed frame: decrypt under the device's session key.
+      const decrypted = fromDevice ? this.decryptRoutedFrame(envelope, fromDevice) : undefined;
+      if (!decrypted) return;
+      payload = decrypted;
+    }
     if (!payload || typeof payload !== "object") return;
 
     if (payload.kind === "request") {
@@ -351,16 +465,99 @@ export class RemoteGateway {
    * without one (mirrored events / approval mirrors) it fans out to every
    * device seen on this relay session — the relay routes host frames by
    * deviceId and closes the connection on frames without a target.
+   *
+   * In cipherMode every frame is E2EE-sealed per device (each device has its
+   * own session key), so the fan-out encrypts once per target.
    */
   private sendToRelay(envelope: Record<string, unknown>, targetDeviceId?: string): void {
     if (!this.socket || this.state !== "ready") return;
-    if (targetDeviceId) {
-      this.sendRaw({ ...envelope, deviceId: targetDeviceId });
+    if (!this.cipherMode) {
+      if (targetDeviceId) {
+        this.sendRaw({ ...envelope, deviceId: targetDeviceId });
+        return;
+      }
+      for (const deviceId of this.knownDevices) {
+        this.sendRaw({ ...envelope, deviceId });
+      }
       return;
     }
-    for (const deviceId of this.knownDevices) {
-      this.sendRaw({ ...envelope, deviceId });
+    const targets = targetDeviceId ? [targetDeviceId] : [...this.knownDevices];
+    const payload = envelope.payload;
+    if (payload === undefined) return;
+    for (const deviceId of targets) {
+      const sealed = this.sealForDevice(deviceId, envelope);
+      if (sealed) this.sendRaw(sealed);
     }
+  }
+
+  /** E2EE-seal a routed envelope for one device; null when no key is known yet. */
+  private sealForDevice(deviceId: string, envelope: Record<string, unknown>): Record<string, unknown> | null {
+    if (!this.hostKeys || !this.options.e2ee) return null;
+    const known = this.deviceCiphers.get(deviceId);
+    if (!known) return null;
+    const header: Record<string, unknown> = {
+      v: envelope.v,
+      traceId: envelope.traceId,
+      ts: envelope.ts,
+      nonce: envelope.nonce,
+      role: envelope.role,
+      deviceId,
+    };
+    if (envelope.hostId !== undefined) header.hostId = envelope.hostId;
+    const parts = known.seal.encrypt(JSON.stringify(envelope.payload ?? null), header);
+    return { ...header, e2eePub: parts.e2eePub, cipher: parts.cipher, payload: parts.payload };
+  }
+
+  /** Decrypt + parse one ciphertext routed frame; drops silently on any failure. */
+  private decryptRoutedFrame(
+    envelope: {
+      v?: unknown;
+      traceId?: unknown;
+      ts?: unknown;
+      nonce?: unknown;
+      role?: unknown;
+      hostId?: unknown;
+      e2eePub?: unknown;
+      cipher?: unknown;
+      payload?: unknown;
+    },
+    deviceId: string,
+  ): WireMessage | undefined {
+    if (!this.hostKeys || !this.options.e2ee) return undefined;
+    const peerPub = typeof envelope.e2eePub === "string" && envelope.e2eePub.length > 0 ? envelope.e2eePub : undefined;
+    const cipher = envelope.cipher as CipherBlock | undefined;
+    if (!peerPub || !cipher || typeof cipher.alg !== "string" || typeof cipher.iv !== "string") return undefined;
+    const device = this.ensureDeviceCipher(deviceId, peerPub);
+    if (!device) return undefined;
+    const header: Record<string, unknown> = {
+      v: envelope.v,
+      traceId: envelope.traceId,
+      ts: envelope.ts,
+      nonce: envelope.nonce,
+      role: envelope.role,
+      deviceId,
+    };
+    if (envelope.hostId !== undefined) header.hostId = envelope.hostId;
+    const payload = typeof envelope.payload === "string" ? envelope.payload : undefined;
+    if (payload === undefined) return undefined;
+    try {
+      return JSON.parse(device.open.decrypt(cipher, payload, header)) as WireMessage;
+    } catch {
+      // Tamper, replay, or a stale clock: the frame is dropped, the link stays.
+      return undefined;
+    }
+  }
+
+  /** Session contexts per device; rotates when a device re-presents its hello. */
+  private ensureDeviceCipher(deviceId: string, peerPub: string): DeviceCipher | undefined {
+    if (!this.hostKeys || !this.options.e2ee) return undefined;
+    const existing = this.deviceCiphers.get(deviceId);
+    if (existing && existing.pub === peerPub) return existing;
+    const seal = sealContext(this.hostKeys.privateKey, this.options.e2ee.publicKey, peerPub, false);
+    const open = openContext(this.hostKeys.privateKey, this.options.e2ee.publicKey, peerPub, false);
+    const device: DeviceCipher = { pub: peerPub, seal, open };
+    this.deviceCiphers.set(deviceId, device);
+    return device;
   }
 }
 

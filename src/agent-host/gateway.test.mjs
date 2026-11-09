@@ -24,6 +24,7 @@ async function loadRemoteModule() {
         contents:
           'export { RemoteGateway } from "./remote/gateway.ts";\n' +
           'export * from "./remote/policy.ts";\n' +
+          'export * as e2eeCipher from "./remote/cipher.ts";\n' +
           'export { createRpcServer } from "../contract/rpc.ts";\n',
         resolveDir: import.meta.dirname,
         loader: "ts",
@@ -101,12 +102,13 @@ class FakeRelaySocket {
   }
 }
 
-async function makeGateway(mod) {
+async function makeGateway(mod, extraOptions = {}) {
   const server = makeServer(mod);
   const socket = new FakeRelaySocket();
   const gateway = new mod.RemoteGateway(server, {
     relayUrl: "wss://relay.test/ws",
     connectWebSocket: async () => socket,
+    ...extraOptions,
   });
   await gateway.start();
   await gateway.whenReady();
@@ -271,4 +273,244 @@ test("gateway: extension_ui_request mirrored to remote.approval; stop aborts", a
   assert.deepEqual(decisions, ["aborted"]);
   assert.equal(gateway.getState(), "stopped");
   gateway.dispose();
+});
+
+test("@ pair.create control frame round-trips through the relay reply", async () => {
+  const mod = await loadRemoteModule();
+  const { socket, gateway } = await makeGateway(mod);
+  try {
+    const pending = gateway.sendControl("pair.create");
+    const frame = socket.sent.map((raw) => JSON.parse(raw)).find((parsed) => parsed.control === "pair.create");
+    assert.ok(frame, "control frame sent");
+    assert.equal(frame.role, "host");
+    assert.equal(typeof frame.traceId, "string");
+
+    socket.emit(
+      "message",
+      JSON.stringify({
+        v: 1,
+        traceId: frame.traceId,
+        ts: Date.now(),
+        nonce: "n",
+        role: "relay",
+        payload: { kind: "pair.create.result", token: "tok-1", expiresAt: 123 },
+      }),
+    );
+    const result = await pending;
+    assert.equal(result.token, "tok-1");
+    assert.equal(result.expiresAt, 123);
+  } finally {
+    gateway.dispose();
+  }
+});
+
+test("@ pair.revoke control frame carries the deviceId header", async () => {
+  const mod = await loadRemoteModule();
+  const { socket, gateway } = await makeGateway(mod);
+  try {
+    const pending = gateway.sendControl("pair.revoke", { deviceId: "dev-9" });
+    const frame = socket.sent.map((raw) => JSON.parse(raw)).find((parsed) => parsed.control === "pair.revoke");
+    assert.ok(frame, "revoke frame sent");
+    assert.equal(frame.deviceId, "dev-9");
+
+    socket.emit(
+      "message",
+      JSON.stringify({
+        v: 1,
+        traceId: frame.traceId,
+        ts: Date.now(),
+        nonce: "n",
+        role: "relay",
+        payload: { kind: "pair.revoke.result", deviceId: "dev-9", revoked: true },
+      }),
+    );
+    const result = await pending;
+    assert.equal(result.revoked, true);
+  } finally {
+    gateway.dispose();
+  }
+});
+
+test("@ sendControl rejects while the relay link is down", async () => {
+  const mod = await loadRemoteModule();
+  const server = makeServer(mod);
+  const gateway = new mod.RemoteGateway(server, {
+    relayUrl: "wss://relay.test/ws",
+    connectWebSocket: async () => new FakeRelaySocket(),
+  });
+  await assert.rejects(gateway.sendControl("pair.create"), /not connected/);
+  gateway.dispose();
+});
+
+// ---------------------------------------------------------------------------
+// E2EE (Step 2): cipherMode from hello_ack, per-device sealing
+// ---------------------------------------------------------------------------
+
+async function makeE2eeGateway(mod) {
+  const hostPair = mod.e2eeCipher.generateKeyPair();
+  const devicePair = mod.e2eeCipher.generateKeyPair();
+  const deviceKeys = mod.e2eeCipher.restoreKeyPair(devicePair.publicKey, devicePair.privateKey);
+  const server = makeServer(mod);
+  const socket = new FakeRelaySocket();
+  const gateway = new mod.RemoteGateway(server, {
+    relayUrl: "wss://relay.test/ws",
+    connectWebSocket: async () => socket,
+    e2ee: hostPair,
+  });
+  await gateway.start();
+  await gateway.whenReady();
+  socket.emit("open");
+  // hello is plaintext and announces the host's static public key.
+  const hello = socket.helloSent();
+  assert.ok(hello, "hello sent");
+  assert.equal(hello.payload.e2eePub, hostPair.publicKey);
+  // Relay confirms the cipher requirement.
+  socket.emit(
+    "message",
+    JSON.stringify({
+      v: 1,
+      traceId: "t-ack",
+      ts: Date.now(),
+      nonce: "n-ack",
+      role: "relay",
+      payload: { kind: "hello_ack", protocolVersion: 1, hostId: "host-1", cipherRequired: true },
+    }),
+  );
+  const seal = mod.e2eeCipher.sealContext(deviceKeys.privateKey, devicePair.publicKey, hostPair.publicKey, true);
+  const open = mod.e2eeCipher.openContext(deviceKeys.privateKey, devicePair.publicKey, hostPair.publicKey, true);
+  return { server, socket, gateway, hostPair, devicePair, seal, open };
+}
+
+function encryptedRequest(mod, seal, deviceId, hostId, wireMessage) {
+  const header = {
+    v: 1,
+    traceId: `t-${wireMessage.id}`,
+    ts: Date.now(),
+    nonce: `n-${wireMessage.id}`,
+    role: "device",
+    deviceId,
+    hostId,
+  };
+  const parts = seal.encrypt(JSON.stringify(wireMessage), header);
+  return { ...header, e2eePub: parts.e2eePub, cipher: parts.cipher, payload: parts.payload };
+}
+
+test("@ e2ee: hello_ack cipherRequired enables per-device sealing end to end", async () => {
+  const mod = await loadRemoteModule();
+  const { socket, gateway, hostPair, seal, open } = await makeE2eeGateway(mod);
+  try {
+    const envelope = encryptedRequest(mod, seal, "dev-1", "host-1", {
+      kind: "request",
+      id: "r-e1",
+      method: "system.runningCount",
+      params: null,
+    });
+    socket.emit("message", JSON.stringify(envelope));
+    await new Promise((resolve) => setTimeout(resolve, 120));
+
+    // Outgoing response must be ciphertext bound to the device session.
+    const frames = socket.sent.map((raw) => JSON.parse(raw));
+    const responseFrame = frames.find(
+      (parsed) => typeof parsed.payload === "string" && parsed.cipher && parsed.deviceId === "dev-1",
+    );
+    assert.ok(responseFrame, "encrypted response frame sent");
+    assert.equal(responseFrame.e2eePub, hostPair.publicKey, "host announces its static key on responses");
+    const header = {
+      v: responseFrame.v,
+      traceId: responseFrame.traceId,
+      ts: responseFrame.ts,
+      nonce: responseFrame.nonce,
+      role: responseFrame.role,
+      deviceId: responseFrame.deviceId,
+    };
+    const clear = JSON.parse(open.decrypt(responseFrame.cipher, responseFrame.payload, header));
+    assert.equal(clear.kind, "response");
+    assert.equal(clear.id, "r-e1");
+    assert.equal(clear.ok, true);
+    assert.equal(clear.result.count, 1);
+  } finally {
+    gateway.dispose();
+  }
+});
+
+test("@ e2ee: tampered ciphertext is dropped without a response", async () => {
+  const mod = await loadRemoteModule();
+  const { socket, gateway, seal } = await makeE2eeGateway(mod);
+  try {
+    const envelope = encryptedRequest(mod, seal, "dev-1", "host-1", {
+      kind: "request",
+      id: "r-e2",
+      method: "system.runningCount",
+      params: null,
+    });
+    envelope.payload = envelope.payload.slice(0, -6) + "AAAAAA";
+    socket.emit("message", JSON.stringify(envelope));
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    const responses = socket.sent.map((raw) => JSON.parse(raw)).filter((p) => p.deviceId === "dev-1");
+    assert.equal(responses.length, 0, "no reply to a forged frame");
+  } finally {
+    gateway.dispose();
+  }
+});
+
+test("@ e2ee: replayed envelope (same nonce) is dropped", async () => {
+  const mod = await loadRemoteModule();
+  const { socket, gateway, seal } = await makeE2eeGateway(mod);
+  try {
+    const envelope = encryptedRequest(mod, seal, "dev-1", "host-1", {
+      kind: "request",
+      id: "r-e3",
+      method: "system.runningCount",
+      params: null,
+    });
+    socket.emit("message", JSON.stringify(envelope));
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    const first = socket.sent.map((raw) => JSON.parse(raw)).filter((p) => p.deviceId === "dev-1").length;
+    assert.equal(first, 1, "first frame answered");
+    socket.emit("message", JSON.stringify(envelope));
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    const second = socket.sent.map((raw) => JSON.parse(raw)).filter((p) => p.deviceId === "dev-1").length;
+    assert.equal(second, 1, "replay produced no second answer");
+  } finally {
+    gateway.dispose();
+  }
+});
+
+test("@ e2ee: mirrored events are sealed per known device", async () => {
+  const mod = await loadRemoteModule();
+  const { server, socket, gateway, seal, open } = await makeE2eeGateway(mod);
+  try {
+    // Subscribe first so mirroring is enabled for this session.
+    const sub = encryptedRequest(mod, seal, "dev-1", "host-1", {
+      kind: "subscribe",
+      id: "s-e1",
+      topic: "sessions.changed",
+      key: "anything",
+    });
+    socket.emit("message", JSON.stringify(sub));
+    await new Promise((resolve) => setTimeout(resolve, 120));
+
+    server.emit("sessions.changed", "s1", { changed: true });
+    await new Promise((resolve) => setTimeout(resolve, 120));
+
+    const decrypted = socket.sent
+      .map((raw) => JSON.parse(raw))
+      .filter((p) => p.deviceId === "dev-1" && typeof p.payload === "string" && p.cipher)
+      .map((frame) => {
+        const header = {
+          v: frame.v,
+          traceId: frame.traceId,
+          ts: frame.ts,
+          nonce: frame.nonce,
+          role: frame.role,
+          deviceId: frame.deviceId,
+        };
+        return JSON.parse(open.decrypt(frame.cipher, frame.payload, header));
+      });
+    const mirrored = decrypted.find((m) => m.kind === "event" && m.topic === "sessions.changed");
+    assert.ok(mirrored, "sessions.changed mirrored encrypted");
+    assert.equal(mirrored.key, "s1");
+  } finally {
+    gateway.dispose();
+  }
 });

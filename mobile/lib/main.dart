@@ -8,9 +8,12 @@ library;
 
 import 'package:flutter/material.dart';
 
+import 'core/keep_alive.dart';
 import 'pages/connect_page.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  initKeepAlive();
   runApp(const PiRemoteApp());
 }
 

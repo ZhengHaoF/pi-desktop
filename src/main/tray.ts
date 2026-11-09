@@ -11,6 +11,8 @@ let tray: Tray | null = null;
 let runningCount = 0;
 let managedProcessCount = 0;
 let stopAllManagedProcesses: (() => void) | null = null;
+let remoteControlEnabled = false;
+let toggleRemoteControl: (() => void) | null = null;
 
 function iconPath(): string {
   // Prefer build/icon.png; fall back to empty template
@@ -68,6 +70,17 @@ export function setTrayManagedProcessCount(count: number, getMainWindow: () => B
   updateTrayMenu(getMainWindow);
 }
 
+/** Mirror the remote-control master switch into the tray menu. */
+export function setTrayRemoteControl(
+  enabled: boolean,
+  getMainWindow: () => BrowserWindow | null,
+  onToggle?: () => void,
+): void {
+  remoteControlEnabled = enabled;
+  if (onToggle) toggleRemoteControl = onToggle;
+  updateTrayMenu(getMainWindow);
+}
+
 export function updateTrayMenu(getMainWindow: () => BrowserWindow | null): void {
   if (!tray) return;
   const language = getNativeLanguage();
@@ -118,6 +131,12 @@ export function updateTrayMenu(getMainWindow: () => BrowserWindow | null): void 
           } as const,
         ]
       : []),
+    {
+      type: "checkbox",
+      label: traditional ? "手機遠端控制" : chinese ? "手机远程控制" : "Phone Remote Control",
+      checked: remoteControlEnabled,
+      click: () => toggleRemoteControl?.(),
+    },
     { type: "separator" },
     {
       label: traditional ? "顯示視窗" : chinese ? "显示窗口" : "Show Window",

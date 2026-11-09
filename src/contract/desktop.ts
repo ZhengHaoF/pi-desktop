@@ -137,6 +137,14 @@ export interface RemoteControlConfig {
   name?: string;
   /** Stable host identity so devices remember this PC across restarts. */
   hostId?: string;
+  /** Host's static X25519 public key (base64url) — E2EE + QR pairing anchor. */
+  e2eePublicKey?: string;
+  /**
+   * Host's X25519 private key (PKCS8 DER base64). Main-only: injected into
+   * the gateway-bound copy of the config, never persisted to uiState and
+   * never sent to the renderer.
+   */
+  e2eePrivateKey?: string;
 }
 
 export interface RelayServiceStatus {

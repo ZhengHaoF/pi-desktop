@@ -3,6 +3,8 @@
 /// rows: status dot / title / time · count / ⋯).
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -84,6 +86,21 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _refresh() async {
+    // 断线重连/进页先渲染本机缓存（按 hostId 隔离），随后静默刷新；
+    // 运行中状态不进缓存，永远以刷新结果为准。
+    final hostId = widget.connection.hostId;
+    if (hostId != null && _sessions.isEmpty) {
+      final cached = await loadCachedSessions(hostId);
+      if (mounted && cached.isNotEmpty && _sessions.isEmpty) {
+        setState(() {
+          _sessions = cached;
+          if (!_defaultsApplied) {
+            _expanded.add(cached.first.projectRoot);
+            _defaultsApplied = true;
+          }
+        });
+      }
+    }
     setState(() {
       _loading = _sessions.isEmpty;
       _error = null;
@@ -99,6 +116,10 @@ class _HomePageState extends State<HomePage> {
       }
       sessions.sort((a, b) => b.modified.compareTo(a.modified));
       final running = result['runningSessionIds'];
+      if (hostId != null) {
+        // 失败可容忍：缓存只是加速展示，写不进去不影响本次渲染。
+        unawaited(saveCachedSessions(hostId, sessions));
+      }
       setState(() {
         _sessions = sessions;
         _runningIds = running is List ? running.map((e) => e.toString()).toList() : [];

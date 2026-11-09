@@ -1,17 +1,56 @@
 /// QR pairing: scan the desktop settings card's relay QR code and hand the
-/// validated ws:// endpoint back to the connect page.
+/// validated endpoint (plus pairing token / target host) back to the connect
+/// page.
 library;
+
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-/// Parses a scanned payload into a relay endpoint.
-/// Accepts a bare `ws://host:port/ws`, `wss://...`, or an http(s) variant
-/// (some QR generators rewrite schemes) and normalizes it to ws(s).
-/// Returns null when the payload is not a usable relay URL.
-String? parseRelayQr(String? raw) {
+/// Parsed scan result: relay endpoint and optional pairing material.
+class RelayQrTarget {
+  final String url;
+  final String? hostId;
+  final String? pairingToken;
+  /// Host's static X25519 public key — the out-of-band E2EE anchor.
+  final String? e2eePub;
+  const RelayQrTarget(this.url, {this.hostId, this.pairingToken, this.e2eePub});
+}
+
+/// Parses a scanned payload into a relay target.
+/// Accepts the JSON pairing payload `{v, relayUrl, hostId, token, e2eePub}` or
+/// a bare `ws://host:port/ws` / `wss://...` (http(s) variants are normalized
+/// too). Returns null when the payload is not a usable relay target.
+RelayQrTarget? parseRelayQr(String? raw) {
   final text = raw?.trim();
   if (text == null || text.isEmpty || text.length > 512) return null;
+  if (text.startsWith('{')) {
+    try {
+      final decoded = jsonDecode(text);
+      if (decoded is! Map) return null;
+      final url = _normalizeRelayUrl(decoded['relayUrl'] as String?);
+      if (url == null) return null;
+      final hostId = decoded['hostId'];
+      final token = decoded['token'];
+      final e2eePub = decoded['e2eePub'];
+      return RelayQrTarget(
+        url,
+        hostId: hostId is String && hostId.isNotEmpty ? hostId : null,
+        pairingToken: token is String && token.isNotEmpty ? token : null,
+        e2eePub: e2eePub is String && e2eePub.isNotEmpty ? e2eePub : null,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+  final url = _normalizeRelayUrl(text);
+  return url == null ? null : RelayQrTarget(url);
+}
+
+String? _normalizeRelayUrl(String? raw) {
+  final text = raw?.trim();
+  if (text == null || text.isEmpty) return null;
   var candidate = text;
   if (candidate.startsWith('http://')) {
     candidate = 'ws://${candidate.substring('http://'.length)}';
@@ -54,7 +93,7 @@ class _ScanPageState extends State<ScanPage> {
       if (parsed == null) {
         // Keep scanning, but tell the user why this code was rejected.
         if (mounted && _error == null) {
-          setState(() => _error = '不是有效的 Relay 二维码（需要 ws:// 地址）');
+          setState(() => _error = '不是有效的 Relay 二维码（需要 ws:// 地址或配对载荷）');
         }
         continue;
       }

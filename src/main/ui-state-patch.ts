@@ -33,6 +33,14 @@ function isRemoteControlConfig(value: unknown): value is RemoteControlConfig {
   }
   if (config.name !== undefined && (typeof config.name !== "string" || config.name.length > 64)) return false;
   if (config.hostId !== undefined && (typeof config.hostId !== "string" || config.hostId.length > 64)) return false;
+  if (
+    config.e2eePublicKey !== undefined &&
+    (typeof config.e2eePublicKey !== "string" || config.e2eePublicKey.length > 128)
+  ) {
+    return false;
+  }
+  // The private key never belongs to renderer-writable ui state.
+  if (config.e2eePrivateKey !== undefined) return false;
   return true;
 }
 

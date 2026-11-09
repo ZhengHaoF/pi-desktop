@@ -44,8 +44,9 @@ class WireEvent {
       );
 }
 
-/// RemoteEnvelope minus the cipher block — M1a talks to a local/plain relay
-/// (diagnostic mode); E2EE arrives with the gateway cipher layer in M1b.
+/// RemoteEnvelope with the E2EE cipher block (Step 2). When cipherMode is on,
+/// `payload` is a base64 ciphertext string and `cipher` carries {alg,keyId,iv,tag};
+/// `e2eePub` is the sender's raw X25519 public key (base64url) bound into the AAD.
 class RemoteEnvelope {
   final int v;
   final String traceId;
@@ -54,9 +55,11 @@ class RemoteEnvelope {
   final String role; // host | device | relay
   final String? deviceId;
   final String? hostId;
+  final String? e2eePub;
+  final Map<String, String>? cipher;
   /// Envelope-level control kind (e.g. "hosts.list") — relay-local, no payload.
   final String? control;
-  final Object? payload; // WireMessage or hello map
+  final Object? payload; // WireMessage, hello map, or ciphertext string
 
   RemoteEnvelope({
     required this.traceId,
@@ -65,6 +68,8 @@ class RemoteEnvelope {
     required this.payload,
     this.deviceId,
     this.hostId,
+    this.e2eePub,
+    this.cipher,
     this.control,
     this.v = protocolVersion,
     int? ts,
@@ -78,6 +83,8 @@ class RemoteEnvelope {
         'role': role,
         if (deviceId != null) 'deviceId': deviceId,
         if (hostId != null) 'hostId': hostId,
+        if (e2eePub != null) 'e2eePub': e2eePub,
+        if (cipher != null) 'cipher': cipher,
         if (control != null) 'control': control,
         'payload': payload,
       };
@@ -89,20 +96,43 @@ class RemoteEnvelope {
         payload: json['payload'],
         deviceId: json['deviceId'] as String?,
         hostId: json['hostId'] as String?,
+        e2eePub: json['e2eePub'] as String?,
+        cipher: json['cipher'] is Map
+            ? {for (final e in (json['cipher'] as Map).entries) e.key.toString(): e.value.toString()}
+            : null,
         v: json['v'] as int? ?? protocolVersion,
         ts: json['ts'] as int?,
       );
 
   String encode() => jsonEncode(toJson());
+
+  /// Header fields (everything but payload) for E2EE AAD reconstruction.
+  Map<String, dynamic> aadHeader() => {
+        'v': v,
+        'traceId': traceId,
+        'ts': ts,
+        'nonce': nonce,
+        'role': role,
+        if (deviceId != null) 'deviceId': deviceId,
+        if (hostId != null) 'hostId': hostId,
+        if (e2eePub != null) 'e2eePub': e2eePub,
+      };
 }
 
-Map<String, dynamic> helloPayload({required String role, required String label}) => {
+Map<String, dynamic> helloPayload({
+  required String role,
+  required String label,
+  Map<String, dynamic> auth = const {},
+  String? e2eePub,
+}) =>
+    {
       'kind': 'hello',
       'protocolVersion': protocolVersion,
       'role': role,
       'appVersion': '0.1.0',
       'label': label,
-      'auth': <String, dynamic>{},
+      'e2eePub': ?e2eePub,
+      'auth': auth,
     };
 
 /// Deny-by-default mirror of packages/protocol/src/allowlist.ts (client side).

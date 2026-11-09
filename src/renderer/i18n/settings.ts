@@ -368,7 +368,7 @@ export const zhCN: Record<string, string> = {
   relayHideQr: "收起二维码",
   relayScanHint: "在手机 App 中扫描",
   relayNoLanAddress: "未找到局域网 IPv4 地址，请先把电脑接入 Wi-Fi 或网线。",
-  relayLanWarning: "内置 Relay 会对整个局域网开放该端口，目前为明文传输（尚无 E2EE）。请仅在可信网络中启用。",
+  relayLanWarning: "内置 Relay 会对整个局域网开放该端口；流量已端到端加密（手机需扫码配对）。请仅在可信网络中启用。",
   relayStateRunning: "运行中",
   relayStateStarting: "启动中…",
   relayStatePortConflict: "端口被占用",
@@ -624,7 +624,8 @@ export const zhTW: Record<string, string> = {
   relayHideQr: "收起 QR 碼",
   relayScanHint: "在手機 App 中掃描",
   relayNoLanAddress: "找不到區域網路 IPv4 位址，請先將電腦連上 Wi-Fi 或網路線。",
-  relayLanWarning: "內建 Relay 會對整個區域網路開放此連接埠，目前為明文傳輸（尚無 E2EE）。請僅在可信網路中啟用。",
+  relayLanWarning:
+    "內建 Relay 會對整個區域網路開放此連接埠；流量已端對端加密（手機需掃碼配對）。請僅在可信網路中啟用。",
   relayStateRunning: "執行中",
   relayStateStarting: "啟動中…",
   relayStatePortConflict: "連接埠被占用",

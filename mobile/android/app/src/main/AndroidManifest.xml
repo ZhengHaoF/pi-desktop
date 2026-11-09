@@ -2,6 +2,15 @@
     <!-- QR pairing: scan the desktop's relay QR code. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- Foreground keep-alive service (remote link must survive screen-off).
+         connectedDevice requires at least one anyOf permission on Android 14+
+         (BLUETOOTH_*/NFC/CHANGE_*_STATE…); the network-state one fits a WS link
+         and is a normal permission, granted at install. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <application
         android:label="pi_remote"
         android:name="${applicationName}"
@@ -28,6 +37,14 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- FlutterForegroundTask service: name is fixed by the plugin.
+             connectedDevice covers a persistent remote-host network link
+             (dataSync is capped at 6h/24h on Android 15). App close stops it. -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="connectedDevice"
+            android:stopWithTask="true"
+            android:exported="false" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

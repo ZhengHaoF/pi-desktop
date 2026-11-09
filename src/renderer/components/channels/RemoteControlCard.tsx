@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
+import { call } from "@/lib/api-client";
 import { useI18n } from "@/i18n";
 import type { LanAddress, RemoteControlConfig, RemoteControlStatus, RelayServiceStatus } from "@contract/desktop";
 
@@ -95,6 +96,10 @@ export function RemoteControlCard() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
+  const [pairing, setPairing] = useState<{ token: string; expiresAt: number } | null>(null);
+  const [pairingBusy, setPairingBusy] = useState(false);
+  const [pairingError, setPairingError] = useState("");
+  const [devices, setDevices] = useState<Array<{ deviceId: string; label?: string; pairedAt: number }>>([]);
 
   const loadLanAddresses = useCallback(async () => {
     try {
@@ -119,8 +124,19 @@ export function RemoteControlCard() {
       if (!disposed) setRelayStatus(status);
     });
     void loadLanAddresses();
+    void call("remote.pair.devices")
+      .then((result) => {
+        if (!disposed) setDevices(result.devices ?? []);
+      })
+      .catch(() => {
+        /* remote control may be disabled; list stays empty */
+      });
     const unsubRemote = window.piBridge.onRemoteStatus((status) => {
-      if (!disposed) setRemoteStatus(status);
+      if (disposed) return;
+      setRemoteStatus(status);
+      // 托盘/其他入口可能改总开关；state=disabled 即关闭，镜像到本地草稿。
+      const enabled = status.state !== "disabled";
+      setDraft((d) => (d.enabled === enabled ? d : { ...d, enabled }));
     });
     const unsubRelay = window.piBridge.onRelayServiceStatus((status) => {
       if (!disposed) setRelayStatus(status);
@@ -167,9 +183,58 @@ export function RemoteControlCard() {
     });
   };
 
+  const loadDevices = useCallback(async () => {
+    try {
+      const result = await call("remote.pair.devices");
+      setDevices(result.devices ?? []);
+    } catch (err) {
+      setPairingError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  const createPairingQr = useCallback(async () => {
+    setPairingBusy(true);
+    setPairingError("");
+    try {
+      const created = await call("remote.pair.create");
+      setPairing(created);
+      void loadDevices();
+    } catch (err) {
+      setPairingError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPairingBusy(false);
+    }
+  }, [loadDevices]);
+
+  const revokeDevice = useCallback(
+    async (deviceId: string) => {
+      setPairingError("");
+      try {
+        await call("remote.pair.revoke", { deviceId });
+        await loadDevices();
+      } catch (err) {
+        setPairingError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [loadDevices],
+  );
+
   const preferred = lanAddresses.find((entry) => entry.preferred) ?? lanAddresses[0] ?? null;
   const active = lanAddresses.find((entry) => entry.url === selectedUrl) ?? preferred;
   const isLan = draft.mode === "lan";
+
+  // 手机扫码载荷：relay 地址 + 目标 hostId + 一次性配对 token。
+  const pairingQrValue = useMemo(() => {
+    if (!pairing) return "";
+    const relayUrl = isLan ? (active?.url ?? draft.relayUrl) : draft.relayUrl.trim();
+    return JSON.stringify({
+      v: 1,
+      relayUrl,
+      hostId: config?.hostId ?? "",
+      token: pairing.token,
+      ...(config?.e2eePublicKey ? { e2eePub: config.e2eePublicKey } : {}),
+    });
+  }, [pairing, isLan, active?.url, draft.relayUrl, config?.hostId, config?.e2eePublicKey]);
 
   const relayStateLabel = !draft.enabled
     ? t("remoteStateDisabled", "Disabled")
@@ -447,6 +512,87 @@ export function RemoteControlCard() {
         </div>
 
         {error && <div style={{ fontSize: 12, color: "#f56c6c" }}>{error}</div>}
+
+        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, display: "grid", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>
+              {t("remotePairingTitle", "设备配对（手机扫码）")}
+            </span>
+            <button
+              type="button"
+              disabled={pairingBusy || !draft.enabled}
+              style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 }}
+              onClick={() => void createPairingQr()}
+            >
+              {pairingBusy ? t("remotePairingCreating", "生成中…") : t("remotePairingAdd", "添加设备")}
+            </button>
+            <button
+              type="button"
+              disabled={!draft.enabled}
+              style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 }}
+              onClick={() => void loadDevices()}
+            >
+              {t("remotePairingRefresh", "刷新设备")}
+            </button>
+            {!draft.enabled && (
+              <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                {t("remotePairingEnableFirst", "先启用远程控制")}
+              </span>
+            )}
+          </div>
+
+          {pairing && pairingQrValue ? (
+            <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+              <div style={{ background: "#fff", padding: 8, borderRadius: 8, border: "1px solid var(--border)" }}>
+                <QrCode value={pairingQrValue} size={144} />
+              </div>
+              <div style={{ display: "grid", gap: 6, fontSize: 11, color: "var(--text-dim)" }}>
+                <span>{t("remotePairingHint", "手机 App 连接页 → 扫码连接；令牌一次性、10 分钟内有效。")}</span>
+                <span>
+                  {t("remotePairingExpires", "过期时间")}: {new Date(pairing.expiresAt).toLocaleTimeString()}
+                </span>
+                <button
+                  type="button"
+                  style={{
+                    justifySelf: "start",
+                    padding: "5px 10px",
+                    borderRadius: 8,
+                    border: "1px solid var(--border)",
+                    fontSize: 11.5,
+                  }}
+                  onClick={() => copy(pairingQrValue, "pairing-qr")}
+                >
+                  {copied === "pairing-qr" ? t("copied", "已复制") : t("remotePairingCopy", "复制配对载荷")}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {devices.length > 0 ? (
+            <div style={{ display: "grid", gap: 4 }}>
+              {devices.map((device) => (
+                <div key={device.deviceId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                  <span style={{ flex: 1, color: "var(--text)" }}>
+                    {device.label?.trim() ? device.label : device.deviceId}
+                    <span style={{ color: "var(--text-dim)", marginLeft: 8, fontSize: 11 }}>
+                      {new Date(device.pairedAt).toLocaleDateString()}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    style={{ padding: "4px 9px", borderRadius: 7, border: "1px solid var(--border)", fontSize: 11.5 }}
+                    onClick={() => void revokeDevice(device.deviceId)}
+                  >
+                    {t("remotePairingRevoke", "撤销")}
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{t("remotePairingEmpty", "暂无已配对设备")}</span>
+          )}
+          {pairingError && <div style={{ fontSize: 11, color: "#f56c6c" }}>{pairingError}</div>}
+        </div>
       </div>
     </section>
   );

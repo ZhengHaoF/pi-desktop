@@ -3,6 +3,8 @@
  * Tokens are stored hashed; failed attempts are capped and lock the token.
  */
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import type { RelayConfig } from "./config.ts";
 import type { AuditLog } from "./audit.ts";
 
@@ -17,15 +19,73 @@ export interface PairingRecord {
   devicePublicKey?: string;
 }
 
+/** A paired device bound to one host; the secret never leaves the relay hashed. */
+export interface DeviceBinding {
+  deviceId: string;
+  hostId: string;
+  secretHash: string;
+  label?: string;
+  /** Device's X25519 public key captured at pairing time (metadata only). */
+  publicKey?: string;
+  pairedAt: number;
+}
+
 export class PairingService {
   private readonly config: RelayConfig;
   private readonly audit: AuditLog;
   private readonly pairings = new Map<string, PairingRecord>();
   private readonly unknownAttempts = new Map<string, { count: number; windowStart: number }>();
+  /** Paired devices by deviceId (relay restart clears this — M2 persistence). */
+  private readonly devices = new Map<string, DeviceBinding>();
 
   constructor(config: RelayConfig, audit: AuditLog) {
     this.config = config;
     this.audit = audit;
+    this.loadPersisted();
+  }
+
+  /**
+   * Device bindings survive relay restarts (the desktop-hosted LAN relay
+   * restarts with every app launch; with pairingRequired on, an in-memory
+   * table would force a re-scan on every start).
+   */
+  private loadPersisted(): void {
+    if (!this.config.statePath || !existsSync(this.config.statePath)) return;
+    try {
+      const parsed = JSON.parse(readFileSync(this.config.statePath, "utf8")) as { devices?: unknown };
+      if (!Array.isArray(parsed.devices)) return;
+      for (const item of parsed.devices) {
+        if (!item || typeof item !== "object") continue;
+        const record = item as Partial<DeviceBinding>;
+        if (
+          typeof record.deviceId !== "string" ||
+          typeof record.hostId !== "string" ||
+          typeof record.secretHash !== "string"
+        )
+          continue;
+        this.devices.set(record.deviceId, {
+          deviceId: record.deviceId,
+          hostId: record.hostId,
+          secretHash: record.secretHash,
+          ...(record.label ? { label: record.label } : {}),
+          ...(record.publicKey ? { publicKey: record.publicKey } : {}),
+          pairedAt: typeof record.pairedAt === "number" ? record.pairedAt : Date.now(),
+        });
+      }
+    } catch {
+      // Corrupt state file: start empty (devices re-pair by scanning again).
+    }
+  }
+
+  private persist(): void {
+    if (!this.config.statePath) return;
+    try {
+      const payload = JSON.stringify({ v: 1, devices: [...this.devices.values()] });
+      mkdirSync(dirname(this.config.statePath), { recursive: true });
+      writeFileSync(this.config.statePath, payload, "utf8");
+    } catch {
+      // Best-effort persistence; the in-memory table stays authoritative.
+    }
   }
 
   static hashToken(token: string): string {
@@ -138,6 +198,72 @@ export class PairingService {
   consume(token: string): void {
     const record = this.pairings.get(PairingService.hashToken(token));
     if (record) record.status = "consumed";
+  }
+
+  /**
+   * Bind a device to a host and issue its long-lived credential. Called after
+   * a successful token submit + approve; re-pairing replaces any old binding.
+   */
+  pairDevice(
+    hostId: string,
+    deviceId: string,
+    label?: string,
+    publicKey?: string,
+  ): { secret: string; binding: DeviceBinding } {
+    const secret = randomBytes(24).toString("base64url");
+    const binding: DeviceBinding = {
+      deviceId,
+      hostId,
+      secretHash: PairingService.hashToken(secret),
+      ...(label ? { label } : {}),
+      ...(publicKey ? { publicKey } : {}),
+      pairedAt: Date.now(),
+    };
+    this.devices.set(deviceId, binding);
+    this.persist();
+    this.audit.append({
+      actor: hostId,
+      action: "pair.approve",
+      targetDigest: this.audit.digest(hostId, deviceId),
+      outcome: "ok",
+      traceId: "pair",
+    });
+    return { secret, binding };
+  }
+
+  /** Reconnect credential check: deviceId must match a binding for this host. */
+  verifyDevice(deviceId: string, secret: string): DeviceBinding | undefined {
+    const binding = this.devices.get(deviceId);
+    if (!binding) return undefined;
+    if (!PairingService.verifyToken(secret, binding.secretHash)) return undefined;
+    return binding;
+  }
+
+  /** Host-initiated revocation; returns true when a binding was removed. */
+  revokeDevice(hostId: string, deviceId: string): boolean {
+    const binding = this.devices.get(deviceId);
+    if (!binding || binding.hostId !== hostId) return false;
+    this.devices.delete(deviceId);
+    this.persist();
+    this.audit.append({
+      actor: hostId,
+      action: "device.revoke",
+      targetDigest: this.audit.digest(hostId, deviceId),
+      outcome: "ok",
+      traceId: "pair",
+    });
+    return true;
+  }
+
+  /** Host-scoped device list (secrets excluded). */
+  listDevices(hostId: string): Array<Omit<DeviceBinding, "secretHash">> {
+    return [...this.devices.values()]
+      .filter((binding) => binding.hostId === hostId)
+      .map((binding) => {
+        const { secretHash, ...rest } = binding;
+        void secretHash;
+        return rest;
+      });
   }
 
   prune(now = Date.now()): void {

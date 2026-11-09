@@ -54,7 +54,10 @@ export class RemoteControlController {
   applyConfig(config: RemoteControlConfig): void {
     if (this.disposed) return;
     const relayUrlChanged = this.config?.relayUrl !== config.relayUrl;
-    const identityChanged = this.config?.hostId !== config.hostId || this.config?.name !== config.name;
+    const identityChanged =
+      this.config?.hostId !== config.hostId ||
+      this.config?.name !== config.name ||
+      this.config?.e2eePublicKey !== config.e2eePublicKey;
     const wasEnabled = this.config?.enabled ?? false;
     this.config = {
       enabled: config.enabled,
@@ -63,6 +66,8 @@ export class RemoteControlController {
       name: config.name,
       mode: config.mode ?? "lan",
       lanPort: config.lanPort,
+      e2eePublicKey: config.e2eePublicKey,
+      e2eePrivateKey: config.e2eePrivateKey,
     };
     if (!config.enabled) {
       this.stopReconnect();
@@ -81,6 +86,35 @@ export class RemoteControlController {
       void this.startGateway();
     }
     this.ensureStatusPolling();
+  }
+
+  /** Issue a one-time pairing token (desktop QR) via the relay. */
+  async createPairingToken(): Promise<{ token: string; expiresAt: number }> {
+    const gateway = this.gateway;
+    if (!gateway) throw new Error("remote control is disabled");
+    const result = await gateway.sendControl("pair.create");
+    const token = typeof result.token === "string" ? result.token : "";
+    const expiresAt = typeof result.expiresAt === "number" ? result.expiresAt : 0;
+    if (!token) throw new Error("relay did not return a pairing token");
+    return { token, expiresAt };
+  }
+
+  /** Revoke a paired device (immediate: the relay drops its live connection). */
+  async revokeDevice(deviceId: string): Promise<boolean> {
+    const gateway = this.gateway;
+    if (!gateway) throw new Error("remote control is disabled");
+    const result = await gateway.sendControl("pair.revoke", { deviceId });
+    return result.revoked === true;
+  }
+
+  /** Paired devices bound to this host (secrets excluded). */
+  async listDevices(): Promise<Array<{ deviceId: string; label?: string; pairedAt: number }>> {
+    const gateway = this.gateway;
+    if (!gateway) throw new Error("remote control is disabled");
+    const result = await gateway.sendControl("pair.devices");
+    return Array.isArray(result.devices)
+      ? (result.devices as Array<{ deviceId: string; label?: string; pairedAt: number }>)
+      : [];
   }
 
   dispose(): void {
@@ -105,13 +139,18 @@ export class RemoteControlController {
 
   private createGateway(relayUrl: string): RemoteGateway {
     const WebSocket = this.require("ws") as new (url: string) => import("./gateway.ts").GatewaySocket;
+    const e2ee =
+      this.config?.e2eePublicKey && this.config?.e2eePrivateKey
+        ? { publicKey: this.config.e2eePublicKey, privateKey: this.config.e2eePrivateKey }
+        : undefined;
     this.options.log?.(
-      `creating gateway hostId=${this.config?.hostId ?? "(none)"} label=${this.config?.name ?? "(none)"}`,
+      `creating gateway hostId=${this.config?.hostId ?? "(none)"} label=${this.config?.name ?? "(none)"} e2ee=${e2ee ? "on" : "off"}`,
     );
     return new RemoteGateway(this.options.server, {
       relayUrl: this.hostRelayUrl(relayUrl),
       hostId: this.config?.hostId,
       hostLabel: this.config?.name,
+      ...(e2ee ? { e2ee } : {}),
       connectWebSocket: (url) => Promise.resolve(new WebSocket(url)),
     });
   }

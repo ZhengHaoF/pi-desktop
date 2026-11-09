@@ -135,10 +135,16 @@ export class RelayService {
       // behave as a plain Node runtime for the bundled relay script.
       ELECTRON_RUN_AS_NODE: "1",
       RELAY_PORT: String(this.port),
-      // LAN mode is diagnostic plaintext until pairing + E2EE ship.
-      RELAY_CIPHER_REQUIRED: "false",
-      RELAY_ALLOW_PLAINTEXT_PUBLIC: "diagnostic",
+      // Step 2: LAN mode is E2EE + pairing by default. Diagnostic plaintext
+      // stays available for local testing via explicit env overrides below.
+      RELAY_CIPHER_REQUIRED: process.env.RELAY_CIPHER_REQUIRED ?? "true",
+      RELAY_PAIRING_REQUIRED: process.env.RELAY_PAIRING_REQUIRED ?? "true",
+      // Device bindings survive relay restarts (every app launch restarts it).
+      RELAY_STATE_PATH: process.env.RELAY_STATE_PATH ?? path.join(app.getPath("userData"), "relay-pairings.json"),
     };
+    if (env.RELAY_CIPHER_REQUIRED === "false" || env.RELAY_PAIRING_REQUIRED === "false") {
+      env.RELAY_ALLOW_PLAINTEXT_PUBLIC = process.env.RELAY_ALLOW_PLAINTEXT_PUBLIC ?? "diagnostic";
+    }
     const child = spawn(process.execPath, [entry], {
       env,
       stdio: ["ignore", "pipe", "pipe"],

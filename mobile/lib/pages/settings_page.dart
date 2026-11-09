@@ -1,8 +1,11 @@
 /// Phone-side settings page: link status, relay params, reconnect controls.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../core/keep_alive.dart';
 import '../core/remote_connection.dart';
 import 'connect_page.dart';
 
@@ -17,6 +20,31 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   bool _reconnecting = false;
+  bool _keepAlive = true;
+  bool _keepAliveLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    keepAliveEnabled().then((enabled) {
+      if (mounted) {
+        setState(() {
+          _keepAlive = enabled;
+          _keepAliveLoading = false;
+        });
+      }
+    });
+  }
+
+  Future<void> _toggleKeepAlive(bool enabled) async {
+    setState(() => _keepAlive = enabled);
+    await setKeepAliveEnabled(enabled);
+    if (enabled) {
+      await startKeepAlive();
+    } else {
+      await stopKeepAlive();
+    }
+  }
 
   Future<void> _reconnect() async {
     setState(() => _reconnecting = true);
@@ -26,6 +54,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
   void _disconnectAndExit() {
     widget.connection.disconnect();
+    // 断开后没有需要保活的链路，停掉前台服务。
+    unawaited(stopKeepAlive());
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const ConnectPage()),
     );
@@ -75,6 +105,28 @@ class _SettingsPageState extends State<SettingsPage> {
                     _kv('Relay 地址', widget.connection.relayUrl),
                     _kv('设备标识', widget.connection.deviceId),
                     _kv('Host ID', widget.connection.hostId ?? '（未获取，未连接或握手未完成）'),
+                  ],
+                ),
+              ),
+              _card(
+                title: '息屏保活',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('前台服务保持连接', style: TextStyle(fontSize: 14)),
+                      subtitle: const Text(
+                        '息屏/切后台时用前台服务 + 网络锁维持链路；通知栏常驻一条通知',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      value: _keepAlive,
+                      onChanged: _keepAliveLoading ? null : _toggleKeepAlive,
+                    ),
+                    const Text(
+                      '小米/红米需在系统设置里允许自启动并把电池策略设为「无限制」，否则杀后台仍会断链',
+                      style: TextStyle(fontSize: 11, color: Colors.black45),
+                    ),
                   ],
                 ),
               ),

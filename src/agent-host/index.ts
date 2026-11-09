@@ -30,12 +30,11 @@ const restoreGitRunner = installToolchainGitRunner(toolchainRuntime, () => {
   // Chat histories are unchanged; only project metadata needs reconciliation.
   server.emit("sessions.changed", "*", { cwd: null, projectInfoChanged: true });
 });
-const stopHandlers = registerHandlers(server);
-const stopWatcher = startSessionWatcher(server);
 
 // Remote control plane: outbound-only gateway to the user-configured relay.
 // Off by default; main pushes "remote:init"/"remote:changed" when the user
-// toggles 自建托管 in settings.
+// toggles 自建托管 in settings. Created before registerHandlers because the
+// remote.pair.* RPC methods delegate to it.
 const remoteControl = new RemoteControlController({
   server,
   postStatus: (status) => {
@@ -47,6 +46,9 @@ const remoteControl = new RemoteControlController({
   },
   log: (message) => log(`remote: ${message}`),
 });
+
+const stopHandlers = registerHandlers(server, { remoteControl });
+const stopWatcher = startSessionWatcher(server);
 process.parentPort?.postMessage({ type: "remote-config-request" });
 
 function log(message: string): void {
