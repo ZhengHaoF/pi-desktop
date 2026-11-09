@@ -1,5 +1,8 @@
 # Relay VPS 部署指南（pm2）
 
+> **面向用户的从零部署教程见 [relay-tutorial.md](relay-tutorial.md)**（含 Release 下载、systemd、TLS/wss 与故障排查）。
+> 本文是维护者的运维速记，绑定当前实际部署的机器与环境。
+
 > 以北京腾讯云 `82.156.168.149`（ssh 别名 `tencent-bj`，Ubuntu 26.04 / Node 22 / pm2 7）为例。
 > 产物是单文件，服务器不需要仓库和 node_modules。
 > CI 发布：打 `v*` tag 后 `release-mobile-relay` job 会把 `pi-relay-<version>.mjs` 与 APK 一起放进 draft release。

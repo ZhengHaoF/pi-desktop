@@ -200,6 +200,14 @@
 - 飞书/Lark 通过官方 SDK 长连接收取私聊、受控群聊和 thread，并使用 Card 渲染 Markdown、流式显示思考/工具调用、最终折叠过程
 - Telegram 与飞书/Lark 在原消息上显示回合 Reaction 状态；飞书单聊可用原生菜单触发 `/help`、`/status`、`/new`、`/compact` 和 `/reload`
 
+### 手机远程控制（Android）
+
+- 安装 Android App 后，人在外面也能用手机连回家里的电脑：按项目分组的会话列表、聊天与流式回复、工具调用卡片、审批与中止、模型切换和 `/` 命令面板，全部在手机上完成
+- 链路为手机 → Relay → 桌面 gateway，全程端到端加密（E2EE）；Relay 是零知识中继，只见密文信封，无法解读消息内容
+- Relay 三种用法：**局域网模式**（桌面应用内置托管，同一 Wi-Fi 直接用）、**云 Relay**（在任意 VPS 部署单文件 `pi-relay-<version>.mjs`，公开 Release 提供现成产物，可配合 Caddy/nginx 终结 TLS 使用 `wss://`）、或桌面应用直接托管给局域网设备
+- 手机首次连接扫码配对，凭证签发后持久保存，重连免扫码；公网 Relay 强制配对并默认 fail-closed（强制 E2EE、防重放、设备级限流）
+- 部署自己的云 Relay 请看 **[Relay 部署教程](docs/relay-tutorial.md)**（从全新 VPS 到手机配对成功，含 TLS 配置与故障排查）；功能与架构细节见 [远程功能文档](docs/remote-features.md)
+
 ### 为长期运行而设计
 
 - 单实例、系统托盘、桌面通知与 Dock / 任务栏角标

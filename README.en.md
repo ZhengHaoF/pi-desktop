@@ -200,6 +200,14 @@ Generated images appear in final replies and remain viewable when session histor
 - Receive Feishu/Lark DMs, controlled groups, and threads through the official SDK long connection; Cards render Markdown, stream thinking and tool progress, and fold process details into the final response
 - Show turn-status reactions on the source message in Telegram and Feishu/Lark; Feishu DMs can invoke `/help`, `/status`, `/new`, `/compact`, and `/reload` from a native bot menu
 
+### Mobile remote control (Android)
+
+- Install the Android app and reach your home computer from anywhere: project-grouped session lists, chat with streaming replies, tool-call cards, approvals and aborts, model switching, and a `/` command palette — all from the phone
+- The link is phone → relay → desktop gateway with end-to-end encryption (E2EE); the relay is a zero-knowledge forwarder that only sees ciphertext envelopes and cannot read any message content
+- Three relay options: **LAN mode** (hosted inside the desktop app over the same Wi-Fi), a **cloud relay** (deploy the single-file `pi-relay-<version>.mjs` on any VPS — ready-made artifacts ship with public releases, and Caddy/nginx can terminate TLS for `wss://`), or the desktop's built-in hosting for LAN devices
+- Pair once by scanning a QR code; the issued credential persists so reconnections need no re-pairing. Public relays enforce pairing and fail-closed defaults (mandatory E2EE, replay protection, per-device rate limiting)
+- To deploy your own cloud relay, see the **[relay deployment tutorial](docs/relay-tutorial.md)** (from a fresh VPS to a paired phone, with TLS setup and troubleshooting); feature and architecture details live in [remote-features.md](docs/remote-features.md)
+
 ### Designed for long-running desktop use
 
 - Single-instance behavior, system tray, desktop notifications, and Dock/taskbar badges
