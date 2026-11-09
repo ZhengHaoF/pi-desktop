@@ -465,17 +465,17 @@ const checks = [
     "the packaged E2E must enforce the release matrix, exact resources, hashes, functional rg/fd, and production startup ack",
   ],
   [
-    ["darwin-arm64", "darwin-x64", "win32-x64", "linux-x64"].every((target) => desktopBuildWorkflow.includes(target)) &&
+    // Fork trim: only Windows is packaged/released by CI (no macOS signing, no
+    // Linux AppImage), so the release matrix narrows to win32-x64 + the shared
+    // toolchain E2E machinery. verify-packaged-toolchains keeps the other
+    // targets implemented for future re-expansion.
+    desktopBuildWorkflow.includes("win32-x64") &&
       desktopBuildWorkflow.includes("check:packaged-toolchains") &&
-      desktopBuildWorkflow.includes("release-linux") &&
-      desktopBuildWorkflow.includes("xvfb-run --auto-servernum") &&
-      desktopBuildWorkflow.includes("sudo chown root:root dist/linux-unpacked/chrome-sandbox") &&
-      desktopBuildWorkflow.includes("sudo chmod 4755 dist/linux-unpacked/chrome-sandbox") &&
+      desktopBuildWorkflow.includes("release-windows") &&
+      desktopBuildWorkflow.includes("release-mobile-relay") &&
       electronBuilderConfig.includes("executableName: pi-agent-desktop") &&
-      electronBuilderConfig.includes("--appimage-desktop-launch") &&
-      !electronBuilderConfig.includes("--no-sandbox") &&
-      desktopBuildWorkflow.includes("Pi-Agent-Desktop-${version}-x86_64.AppImage"),
-    "CI and tag releases must run packaged toolchain E2E for every supported target, including Linux under Xvfb",
+      !electronBuilderConfig.includes("--no-sandbox"),
+    "CI and tag releases must run the packaged toolchain E2E for the fork release target (Windows) plus mobile/relay assets",
   ],
   [
     toolchainInstaller.includes("previousRoot") &&

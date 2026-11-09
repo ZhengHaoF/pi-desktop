@@ -16,24 +16,16 @@ function stepByName(jobName, stepName) {
   return step;
 }
 
-test("main pushes package every supported desktop target", () => {
+test("main pushes package every supported desktop target (fork: Windows only)", () => {
   assert.deepEqual(workflow.on.push.branches, ["main"]);
   assert.equal(workflow.jobs.package.if, "github.ref_type != 'tag'");
   assert.deepEqual(
     workflow.jobs.package.strategy.matrix.include.map(({ tool_target }) => tool_target),
-    ["darwin-arm64", "darwin-x64", "win32-x64", "linux-x64"],
-  );
-  assert.match(
-    stepByName("package", "Verify packaged toolchains and production startup (macOS)").run,
-    /check:packaged-toolchains/,
+    ["win32-x64"],
   );
   assert.match(
     stepByName("package", "Verify packaged toolchains and production startup (Windows)").run,
     /check:packaged-toolchains.*--release-helper/,
-  );
-  assert.match(
-    stepByName("package", "Verify packaged toolchains and production startup (Linux)").run,
-    /check:packaged-toolchains/,
   );
 });
 
@@ -79,18 +71,10 @@ test("Windows runs pure quality checks and Electron smoke without an Xvfb depend
   );
 });
 
-test("package metadata is cross-checked against each platform artifact", () => {
+test("package metadata is cross-checked against each platform artifact (fork: Windows only)", () => {
   const verification = stepByName("package", "Verify update metadata matches the packaged architecture").run;
-  for (const metadata of ["latest-mac.yml", "latest.yml", "latest-linux.yml"])
-    assert.match(verification, new RegExp(metadata));
-  for (const artifact of [
-    "${{ matrix.arch }}.dmg",
-    "${{ matrix.arch }}.zip",
-    "Unsigned-Beta-Setup-${version}.exe",
-    "x86_64.AppImage",
-  ]) {
-    assert.ok(verification.includes(artifact), artifact);
-  }
+  assert.ok(verification.includes("latest.yml"), "latest.yml");
+  assert.ok(verification.includes("Unsigned-Beta-Setup-${version}.exe"), "installer");
   assert.match(verification, /verify-update-metadata\.mjs "\$metadata" "\$version" "\$\{update_artifacts\[@\]\}"/);
 });
 

@@ -25,15 +25,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Linux x64
-            runner: ubuntu-24.04
-            timeout_minutes: 25
-          - name: macOS arm64
-            runner: macos-15
-            timeout_minutes: 25
-          - name: macOS x64
-            runner: macos-15-intel
-            timeout_minutes: 25
           - name: Windows x64
             runner: windows-2025
             timeout_minutes: 45
@@ -271,20 +262,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: macOS arm64
-            runner: macos-15
-            platform: mac
-            targets: dmg zip
-            arch: arm64
-            tool_target: darwin-arm64
-            artifact: pi-desktop-macos-arm64
-          - name: macOS Intel x64
-            runner: macos-15-intel
-            platform: mac
-            targets: dmg zip
-            arch: x64
-            tool_target: darwin-x64
-            artifact: pi-desktop-macos-x64
           - name: Windows x64
             runner: windows-2025
             platform: win
@@ -292,13 +269,6 @@ jobs:
             arch: x64
             tool_target: win32-x64
             artifact: pi-desktop-windows-x64
-          - name: Linux x64
-            runner: ubuntu-24.04
-            platform: linux
-            targets: AppImage
-            arch: x64
-            tool_target: linux-x64
-            artifact: pi-desktop-linux-x64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 35
     env:
@@ -413,27 +383,8 @@ jobs:
         run: |
           set -euo pipefail
           version="$(node -p "require('./package.json').version")"
-          case "${{ matrix.platform }}" in
-            mac)
-              metadata="dist/latest-mac.yml"
-              update_artifacts=(
-                "dist/Pi-Agent-Desktop-${version}-${{ matrix.arch }}.dmg"
-                "dist/Pi-Agent-Desktop-${version}-${{ matrix.arch }}.zip"
-              )
-              ;;
-            win)
-              metadata="dist/latest.yml"
-              update_artifacts=("dist/Pi-Agent-Desktop-Unsigned-Beta-Setup-${version}.exe")
-              ;;
-            linux)
-              metadata="dist/latest-linux.yml"
-              update_artifacts=("dist/Pi-Agent-Desktop-${version}-x86_64.AppImage")
-              ;;
-            *)
-              echo "Unsupported package platform: ${{ matrix.platform }}" >&2
-              exit 1
-              ;;
-          esac
+          metadata="dist/latest.yml"
+          update_artifacts=("dist/Pi-Agent-Desktop-Unsigned-Beta-Setup-${version}.exe")
           node scripts/verify-update-metadata.mjs "$metadata" "$version" "${update_artifacts[@]}"
 
       - name: Upload ${{ matrix.name }} artifacts
@@ -441,15 +392,10 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: |
-            dist/*.dmg
-            dist/*.zip
             dist/*.exe
-            dist/*.AppImage
             dist/*.blockmap
             dist/latest*.yml
             dist/latest*.yaml
-            dist/*-mac.yml
-            dist/latest-linux*.yml
             dist/*.cdx.json
             THIRD_PARTY_NOTICES.md
           if-no-files-found: error
@@ -537,27 +483,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: npm run check:toolchain-catalog:upstream
-
-  release-macos:
-    name: Sign and notarize macOS
-    # This fork has no Apple signing secrets; macOS distribution is disabled.
-    if: false
-    needs: [release-contract]
-    runs-on: macos-15
-    timeout-minutes: 90
-    environment:
-      name: release
-    steps:
-      - run: echo "macOS release disabled (no Apple signing secrets in this fork)."
-
-  verify-macos-x64:
-    name: Verify signed macOS x64 package
-    if: false
-    needs: [release-macos]
-    runs-on: macos-15-intel
-    timeout-minutes: 15
-    steps:
-      - run: echo "skipped (macOS release disabled)."
 
   release-windows:
     name: Package Windows x64 (Unsigned Beta)
@@ -800,70 +725,6 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  release-linux:
-    name: Package Linux x64
-    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
-    needs: [release-contract]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    env:
-      CSC_IDENTITY_AUTO_DISCOVERY: "false"
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build application
-        run: npm run build
-
-      - name: Prepare verified bundled search tools
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-downloads.mjs tools linux-x64
-
-      - name: Package Linux x64
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-downloads.mjs builder --linux AppImage --x64 --publish never
-
-      - name: Configure packaged Electron sandbox
-        run: |
-          sudo chown root:root dist/linux-unpacked/chrome-sandbox
-          sudo chmod 4755 dist/linux-unpacked/chrome-sandbox
-
-      - name: Run packaged toolchain E2E for Linux x64
-        run: xvfb-run --auto-servernum npm run check:packaged-toolchains -- linux-x64
-
-      - name: Verify Linux release artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(node -p "require('./package.json').version")"
-          appimage="dist/Pi-Agent-Desktop-${version}-x86_64.AppImage"
-          test -s "$appimage"
-          test "$(find dist -maxdepth 1 -type f -name '*.AppImage' | wc -l | tr -d ' ')" -eq 1
-          test -s dist/latest-linux.yml
-          node scripts/verify-update-metadata.mjs dist/latest-linux.yml "$version" "$appimage"
-
-      - name: Upload Linux release artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: pi-desktop-linux-release
-          path: |
-            dist/*.AppImage
-            dist/*.blockmap
-            dist/latest-linux.yml
-          if-no-files-found: error
-          retention-days: 14
-
   release-mobile-relay:
     name: Package Android APK and relay bundle
     if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
@@ -948,7 +809,7 @@ jobs:
   release:
     name: Create desktop draft release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [release-macos, verify-macos-x64, release-windows, release-linux, release-mobile-relay]
+    needs: [release-windows, release-mobile-relay]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -968,17 +829,13 @@ jobs:
           set -euo pipefail
 
           files=()
-          mac_artifacts="release-artifacts/pi-desktop-macos-release"
           windows_artifacts="release-artifacts/pi-desktop-windows-release"
-          linux_artifacts="release-artifacts/pi-desktop-linux-release"
           mobile_relay_artifacts="release-artifacts/pi-desktop-mobile-relay-release"
-          test -d "$mac_artifacts"
           test -d "$windows_artifacts"
-          test -d "$linux_artifacts"
           test -d "$mobile_relay_artifacts"
           while IFS= read -r -d '' file; do
             files+=("$file")
-          done < <(find "$mac_artifacts" "$windows_artifacts" "$linux_artifacts" "$mobile_relay_artifacts" -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.AppImage' -o -name '*.apk' -o -name '*.mjs' -o -name '*.md' -o -name '*.blockmap' -o -name '*.yml' -o -name '*.yaml' -o -name '*.cdx.json' -o -name 'THIRD_PARTY_NOTICES.md' \) -print0)
+          done < <(find "$windows_artifacts" "$mobile_relay_artifacts" -type f \( -name '*.exe' -o -name '*.apk' -o -name '*.mjs' -o -name '*.md' -o -name '*.blockmap' -o -name '*.yml' -o -name '*.yaml' -o -name '*.cdx.json' -o -name 'THIRD_PARTY_NOTICES.md' \) -print0)
 
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No release files were downloaded" >&2
@@ -998,8 +855,6 @@ jobs:
           test "$(find "$windows_artifacts" -type f -name 'latest.yml' | wc -l | tr -d ' ')" -eq 1
           test "$(find "$windows_artifacts" -type f -name '*.cdx.json' | wc -l | tr -d ' ')" -eq 1
           test "$(find "$windows_artifacts" -type f -name 'THIRD_PARTY_NOTICES.md' | wc -l | tr -d ' ')" -eq 1
-          test "$(find "$linux_artifacts" -type f -name '*.AppImage' | wc -l | tr -d ' ')" -eq 1
-          test "$(find "$linux_artifacts" -type f -name 'latest-linux.yml' | wc -l | tr -d ' ')" -eq 1
           test "$(find "$mobile_relay_artifacts" -type f -name '*.apk' | wc -l | tr -d ' ')" -eq 1
           test "$(find "$mobile_relay_artifacts" -type f -name 'pi-relay-*.mjs' | wc -l | tr -d ' ')" -eq 1
 
