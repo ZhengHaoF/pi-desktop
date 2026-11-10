@@ -124,6 +124,19 @@ test("v2 automation defaults always migrate to ask and active advanced state is 
   assert.equal(migrated.settings.advancedBrowserMode.enabled, false);
 });
 
+test("v3 files written before allowAgentJavaScript load without invalidation and fail closed", () => {
+  const legacy = createDefaultBrowserSettings();
+  delete legacy.automation.allowAgentJavaScript;
+  const parsed = parseBrowserSettings(legacy);
+  assert.equal(parsed.recoveredFromInvalid, false);
+  assert.equal(parsed.settings.automation.allowAgentJavaScript, false);
+  // Every other field survives: the whole file must not fall back to defaults.
+  assert.equal(parsed.settings.automation.enabled, legacy.automation.enabled);
+  assert.equal(parsed.settings.automation.defaultPermission, legacy.automation.defaultPermission);
+  // An unknown automation key is still rejected outright.
+  assert.throws(() => validateBrowserSettings({ ...legacy, automation: { ...legacy.automation, notARealKey: true } }));
+});
+
 test("BrowserSettingsStore writes atomically with private mode, recovers corruption, and preserves future state", () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "pi-browser-settings-"));
   const file = path.join(directory, "browser-settings.json");

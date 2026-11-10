@@ -231,7 +231,10 @@ export function validateBrowserSettings(value: unknown): BrowserSettingsV2 {
   const navigation = expectRecord(root.navigation, "Browser navigation settings");
   expectExactKeys(navigation, NAVIGATION_KEYS, "Browser navigation settings");
   const automation = expectRecord(root.automation, "Browser automation settings");
-  expectExactKeys(automation, AUTOMATION_KEYS, "Browser automation settings");
+  // allowAgentJavaScript shipped after v3 files started being written; tolerate
+  // its absence (it fails closed to false below) instead of invalidating the
+  // whole settings file on first load after the upgrade.
+  expectExactKeys(automation, AUTOMATION_KEYS, "Browser automation settings", "allowAgentJavaScript");
   const downloads = expectRecord(root.downloads, "Browser download settings");
   expectExactKeys(downloads, DOWNLOAD_KEYS, "Browser download settings", true);
   const proxy = expectRecord(root.proxy, "Browser proxy settings");
@@ -462,12 +465,19 @@ function expectExactKeys(
   value: Record<string, unknown>,
   allowed: ReadonlySet<PropertyKey>,
   label: string,
-  optionalKeys = false,
+  optionalKeys: boolean | string | ReadonlySet<string> = false,
 ): void {
   expectAllowedKeys(value, allowed, label);
-  if (!optionalKeys) {
-    for (const key of allowed) {
-      if (typeof key === "string" && !(key in value)) throw new Error(`${label}.${key} is required`);
+  const optional =
+    typeof optionalKeys === "boolean"
+      ? null
+      : typeof optionalKeys === "string"
+        ? new Set([optionalKeys])
+        : optionalKeys;
+  if (optionalKeys === true) return;
+  for (const key of allowed) {
+    if (typeof key === "string" && !(key in value) && !(optional?.has(key) ?? false)) {
+      throw new Error(`${label}.${key} is required`);
     }
   }
 }
