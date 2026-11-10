@@ -101,12 +101,17 @@ cd mobile && flutter run -d 192.168.31.118:38043 # 真机无线调试
 - [x] 发送逻辑：`agent.running` 流驱动回合状态镜像——运行中发送自动改为 `steer`（插队，本轮内送达），空闲发 `prompt`；对标 PC「Enter=steer」
 - [x] 输入框运行中态：黄色边框 + 提示「回合进行中，发送将插队…」
 - [x] 队列横条：运行中每 5 秒轮询 `agent.state`（`agentState.queuedMessages`），黄色横条显示「已排队 n 条」+ 每条内容（⚡ 插队 / ⏭ 排队）+ **清空**按钮（`clear_queue`，带 loading，用返回值刷新）
-- [x] 生命周期：`agent.running` 订阅驱动轮询启停（空闲零开销）；进入页面从 `sessions.get` 的 `agentState.running` 恢复状态；回合结束自动清空横条
+- [x] 生命周期：`agent.running` 订阅驱动轮询启停（空闲零开销）；进入页面从 `sessions.get` 的 `agentState.state`（`isStreaming` / `isPromptRunning`）恢复状态，再拉一次 `sessions.list.runningSessionIds` 对齐；回合结束自动清空横条
 - [x] 白名单补充：`agent.state`（只读）三处镜像 + gateway 测试断言
 - [x] 协议 E2E 验收（会话期脚本，未入库）：prompt 长回合 → steer + follow_up → `get_state` 快照确认两条在队列 → `clear_queue` → 队列确认清空，全 PASS
 - [x] **手机 UI 视觉确认** ✅ 2026-11-09（MuMu + uiautomator 文本断言）：黄条 5 秒轮询内出现「已排队 1 条（回合中送达）」、条目带「⚡ 插队」标记、清空按钮生效。验证前发现并修复两个 bug：
   1. **回合状态镜像断裂**：PC 端 `agent.running` 事件负载是全局 `{sessionIds, runningSessionIds}`（handlers.ts），chat_page 却读 `data['running']` 布尔 → 永远 false，运行中发送退化为 prompt、黄条不出现。已改为 `ids.contains(sessionId)`
   2. **恢复路径失效**：`sessions.get` 需显式 `includeState: true` 才返回 agentState，chat_page 未传 → 进页恢复 running 态永远 false。已补传
+
+- [x] **空闲会话「假排队」修复** ✅ 2026-11-10（真机截图反馈）：chat_page 原先把 `sessions.get` 的 `agentState.running` 当作回合状态，但该字段在 PC 端是 `isAlive()`（会话对象驻留内存），几乎恒为 true → 进页面即显示「回合进行中」，首条消息被发成 `steer` 卡在 Pi 的 steering 队列（黄条显示自己那条 +「正在回复…」不消失，因为没有回合来消费）。修复三处：
+  1. 手机端改用运行时快照 `state.isStreaming / state.isPromptRunning` 恢复 `_turnRunning`（抽出纯函数 + 3 项单测）；
+  2. `agent.running` 只在状态变化时广播、订阅不重放快照，故进页面再拉一次 `sessions.list.runningSessionIds`（`isRunning()`，与主页红点同源）对齐，轮询启停统一走 `_applyTurnRunning`；
+  3. PC 端 `rpc-manager.ts` 的 `send()` 加兜底：空闲时 `steer` / `follow_up` 归一化为 `prompt`（丢弃残留 `streamingBehavior`），即使客户端状态再次出错也不会把用户消息挂死。新增 4 项桌面单测覆盖空闲/回合中两种路径。
 
 ### 息屏保活（Android 前台服务）✅ 新增
 - [x] `flutter_foreground_task` 11.x：TaskHandler 在**服务 isolate 回调**里注册（主 isolate 注册会向主引擎发无 handler 的 start → MissingPluginException 噪音，已避开）；`startService` 携带 callback

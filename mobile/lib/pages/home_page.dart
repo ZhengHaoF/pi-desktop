@@ -135,7 +135,8 @@ class _HomePageState extends State<HomePage> {
       final message = err is StateError ? err.message.replaceFirst('Bad state: ', '') : err.toString();
       setState(() {
         // 离线是已知状态而非异常：用空态提示，不显示红色超时错误。
-        _error = widget.connection.isTargetHostOffline ? null : message;
+        // 但配对被拒/协议违规等服务器主动断链要原样呈现给用户。
+        _error = widget.connection.isTargetHostOffline ? null : widget.connection.describeLastFailure() ?? message;
         _loading = false;
       });
     }

@@ -12,6 +12,7 @@ import type { HerdrRuntimeDescriptor } from "../contract/herdr";
 import type { RemoteControlConfig } from "../contract/desktop";
 import { BrowserError } from "./browser/browser-error";
 import { createHostExitSignal, reserveHostRestart, trySpawnHost, type HostExitSignal } from "./host-restart-core";
+import { hostRemoteControlConfig } from "./host-remote-config";
 import { HostOutputLineBuffer } from "./logger-core";
 import { randomUUID } from "node:crypto";
 import { evaluateHeartbeatTick } from "../shared/heartbeat-liveness";
@@ -121,14 +122,7 @@ export class HostManager {
   }
 
   setRemoteControlConfig(config: RemoteControlConfig): void {
-    this.remoteControlConfig = {
-      enabled: config.enabled,
-      relayUrl: config.relayUrl,
-      hostId: config.hostId,
-      name: config.name,
-      mode: config.mode ?? "lan",
-      lanPort: config.lanPort,
-    };
+    this.remoteControlConfig = hostRemoteControlConfig(config);
     if (this.child && this.status === "ready") this.postRemoteSnapshot("remote:changed");
   }
 

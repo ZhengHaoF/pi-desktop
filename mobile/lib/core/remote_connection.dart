@@ -1,6 +1,7 @@
 /// Remote connection: outbound WebSocket to the Relay, hello handshake,
-/// request/response correlation, subscription bookkeeping. M1a talks plain
-/// JSON envelopes (diagnostic relay mode); E2EE arrives in M1b.
+/// request/response correlation, subscription bookkeeping. Routed payloads
+/// are E2EE-sealed whenever the relay reports cipherRequired (hello/auth
+/// stays plaintext by design — it carries no session content).
 library;
 
 import 'dart:async';
@@ -61,6 +62,10 @@ class RemoteConnection {
   /// hello_ack 要求密文且密钥就绪：之后的路由帧全部 E2EE。
   bool _cipherMode = false;
   String? _handshakeError;
+  /// 服务器主动断链时的关闭码/原因（如 4003 "pairing required"）；用于在
+  /// UI 呈现真实失败原因，而不是笼统的 "not connected"。
+  int? _lastCloseCode;
+  String? _lastCloseReason;
   /// Device-chosen target host (multi-PC); falls back to the relay's first
   /// online host when null.
   String? _preferredHostId;
@@ -94,6 +99,32 @@ class RemoteConnection {
   String? get preferredHostId => _preferredHostId;
   /// E2EE 握手错误（如主机公钥与钉扎不符）；非 null 时链路已拒绝。
   String? get handshakeError => _handshakeError;
+  /// 最近一次断链的 WebSocket 关闭码/原因（服务器拒绝时非 null）。
+  int? get lastCloseCode => _lastCloseCode;
+  String? get lastCloseReason => _lastCloseReason;
+
+  /// 面向用户的最近一次失败原因：优先握手拒绝（E2EE/钉扎），其次服务器
+  /// 主动断链（配对被拒、协议违规等），兜底 null。请求超时类错误不在此列。
+  String? describeLastFailure() {
+    if (_handshakeError != null) return _handshakeError;
+    final reason = _lastCloseReason;
+    if (_lastCloseCode == null) return null;
+    switch (_lastCloseCode) {
+      case 4003:
+        return '配对失败：设备尚未配对或凭证已失效，请在电脑上重新扫码配对'
+            '${reason == null || reason.isEmpty ? '' : '（$reason）'}';
+      case 4002:
+        return '连接被中继拒绝（协议违规）${reason == null || reason.isEmpty ? '' : '：$reason'}';
+      case 4000:
+        return '连接被中继拒绝（协议版本不匹配）：请更新手机端与电脑端到相同版本';
+      case 4001:
+        return '连接被中继拒绝（缺少设备标识）：请清除应用数据后重试';
+      case 1008:
+        return '连接被中继拒绝（请求频率超限），请稍后重试';
+      default:
+        return reason == null || reason.isEmpty ? null : '连接关闭（$_lastCloseCode）：$reason';
+    }
+  }
 
   /// 当前目标主机是否已知且离线（离线时请求会直接失败，不再等 30s 超时）。
   bool get isTargetHostOffline {
@@ -148,7 +179,7 @@ class RemoteConnection {
       onDone: () => _onLinkDown('link closed'),
       onError: (_) => _onLinkDown('link error'),
     );
-    _deviceSecret ??= await loadDeviceSecret(deviceId);
+    _deviceSecret ??= await loadDeviceSecret(deviceId, relayUrl: relayUrl);
     // E2EE: ephemeral X25519 key pair per connection; the host derives the
     // shared secret from our public key + its static key.
     _deviceKeys = await E2eeKeyPair.generate();
@@ -156,6 +187,8 @@ class RemoteConnection {
     _open = null;
     _cipherMode = false;
     _handshakeError = null;
+    _lastCloseCode = null;
+    _lastCloseReason = null;
     final auth = <String, dynamic>{
       if (_deviceSecret != null && _deviceSecret!.isNotEmpty) 'deviceSecret': _deviceSecret,
       if (pairingToken != null && pairingToken!.isNotEmpty) 'pairingToken': pairingToken,
@@ -169,6 +202,11 @@ class RemoteConnection {
   /// every routed frame, so reconnect (fresh hello → fresh hostId) on any
   /// link loss unless the user disconnected on purpose.
   void _onLinkDown(String reason) {
+    // 服务器主动断链时 adapter 已收到 Close 帧：把关闭码/原因留在连接对象
+    // 上（_lastCloseCode/_lastCloseReason），供 UI 呈现真实原因。注意
+    // connect() 会在下次拨号时清空它们，所以这是"最近一次失败"的快照。
+    _lastCloseCode = _channel?.closeCode;
+    _lastCloseReason = _channel?.closeReason;
     _helloAcked = false;
     _outbox.clear();
     _failPending(reason);
@@ -210,6 +248,9 @@ class RemoteConnection {
     _outbox.clear();
     _failPending('disconnected');
     _resetCipher();
+    // 主动断链不算失败：清掉上一次的快照，避免 UI 呈现过时原因。
+    _lastCloseCode = null;
+    _lastCloseReason = null;
     _setState(LinkState.disconnected);
   }
 
@@ -378,7 +419,7 @@ class RemoteConnection {
         final issuedSecret = payload['deviceSecret'];
         if (issuedSecret is String && issuedSecret.isNotEmpty) {
           _deviceSecret = issuedSecret;
-          unawaited(saveDeviceSecret(deviceId, issuedSecret));
+          unawaited(saveDeviceSecret(deviceId, issuedSecret, relayUrl: relayUrl));
         }
         if (_preferredHostId != null &&
             _knownHosts.any((h) => h.id == _preferredHostId) &&
@@ -444,7 +485,7 @@ class RemoteConnection {
       }
     }
     if (hostId != null && hostPub != null) {
-      final pinned = await loadPinnedHostPub(hostId);
+      final pinned = await loadPinnedHostPub(hostId, relayUrl: relayUrl);
       if (pinned != null && pinned != hostPub) {
         // Key rotation is only trusted through a fresh pairing scan; a silent
         // swap over the wire is a relay/network MITM signal — refuse.
@@ -457,7 +498,7 @@ class RemoteConnection {
         _setState(LinkState.disconnected);
         return;
       }
-      if (pinned == null) await savePinnedHostPub(hostId, hostPub);
+      if (pinned == null) await savePinnedHostPub(hostId, hostPub, relayUrl: relayUrl);
     }
     if (cipherRequired) {
       final deviceKeys = _deviceKeys;
@@ -476,6 +517,8 @@ class RemoteConnection {
       _open = null;
     }
     _setState(LinkState.ready);
+    // 握手成功才记住地址：失败的尝试不覆盖上一次可用配置。
+    unawaited(saveLastRelayUrl(relayUrl));
     _flushOutbox();
   }
 

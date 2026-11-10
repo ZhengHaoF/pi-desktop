@@ -139,9 +139,10 @@ export interface RemoteControlConfig {
   /** Host's static X25519 public key (base64url) — E2EE + QR pairing anchor. */
   e2eePublicKey?: string;
   /**
-   * Host's X25519 private key (PKCS8 DER base64). Main-only: injected into
-   * the gateway-bound copy of the config, never persisted to uiState and
-   * never sent to the renderer.
+   * Host's X25519 private key (PKCS8 DER base64). Trusted-process-only:
+   * injected into the gateway-bound copy of the config that main forwards to
+   * the agent-host child, never persisted to uiState and never sent to the
+   * renderer.
    */
   e2eePrivateKey?: string;
 }

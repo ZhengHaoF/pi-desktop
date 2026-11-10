@@ -92,7 +92,6 @@ export function RemoteControlCard() {
   const [relayStatus, setRelayStatus] = useState<RelayServiceStatus | null>(null);
   const [lanAddresses, setLanAddresses] = useState<LanAddress[]>([]);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
-  const [showCustomQr, setShowCustomQr] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
@@ -428,14 +427,6 @@ export function RemoteControlCard() {
                     </button>
                   </div>
                 </div>
-                <div style={{ display: "grid", justifyItems: "center", gap: 4 }}>
-                  <div style={{ background: "#fff", padding: 6, borderRadius: 8, border: "1px solid var(--border)" }}>
-                    <QrCode value={active.url} />
-                  </div>
-                  <div style={{ fontSize: 10, color: "var(--text-dim)" }}>
-                    {t("relayScanHint", "Scan in the phone app")}
-                  </div>
-                </div>
               </div>
             ) : (
               <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
@@ -483,28 +474,8 @@ export function RemoteControlCard() {
                 >
                   {copied === "custom-url" ? t("remoteCopied", "Copied") : t("remoteCopy", "Copy")}
                 </button>
-                <button
-                  type="button"
-                  style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }}
-                  onClick={() => setShowCustomQr((v) => !v)}
-                >
-                  {showCustomQr ? t("relayHideQr", "Hide QR") : t("relayShowQr", "Show QR")}
-                </button>
-                <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
-                  {t("relayScanHint", "Scan in the phone app")}
-                </span>
               </div>
             </div>
-            {showCustomQr && draft.relayUrl.trim().startsWith("ws") ? (
-              <div style={{ display: "grid", justifyItems: "center", gap: 4 }}>
-                <div style={{ background: "#fff", padding: 6, borderRadius: 8, border: "1px solid var(--border)" }}>
-                  <QrCode value={draft.relayUrl.trim()} />
-                </div>
-                <div style={{ fontSize: 10, color: "var(--text-dim)" }}>
-                  {t("relayScanHint", "Scan in the phone app")}
-                </div>
-              </div>
-            ) : null}
           </div>
         )}
 

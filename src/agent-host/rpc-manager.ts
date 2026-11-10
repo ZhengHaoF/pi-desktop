@@ -540,7 +540,18 @@ export class AgentSessionWrapper {
 
   async send(command: Record<string, unknown>): Promise<unknown> {
     this.resetIdleTimer();
-    const type = command.type as string;
+    let type = command.type as string;
+    // steer/follow_up are only meaningful mid-turn: pi queues them for the
+    // agent loop to pick up after the current tool call / run. With no turn
+    // running (e.g. a remote client mirrored a stale "running" flag) the
+    // message would sit in the queue forever with nothing to consume it.
+    // Treat it as a fresh prompt, which is also what the desktop does while
+    // idle. Normal mid-turn steers are untouched because isRunning() is true.
+    if ((type === "steer" || type === "follow_up") && !this.isRunning()) {
+      command = { ...command, type: "prompt" };
+      delete command.streamingBehavior;
+      type = "prompt";
+    }
     if (this.shouldWaitForExtensions(type)) await this.waitForExtensionsBound();
     if (this.forceEmptySystemPrompt && this.shouldWaitForExtensions(type)) this.syncDesktopToolActivation();
     if (["prompt", "steer", "follow_up", "compact"].includes(type)) this.modelSelection.assertReady(this.inner);

@@ -10,6 +10,19 @@ import '../core/remote_connection.dart';
 import '../widgets/markdown_text.dart';
 import '../widgets/session_models.dart';
 
+/// PC `agentState.running` means the session object is still alive
+/// (`isAlive()`), NOT that a turn is in flight. A turn is running only when
+/// the runtime snapshot returned by `get_state` says so; the desktop makes
+/// the same distinction in useAgentSession.ts. Reading `running` here made
+/// every live session look like "turn in progress", so the first message was
+/// sent as `steer` and sat in pi's steering queue with no run to consume it.
+bool turnRunningFromAgentState(Object? agentState) {
+  if (agentState is! Map) return false;
+  final runtime = agentState['state'];
+  if (runtime is! Map) return false;
+  return runtime['isStreaming'] == true || runtime['isPromptRunning'] == true;
+}
+
 class ChatPage extends StatefulWidget {
   const ChatPage({
     required this.connection,
@@ -82,15 +95,53 @@ class _ChatPageState extends State<ChatPage> {
           ..clear()
           ..addAll(historyLinesFromDetail(detail));
         _currentModel = _modelFromDetail(detail);
-        // Restore the turn-running mirror from the session snapshot so the
+        // Restore the turn mirror from the runtime snapshot so the
         // steer-vs-prompt choice is correct right after opening the page.
-        final agentState = detail['agentState'];
-        _turnRunning = agentState is Map ? agentState['running'] == true : false;
+        _turnRunning = turnRunningFromAgentState(detail['agentState']);
       });
-      if (_turnRunning) _startQueuePolling();
+      _applyTurnRunning(_turnRunning);
+      // agent.running broadcasts changes only and never replays a snapshot on
+      // subscribe; reconcile against the authoritative running-session ids so
+      // an idle PC cannot leave this page stuck in "turn in progress".
+      await _reconcileTurnRunning();
       _throttledScroll();
     } catch (err) {
       setState(() => _error = err.toString());
+    }
+  }
+
+  /// Apply a turn-state change from any source (snapshot restore, running
+  /// broadcast, sessions.list reconciliation), keeping the queue bar and its
+  /// polling in sync with the mirror.
+  void _applyTurnRunning(bool running) {
+    if (!mounted) return;
+    setState(() {
+      _turnRunning = running;
+      if (!running) {
+        _steeringQueue = const [];
+        _followUpQueue = const [];
+      }
+    });
+    if (running) {
+      _startQueuePolling();
+    } else {
+      _stopQueuePolling();
+    }
+  }
+
+  /// `sessions.list.runningSessionIds` comes from `isRunning()` on the PC
+  /// (the same source the home page uses for its running dot). Best-effort:
+  /// a failure here must not break the page, the snapshot restore above is
+  /// already a reasonable fallback.
+  Future<void> _reconcileTurnRunning() async {
+    try {
+      final result = await widget.connection.request('sessions.list', null);
+      final ids = result['runningSessionIds'];
+      if (ids is! List) return;
+      final running = ids.map((e) => e.toString()).contains(_sessionId);
+      if (running != _turnRunning) _applyTurnRunning(running);
+    } catch (_) {
+      // Keep the value restored from the session snapshot.
     }
   }
 
@@ -167,18 +218,7 @@ class _ChatPageState extends State<ChatPage> {
       final raw = data['runningSessionIds'] ?? data['sessionIds'];
       final ids = raw is List ? raw.map((e) => e.toString()).toSet() : const <String>{};
       final nowRunning = ids.contains(_sessionId);
-      if (nowRunning != _turnRunning || nowRunning) {
-        setState(() => _turnRunning = nowRunning);
-        if (nowRunning) {
-          _startQueuePolling();
-        } else {
-          _stopQueuePolling();
-          setState(() {
-            _steeringQueue = const [];
-            _followUpQueue = const [];
-          });
-        }
-      }
+      if (nowRunning != _turnRunning || nowRunning) _applyTurnRunning(nowRunning);
       return;
     }
     if (event.topic != 'agent.events' || event.key != _sessionId) return;

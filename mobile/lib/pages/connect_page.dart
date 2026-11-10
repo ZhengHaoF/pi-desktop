@@ -17,7 +17,9 @@ class ConnectPage extends StatefulWidget {
 }
 
 class _ConnectPageState extends State<ConnectPage> {
-  final _urlController = TextEditingController(text: 'ws://10.0.2.2:8788/ws');
+  static const String _defaultRelayUrl = 'ws://10.0.2.2:8788/ws';
+
+  final _urlController = TextEditingController(text: _defaultRelayUrl);
   final _deviceController = TextEditingController();
   /// 扫码载荷带入的配对材料：一次性 token 与目标 PC（hostId）。
   String? _pairingToken;
@@ -30,6 +32,11 @@ class _ConnectPageState extends State<ConnectPage> {
     super.initState();
     loadOrCreateDeviceId().then((id) {
       if (mounted) _deviceController.text = id;
+    });
+    // 回填上次成功连接的 relay 地址；用户已手动改过输入框时不覆盖。
+    loadLastRelayUrl().then((url) {
+      if (!mounted || url == null) return;
+      if (_urlController.text == _defaultRelayUrl) _urlController.text = url;
     });
   }
 
@@ -46,8 +53,9 @@ class _ConnectPageState extends State<ConnectPage> {
       _error = null;
     });
     // 配对二维码带的主机公钥是带外锚点：先钉扎，hello_ack 不符即拒连。
+    // 钉扎按 relay 地址隔离，换 relay 不互相污染。
     if (scanned.e2eePub != null && scanned.hostId != null) {
-      await savePinnedHostPub(scanned.hostId!, scanned.e2eePub!);
+      await savePinnedHostPub(scanned.hostId!, scanned.e2eePub!, relayUrl: scanned.url);
     }
     // Scanning is an explicit intent to connect — go straight through.
     await _connect();
@@ -136,8 +144,8 @@ class _ConnectPageState extends State<ConnectPage> {
             ],
             const Spacer(),
             Text(
-              'M1a 链路验证版：本地/内网 Relay（诊断模式，无 E2EE）。\n'
-              '正式配对、E2EE 与公网 Relay 属于 M1b。',
+              '端到端加密：配对成功后所有会话内容在手机与电脑间加密传输，'
+              '中继服务器无法读取。\n首次连接请用电脑端「设备配对」二维码扫码配对。',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
