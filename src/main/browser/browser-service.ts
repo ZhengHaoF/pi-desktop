@@ -791,7 +791,7 @@ export class BrowserService {
       >
     >;
     const permission = requiredPermission(method);
-    this.policy.assertRequest(context, permission);
+    this.policy.assertRequestForMethod(context, permission, method);
 
     switch (method) {
       case "browser.open": {

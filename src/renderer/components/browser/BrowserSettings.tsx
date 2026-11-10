@@ -256,6 +256,12 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
               </select>
             </Field>
             <Toggle
+              label={t("browserAllowAgentJavaScript", "Allow Agent to run page JavaScript (advanced)")}
+              checked={settings.automation.allowAgentJavaScript}
+              onChange={(allowAgentJavaScript) => void update({ automation: { allowAgentJavaScript } })}
+              danger
+            />
+            <Toggle
               label={t("browserAllowApprovedChannels", "Allow specifically approved channel sessions")}
               checked={settings.automation.allowChannelSessions}
               onChange={(allowChannelSessions) => void update({ automation: { allowChannelSessions } })}
@@ -353,6 +359,136 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                 {t("browserOpenSavedSession", "Open a saved session to manage its Browser permission.")}
               </div>
             )}
+
+            <div style={{ marginTop: 18, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 650, marginBottom: 10 }}>
+                {t("browserAdvancedMode", "Advanced Browser Mode")}
+              </div>
+              <div style={dangerStyle}>
+                {t(
+                  "browserAdvancedModeWarning",
+                  "One launch-only switch enables JavaScript, three-layer browser identity, trusted humanized input, full CDP network capture, confirmed write replay, the JavaScript experience library, security-header removal, advanced Profiles, certificate bypass, and unrestricted CDP. Full Cookie values remain blocked by Gate A.",
+                )}
+              </div>
+              <Toggle
+                label={t("browserEnableAdvancedForLaunch", "Enable Advanced Browser Mode for this launch")}
+                checked={runtime.advancedBrowserModeEnabled}
+                onChange={(enabled) => void update({ advancedBrowserMode: { enabled } })}
+                danger
+              />
+              <div style={noticeStyle}>
+                {t(
+                  "browserAdvancedRuntimeConfirmations",
+                  "POST/PUT/PATCH/DELETE replay and existing sensitive actions still require one local confirmation per action; these are action confirmations, not extra settings.",
+                )}
+              </div>
+              <Field label={t("browserIdentityMode", "Browser identity")}>
+                <select
+                  style={inputStyle}
+                  value={settings.advancedBrowserMode.identityMode}
+                  onChange={(event) =>
+                    void update({
+                      advancedBrowserMode: {
+                        identityMode: event.target.value as "native" | "chrome-compatible" | "custom",
+                      },
+                    })
+                  }
+                >
+                  <option value="chrome-compatible">
+                    {t("browserIdentityChromeCompatible", "Chromium-compatible (recommended)")}
+                  </option>
+                  <option value="native">{t("browserIdentityNative", "Electron native")}</option>
+                  <option value="custom">{t("browserIdentityCustom", "Custom consistent identity")}</option>
+                </select>
+              </Field>
+              {settings.advancedBrowserMode.identityMode === "custom" && (
+                <>
+                  <Field label={t("browserCustomUserAgent", "Custom User-Agent")}>
+                    <input
+                      style={inputStyle}
+                      value={settings.advancedBrowserMode.customUserAgentValue}
+                      onChange={(event) =>
+                        setState(withAdvancedMode(state, { customUserAgentValue: event.target.value }))
+                      }
+                      onBlur={(event) =>
+                        void update({ advancedBrowserMode: { customUserAgentValue: event.target.value } })
+                      }
+                      placeholder="Mozilla/5.0 … Chrome/142.0.0.0 …"
+                    />
+                  </Field>
+                  <Field label={t("browserClientHintsPlatform", "Client Hints platform")}>
+                    <input
+                      style={inputStyle}
+                      value={settings.advancedBrowserMode.customUserAgentPlatform}
+                      onChange={(event) =>
+                        setState(withAdvancedMode(state, { customUserAgentPlatform: event.target.value }))
+                      }
+                      onBlur={(event) =>
+                        void update({ advancedBrowserMode: { customUserAgentPlatform: event.target.value } })
+                      }
+                      placeholder="macOS, Windows, Linux…"
+                    />
+                  </Field>
+                  <Field label={t("browserChromiumFullVersion", "Chromium full version")}>
+                    <input
+                      style={inputStyle}
+                      value={settings.advancedBrowserMode.customUserAgentFullVersion}
+                      onChange={(event) =>
+                        setState(withAdvancedMode(state, { customUserAgentFullVersion: event.target.value }))
+                      }
+                      onBlur={(event) =>
+                        void update({ advancedBrowserMode: { customUserAgentFullVersion: event.target.value } })
+                      }
+                      placeholder="142.0.0.0"
+                    />
+                  </Field>
+                </>
+              )}
+              <Field label={t("browserCertificateDomains", "Certificate bypass domains (comma separated)")}>
+                <input
+                  style={inputStyle}
+                  value={settings.advancedBrowserMode.certificateBypassDomains.join(", ")}
+                  onChange={(event) =>
+                    setState(
+                      withAdvancedMode(state, {
+                        certificateBypassDomains: event.target.value.split(",").map((value) => value.trim()),
+                      }),
+                    )
+                  }
+                  onBlur={(event) =>
+                    void update({
+                      advancedBrowserMode: {
+                        certificateBypassDomains: event.target.value
+                          .split(",")
+                          .map((value) => value.trim())
+                          .filter(Boolean),
+                      },
+                    })
+                  }
+                />
+              </Field>
+              <NumberField
+                label={t("browserNetworkRequestCapacity", "Captured requests per tab")}
+                value={settings.advancedBrowserMode.maxRequestsPerTab}
+                min={50}
+                max={5000}
+                onCommit={(maxRequestsPerTab) => void update({ advancedBrowserMode: { maxRequestsPerTab } })}
+              />
+              <NumberField
+                label={t("browserNetworkBodyCapacity", "Captured body capacity per tab (MiB)")}
+                value={Math.round(settings.advancedBrowserMode.maxBodyBytesPerTab / (1024 * 1024))}
+                min={1}
+                max={256}
+                onCommit={(value) => void update({ advancedBrowserMode: { maxBodyBytesPerTab: value * 1024 * 1024 } })}
+              />
+              <NumberField
+                label={t("browserSnippetCapacity", "JavaScript experiences per host")}
+                value={settings.advancedBrowserMode.maxPerHost}
+                min={5}
+                max={200}
+                onCommit={(maxPerHost) => void update({ advancedBrowserMode: { maxPerHost } })}
+              />
+            </div>
           </Section>
 
           <Section title={t("browserDownloadsProxy", "Downloads and proxy")}>
@@ -491,133 +627,6 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                 </div>
               </>
             )}
-          </Section>
-
-          <Section title={t("browserAdvancedMode", "Advanced Browser Mode")}>
-            <div style={dangerStyle}>
-              {t(
-                "browserAdvancedModeWarning",
-                "One launch-only switch enables JavaScript, three-layer browser identity, trusted humanized input, full CDP network capture, confirmed write replay, the JavaScript experience library, security-header removal, advanced Profiles, certificate bypass, and unrestricted CDP. Full Cookie values remain blocked by Gate A.",
-              )}
-            </div>
-            <Toggle
-              label={t("browserEnableAdvancedForLaunch", "Enable Advanced Browser Mode for this launch")}
-              checked={runtime.advancedBrowserModeEnabled}
-              onChange={(enabled) => void update({ advancedBrowserMode: { enabled } })}
-              danger
-            />
-            <div style={noticeStyle}>
-              {t(
-                "browserAdvancedRuntimeConfirmations",
-                "POST/PUT/PATCH/DELETE replay and existing sensitive actions still require one local confirmation per action; these are action confirmations, not extra settings.",
-              )}
-            </div>
-            <Field label={t("browserIdentityMode", "Browser identity")}>
-              <select
-                style={inputStyle}
-                value={settings.advancedBrowserMode.identityMode}
-                onChange={(event) =>
-                  void update({
-                    advancedBrowserMode: {
-                      identityMode: event.target.value as "native" | "chrome-compatible" | "custom",
-                    },
-                  })
-                }
-              >
-                <option value="chrome-compatible">
-                  {t("browserIdentityChromeCompatible", "Chromium-compatible (recommended)")}
-                </option>
-                <option value="native">{t("browserIdentityNative", "Electron native")}</option>
-                <option value="custom">{t("browserIdentityCustom", "Custom consistent identity")}</option>
-              </select>
-            </Field>
-            {settings.advancedBrowserMode.identityMode === "custom" && (
-              <>
-                <Field label={t("browserCustomUserAgent", "Custom User-Agent")}>
-                  <input
-                    style={inputStyle}
-                    value={settings.advancedBrowserMode.customUserAgentValue}
-                    onChange={(event) =>
-                      setState(withAdvancedMode(state, { customUserAgentValue: event.target.value }))
-                    }
-                    onBlur={(event) =>
-                      void update({ advancedBrowserMode: { customUserAgentValue: event.target.value } })
-                    }
-                    placeholder="Mozilla/5.0 … Chrome/142.0.0.0 …"
-                  />
-                </Field>
-                <Field label={t("browserClientHintsPlatform", "Client Hints platform")}>
-                  <input
-                    style={inputStyle}
-                    value={settings.advancedBrowserMode.customUserAgentPlatform}
-                    onChange={(event) =>
-                      setState(withAdvancedMode(state, { customUserAgentPlatform: event.target.value }))
-                    }
-                    onBlur={(event) =>
-                      void update({ advancedBrowserMode: { customUserAgentPlatform: event.target.value } })
-                    }
-                    placeholder="macOS, Windows, Linux…"
-                  />
-                </Field>
-                <Field label={t("browserChromiumFullVersion", "Chromium full version")}>
-                  <input
-                    style={inputStyle}
-                    value={settings.advancedBrowserMode.customUserAgentFullVersion}
-                    onChange={(event) =>
-                      setState(withAdvancedMode(state, { customUserAgentFullVersion: event.target.value }))
-                    }
-                    onBlur={(event) =>
-                      void update({ advancedBrowserMode: { customUserAgentFullVersion: event.target.value } })
-                    }
-                    placeholder="142.0.0.0"
-                  />
-                </Field>
-              </>
-            )}
-            <Field label={t("browserCertificateDomains", "Certificate bypass domains (comma separated)")}>
-              <input
-                style={inputStyle}
-                value={settings.advancedBrowserMode.certificateBypassDomains.join(", ")}
-                onChange={(event) =>
-                  setState(
-                    withAdvancedMode(state, {
-                      certificateBypassDomains: event.target.value.split(",").map((value) => value.trim()),
-                    }),
-                  )
-                }
-                onBlur={(event) =>
-                  void update({
-                    advancedBrowserMode: {
-                      certificateBypassDomains: event.target.value
-                        .split(",")
-                        .map((value) => value.trim())
-                        .filter(Boolean),
-                    },
-                  })
-                }
-              />
-            </Field>
-            <NumberField
-              label={t("browserNetworkRequestCapacity", "Captured requests per tab")}
-              value={settings.advancedBrowserMode.maxRequestsPerTab}
-              min={50}
-              max={5000}
-              onCommit={(maxRequestsPerTab) => void update({ advancedBrowserMode: { maxRequestsPerTab } })}
-            />
-            <NumberField
-              label={t("browserNetworkBodyCapacity", "Captured body capacity per tab (MiB)")}
-              value={Math.round(settings.advancedBrowserMode.maxBodyBytesPerTab / (1024 * 1024))}
-              min={1}
-              max={256}
-              onCommit={(value) => void update({ advancedBrowserMode: { maxBodyBytesPerTab: value * 1024 * 1024 } })}
-            />
-            <NumberField
-              label={t("browserSnippetCapacity", "JavaScript experiences per host")}
-              value={settings.advancedBrowserMode.maxPerHost}
-              min={5}
-              max={200}
-              onCommit={(maxPerHost) => void update({ advancedBrowserMode: { maxPerHost } })}
-            />
           </Section>
 
           <HeaderRulesSection

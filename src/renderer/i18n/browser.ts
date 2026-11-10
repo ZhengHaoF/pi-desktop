@@ -6,7 +6,7 @@ export const enUS: Record<string, string> = {
   browserAdvancedMode: "Advanced Browser Mode",
   browserAdvancedModeBadge: "Advanced Browser Mode",
   browserAdvancedModeWarning:
-    "One launch-only switch enables JavaScript, three-layer browser identity, trusted humanized input, full CDP network capture, confirmed write replay, the JavaScript experience library, security-header removal, advanced Profiles, certificate bypass, and unrestricted CDP. Full Cookie values remain blocked by Gate A.",
+    "One launch-only switch enables the browser identity, trusted humanized input, full CDP network capture, confirmed write replay, the JavaScript experience library, security-header removal, advanced Profiles, certificate bypass, and unrestricted CDP. Page JavaScript is additionally gated by its own toggle in Agent access. Full Cookie values remain blocked by Gate A.",
   browserAdvancedPrompt:
     "This enables JavaScript, identity overrides, trusted input, network bodies and write replay, security-header removal, certificate bypass, and unrestricted CDP together. Type ENABLE ADVANCED BROWSER to continue.",
   browserAdvancedPromptMismatch: "Advanced Browser confirmation phrase did not match.",
@@ -15,6 +15,7 @@ export const enUS: Record<string, string> = {
   browserAdvancedTabs: "{count} advanced tabs",
   browserAgentAccess: "Agent access",
   browserAgentControl: "Agent is controlling this tab — click or type to take over",
+  browserAllowAgentJavaScript: "Allow Agent to run page JavaScript (advanced)",
   browserAllowApprovedChannels: "Allow specifically approved channel sessions",
   browserAllowApprovedDirectory: "Allow to approved directory",
   browserAllowCurrentAgentSession: "Allow current Agent session",
@@ -222,14 +223,15 @@ export const zhCN: Record<string, string> = {
   browserAdvancedMode: "高级浏览器模式",
   browserAdvancedModeBadge: "高级模式",
   browserAdvancedModeWarning:
-    "此单一开关会同时启用 JavaScript、身份覆盖、可信输入、网络正文与写请求重放、站点安全限制移除、证书放行和不受限 CDP。它仅在本次启动有效。",
+    "此单一开关会同时启用浏览器身份、可信输入、网络正文与写请求重放、站点安全限制移除、证书放行和不受限 CDP。页面 JavaScript 由「Agent 访问」中的单独开关额外控制。它仅在本次启动有效。",
   browserAdvancedPrompt:
-    "这会同时启用 JavaScript、身份覆盖、可信输入、网络正文和写请求重放、站点安全限制移除、证书放行与不受限 CDP。请输入 ENABLE ADVANCED BROWSER 继续。",
+    "这会同时启用浏览器身份、可信输入、网络正文和写请求重放、站点安全限制移除、证书放行与不受限 CDP。请输入 ENABLE ADVANCED BROWSER 继续。",
   browserAdvancedPromptMismatch: "高级浏览器确认短语不匹配。",
   browserAdvancedRuntimeConfirmations: "高风险操作仍会在执行时单独确认。",
   browserAdvancedTabs: "{count} 个高级标签页",
   browserAgentAccess: "Agent 访问",
   browserAgentControl: "Agent 正在控制此标签页——点击或输入即可接管",
+  browserAllowAgentJavaScript: "允许 Agent 执行页面 JavaScript（高级）",
   browserAllowApprovedChannels: "允许经过单独批准的渠道会话",
   browserAllowApprovedDirectory: "允许保存到已批准目录",
   browserAllowCurrentAgentSession: "允许当前 Agent 会话",
@@ -430,7 +432,7 @@ export const zhTW: Record<string, string> = {
   browserAdvancedMode: "進階瀏覽器模式",
   browserAdvancedModeBadge: "進階模式",
   browserAdvancedModeWarning:
-    "這單一開關會同時啟用 JavaScript、身分覆寫、可信輸入、網路內文與寫入請求重播、移除網站安全限制、憑證放行與不受限 CDP。僅在本次啟動期間有效。",
+    "這單一開關會同時啟用瀏覽器身分、可信輸入、網路內文與寫入請求重播、移除網站安全限制、憑證放行與不受限 CDP。頁面 JavaScript 由「Agent 存取」中的獨立開關額外控制。僅在本次啟動期間有效。",
   browserAdvancedPrompt:
     "這會同時啟用 JavaScript、身分覆寫、可信輸入、網路內文與寫入請求重播、移除網站安全限制、憑證放行與不受限 CDP。請輸入 ENABLE ADVANCED BROWSER 以繼續。",
   browserAdvancedPromptMismatch: "進階瀏覽器的確認片語不符。",
@@ -438,6 +440,7 @@ export const zhTW: Record<string, string> = {
   browserAdvancedTabs: "{count} 個進階分頁",
   browserAgentAccess: "Agent 存取",
   browserAgentControl: "Agent 正在控制此分頁——點擊或輸入即可接管",
+  browserAllowAgentJavaScript: "允許 Agent 執行頁面 JavaScript（進階）",
   browserAllowApprovedChannels: "允許已個別核準的通路會話",
   browserAllowApprovedDirectory: "允許儲存到已核準的目錄",
   browserAllowCurrentAgentSession: "允許目前的 Agent 會話",

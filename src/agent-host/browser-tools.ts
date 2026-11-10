@@ -63,7 +63,11 @@ export function browserToolNamesForSnapshot(snapshot: BrowserCapabilitySnapshot)
   if (!snapshot.browserEnabled || !snapshot.automationEnabled) return [];
   return BROWSER_TOOL_NAMES.filter((name) => {
     const required = BROWSER_TOOL_PERMISSIONS[name];
-    return required !== "advanced" || snapshot.advancedEnabled;
+    if (required !== "advanced") return true;
+    if (!snapshot.advancedEnabled) return false;
+    // Page JavaScript has its own fine-grained switch in Agent access.
+    if (name === "browser_execute_javascript") return snapshot.agentJavaScriptEnabled === true;
+    return true;
   });
 }
 

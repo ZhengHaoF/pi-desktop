@@ -115,6 +115,12 @@ export interface BrowserAutomationSettings {
   userTakeover: "cancel-agent-action" | "wait";
   allowChannelSessions: boolean;
   showActionHighlight: boolean;
+  /**
+   * Fine-grained gate for `browser.executeJavaScript` (and the JS experience
+   * library). Only effective while advanced mode is also enabled: JS stays
+   * gated behind both switches, the other advanced capabilities are not.
+   */
+  allowAgentJavaScript: boolean;
 }
 
 export interface BrowserDownloadSettings {
@@ -342,6 +348,8 @@ export interface BrowserCapabilitySnapshot {
   browserEnabled: boolean;
   automationEnabled: boolean;
   advancedEnabled: boolean;
+  /** True only when advanced mode AND the Agent-JavaScript switch are both on. */
+  agentJavaScriptEnabled: boolean;
   sessionPermissions: Record<string, BrowserPermissionLevel>;
   generatedAt: number;
 }

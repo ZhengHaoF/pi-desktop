@@ -82,6 +82,11 @@ export class BrowserPolicyEngine {
     return this.isAdvancedEnabled();
   }
 
+  /** Fine-grained gate: page JavaScript for the Agent needs its own switch. */
+  isAgentJavaScriptEnabled(): boolean {
+    return this.isAdvancedEnabled() && this.settings.automation.allowAgentJavaScript;
+  }
+
   updateSettings(settings: BrowserSettingsV2): BrowserCapabilitySnapshot {
     this.settings = structuredClone(settings);
     if (!settings.enabled || !settings.automation.enabled) this.grants.clear();
@@ -158,6 +163,14 @@ export class BrowserPolicyEngine {
   }
 
   assertRequest(context: BrowserHostRequestContext, required: BrowserPermissionLevel): BrowserCapabilityLease {
+    return this.assertRequestForMethod(context, required, undefined);
+  }
+
+  assertRequestForMethod(
+    context: BrowserHostRequestContext,
+    required: BrowserPermissionLevel,
+    method: string | undefined,
+  ): BrowserCapabilityLease {
     this.pruneExpired();
     if (!this.settings.enabled) throw new BrowserError("BROWSER_DISABLED", "The built-in browser is disabled");
     if (!this.settings.automation.enabled) {
@@ -187,6 +200,9 @@ export class BrowserPolicyEngine {
     if (required === "advanced" && !this.isHighRiskPermissionEnabled()) {
       throw new BrowserError("ADVANCED_CONFIRMATION_REQUIRED", "Advanced browser capabilities are disabled");
     }
+    if (method === "browser.executeJavaScript" && !this.isAgentJavaScriptEnabled()) {
+      throw new BrowserError("CAPABILITY_DISABLED", "Agent JavaScript execution is disabled");
+    }
     return structuredClone(lease);
   }
 
@@ -199,6 +215,7 @@ export class BrowserPolicyEngine {
       browserEnabled: this.settings.enabled,
       automationEnabled: this.settings.automation.enabled,
       advancedEnabled: this.isHighRiskPermissionEnabled(),
+      agentJavaScriptEnabled: this.isAgentJavaScriptEnabled(),
       sessionPermissions,
       generatedAt: this.now(),
     };

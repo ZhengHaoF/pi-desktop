@@ -7,6 +7,7 @@ const disabledSnapshot = (): BrowserCapabilitySnapshot => ({
   browserEnabled: false,
   automationEnabled: false,
   advancedEnabled: false,
+  agentJavaScriptEnabled: false,
   sessionPermissions: {},
   generatedAt: 0,
 });
@@ -37,6 +38,15 @@ class BrowserCapabilityRuntime {
     const permission = this.snapshot.sessionPermissions[sessionId] ?? "none";
     if (permission === "advanced" && !this.snapshot.advancedEnabled) return "interact";
     return permission;
+  }
+
+  /** Page JavaScript needs its own switch on top of the session permission. */
+  allowsJavaScript(sessionId: string): boolean {
+    return (
+      this.snapshot.agentJavaScriptEnabled === true &&
+      this.snapshot.sessionPermissions[sessionId] !== undefined &&
+      RANK[this.permissionFor(sessionId)] >= RANK.advanced
+    );
   }
 
   allows(sessionId: string, required: BrowserPermissionLevel): boolean {

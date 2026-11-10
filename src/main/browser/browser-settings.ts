@@ -43,6 +43,7 @@ const AUTOMATION_KEYS = new Set<keyof BrowserAutomationSettings>([
   "userTakeover",
   "allowChannelSessions",
   "showActionHighlight",
+  "allowAgentJavaScript",
 ]);
 const DOWNLOAD_KEYS = new Set<keyof BrowserDownloadSettings>(["mode", "directory"]);
 const PROXY_KEYS = new Set<keyof BrowserProxySettings>([
@@ -98,6 +99,7 @@ export function createDefaultBrowserSettings(): BrowserSettingsV2 {
       userTakeover: "cancel-agent-action",
       allowChannelSessions: false,
       showActionHighlight: true,
+      allowAgentJavaScript: false,
     },
     downloads: {
       mode: "ask",
@@ -285,6 +287,7 @@ export function validateBrowserSettings(value: unknown): BrowserSettingsV2 {
       ),
       allowChannelSessions: expectBoolean(automation.allowChannelSessions, "automation.allowChannelSessions"),
       showActionHighlight: expectBoolean(automation.showActionHighlight, "automation.showActionHighlight"),
+      allowAgentJavaScript: expectBoolean(automation.allowAgentJavaScript ?? false, "automation.allowAgentJavaScript"),
     },
     downloads: {
       mode: expectEnum(downloads.mode, ["ask", "deny", "allow-to-directory"] as const, "downloads.mode"),
