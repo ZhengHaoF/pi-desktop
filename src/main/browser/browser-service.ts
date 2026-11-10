@@ -1,5 +1,6 @@
 import { getNativeLanguage } from "../native-language";
 import path from "node:path";
+import fs from "node:fs";
 import { createHmac, randomBytes } from "node:crypto";
 import { app, dialog, safeStorage, session, shell, type BrowserWindow, type Session } from "electron";
 import type {
@@ -24,7 +25,6 @@ import type {
   BrowserPageSnippetSummary,
   BrowserProxyCredentialsInput,
   BrowserRendererState,
-  BrowserPersistentSessionPermission,
   BrowserRuntimeSessionGrant,
   BrowserSessionGrantInput,
   BrowserSettingsPatch,
@@ -41,7 +41,6 @@ import { validateHeaderRules } from "./browser-header-rules.ts";
 import { BrowserAgentHeaderRuleRegistry } from "./browser-agent-header-rule-registry.ts";
 import { BrowserNetworkInterceptor } from "./browser-network-interceptor.ts";
 import { BrowserPolicyEngine, createDisabledAdvancedRuntimePolicy } from "./browser-policy.ts";
-import { BrowserPersistentGrantStore } from "./browser-persistent-grant-store.ts";
 import { BrowserProfileManager, DEFAULT_BROWSER_PROFILE_ID } from "./browser-profile-manager.ts";
 import { BrowserSecretVault, type BrowserSecretCodec } from "./browser-secret-vault.ts";
 import { BrowserSettingsStore } from "./browser-settings-store.ts";
@@ -75,7 +74,6 @@ export class BrowserService {
   private readonly options: BrowserServiceOptions;
   private readonly settingsStore: BrowserSettingsStore;
   private readonly policy: BrowserPolicyEngine;
-  private readonly persistentGrants: BrowserPersistentGrantStore;
   private readonly authorization: BrowserAuthorizationCoordinator;
   private readonly runtimeGrants = new Map<string, BrowserRuntimeSessionGrant>();
   private readonly confirmations = new BrowserConfirmationManager();
@@ -98,14 +96,17 @@ export class BrowserService {
   constructor(options: BrowserServiceOptions) {
     this.options = options;
     this.settingsStore = new BrowserSettingsStore(path.join(options.userDataDir, "browser-settings.json"));
-    this.persistentGrants = new BrowserPersistentGrantStore(
-      path.join(options.userDataDir, "browser-session-grants.json"),
-    );
+    // Legacy per-session grant overrides are gone; a leftover file is stale
+    // state that must never resurrect permissions, so remove it on startup.
+    try {
+      fs.rmSync(path.join(options.userDataDir, "browser-session-grants.json"), { force: true });
+    } catch {
+      // Best effort; absence is fine.
+    }
     const parsed = this.settingsStore.get();
     this.policy = new BrowserPolicyEngine(parsed.settings);
     this.authorization = new BrowserAuthorizationCoordinator({
-      getPersistentPermission: (sessionId) =>
-        this.persistentGrants.get(sessionId)?.permission ?? this.policy.getSettings().automation.defaultPermission,
+      getDefaultPermission: () => this.policy.getSettings().automation.defaultPermission,
       isRendererAvailable: () => {
         const win = options.getWindow();
         return !!win && !win.isDestroyed() && !win.webContents.isDestroyed() && !win.webContents.isLoadingMainFrame();
@@ -185,9 +186,6 @@ export class BrowserService {
       permissionRequests: [...this.interceptors.values()].flatMap((interceptor) =>
         interceptor.listPermissionRequests(),
       ),
-      persistentSessionPermissions: Object.fromEntries(
-        this.persistentGrants.list().map((grant) => [grant.sessionId, grant.permission]),
-      ),
       runtimeSessionGrants: Object.fromEntries(
         [...this.runtimeGrants.entries()]
           .filter(([, grant]) => grant.expiresAt > Date.now() && settings.settings.enabled)
@@ -251,11 +249,6 @@ export class BrowserService {
       this.runtimeGrants.clear();
     }
     this.policy.updateSettings(parsed.settings);
-    if (persistentDefaultChanged) {
-      for (const pending of this.authorization.listPending()) {
-        this.authorization.persistentPolicyChanged(pending.sessionId);
-      }
-    }
     this.applySettingsSideEffects(before, parsed.settings);
     return this.getSettings();
   }
@@ -357,15 +350,6 @@ export class BrowserService {
     this.runtimeGrants.delete(sessionId);
     this.authorization.cancelSession(sessionId);
     this.tabs.revokeAgentActions(sessionId);
-  }
-
-  setPersistentSessionPermission(sessionId: string, permission: BrowserPersistentSessionPermission): void {
-    this.clearAgentHeaderRules(sessionId);
-    this.persistentGrants.set(sessionId, permission);
-    this.policy.revokeSession(sessionId);
-    this.runtimeGrants.delete(sessionId);
-    this.tabs.revokeAgentActions(sessionId);
-    this.authorization.persistentPolicyChanged(sessionId);
   }
 
   revokeTemporarySessionPermission(sessionId: string): void {
@@ -514,7 +498,6 @@ export class BrowserService {
     this.policy.revokeAll();
     this.authorization.cancelAll();
     this.runtimeGrants.clear();
-    this.persistentGrants.clear();
     const settings = this.settingsStore.reset().settings;
     this.policy.updateSettings(settings);
     this.confirmations.clear();
@@ -754,7 +737,6 @@ export class BrowserService {
       const body = params as BrowserHostParams<"browser.sessionEnded">;
       this.revokeSession(body.sessionId);
       this.tabs.clearSessionState(body.sessionId);
-      this.persistentGrants.delete(body.sessionId);
       return { ok: true } as BrowserHostResult<M>;
     }
     if (method === "browser.requestRouteBypass") {

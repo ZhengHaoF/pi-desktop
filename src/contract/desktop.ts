@@ -22,7 +22,6 @@ import type {
   BrowserRendererState,
   BrowserSettingsPatch,
   BrowserSettingsPublic,
-  BrowserPersistentSessionPermission,
   BrowserAgentAuthorizationDecision,
   BrowserTabInfo,
 } from "./browser";
@@ -251,10 +250,6 @@ export interface PiBridge {
   browserCloseAllTabs: () => Promise<void>;
   browserSetBounds: (input: BrowserBoundsInput) => Promise<void>;
   browserSetSurfaceVisible: (input: { tabId?: string; visible: boolean }) => Promise<void>;
-  browserSetPersistentSessionPermission: (
-    sessionId: string,
-    permission: BrowserPersistentSessionPermission,
-  ) => Promise<void>;
   browserRevokeTemporarySessionPermission: (sessionId: string) => Promise<void>;
   browserRespondAgentAuthorization: (requestId: string, decision: BrowserAgentAuthorizationDecision) => Promise<void>;
   browserListProfiles: () => Promise<BrowserProfileInfo[]>;

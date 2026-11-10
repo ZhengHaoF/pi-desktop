@@ -58,11 +58,14 @@ test("Browser access is demand-prompted and AppShell never eagerly grants a sele
   assert.match(browserAuthorization, /event\.key === "Escape"/);
 });
 
-test("Browser Settings is reachable and separates permanent policy from temporary grants", () => {
+test("Browser Settings is reachable and shows the current session permission", () => {
   assert.match(settingsConfig, /id: "browser"/);
   assert.match(settingsConfig, /<BrowserSettings sessionId=/);
   assert.doesNotMatch(browserSettings, /browserGrantSession/);
-  assert.match(browserSettings, /browserSetPersistentSessionPermission/);
+  // Per-session persistent overrides are gone: authorization is global-default
+  // + per-session prompt only.
+  assert.doesNotMatch(browserSettings, /browserSetPersistentSessionPermission/);
+  assert.doesNotMatch(browserSettings, /persistentSessionPermissions/);
   assert.match(browserSettings, /browserRevokeTemporarySessionPermission/);
   assert.match(browserSettings, /browserRequestConfirmation\("advanced-browser-mode"/);
   assert.doesNotMatch(browserSettings, /browserSetUnsafePolicy|ENABLE UNSAFE BROWSER/);
@@ -84,7 +87,8 @@ test("Settings categories use a vertical sidebar with matching keyboard navigati
 test("Browser Settings and Browser panel use the app language dictionary", () => {
   assert.match(browserSettings, /useI18n/);
   assert.match(browserSettings, /t\("browserSettingsTitle"/);
-  assert.match(browserSettings, /t\("browserSessionPermanentPermission"/);
+  assert.match(browserSettings, /t\("browserCurrentSessionPermission"/);
+  assert.doesNotMatch(browserSettings, /browserSessionPermanentPermission/);
   assert.match(browserDock, /useI18n/);
   assert.match(browserDock, /t\("browserLoadingPanel"/);
   assert.match(browserSettings, /browserRequestConfirmation\("advanced-browser-mode", patch, language\)/);
@@ -92,7 +96,7 @@ test("Browser Settings and Browser panel use the app language dictionary", () =>
   assert.match(browserService, /启用高级浏览器模式/);
   assert.equal(zhCN.browser, "浏览器");
   assert.equal(zhCN.browserSettingsTitle, "内置浏览器");
-  assert.equal(zhCN.browserSessionPermanentPermission, "此会话的永久浏览器权限");
+  assert.equal(zhCN.browserCurrentSessionPermission, "当前会话权限");
   assert.equal(zhCN.browserLoadingPanel, "正在加载浏览器…");
 });
 

@@ -6,7 +6,6 @@ import type {
   BrowserHeaderRule,
   BrowserHeaderRuleDirection,
   BrowserPageSnippetSummary,
-  BrowserPersistentSessionPermission,
   BrowserProfileInfo,
   BrowserRendererState,
   BrowserSettingsPatch,
@@ -304,56 +303,32 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
               onChange={(showActionHighlight) => void update({ automation: { showActionHighlight } })}
             />
             {sessionId ? (
-              <>
-                <Field label={t("browserSessionPermanentPermission", "Permanent Browser permission for this session")}>
-                  <select
-                    style={inputStyle}
-                    value={state.persistentSessionPermissions[sessionId] ?? "inherit"}
-                    onChange={(event) =>
-                      void window.piBridge
-                        .browserSetPersistentSessionPermission(
-                          sessionId,
-                          event.target.value as BrowserPersistentSessionPermission,
-                        )
-                        .then(refresh)
-                        .catch((cause) => setError(messageOf(cause)))
-                    }
-                  >
-                    <option value="inherit">{t("browserPermissionInherit", "Use global default")}</option>
-                    <option value="ask">{t("browserPermissionAskSession", "Ask for this session")}</option>
-                    <option value="deny">{t("browserPermissionDeny", "Always deny")}</option>
-                    <option value="read">{t("browserPermissionRead", "Read")}</option>
-                    <option value="interact">{t("browserPermissionInteract", "Interact")}</option>
-                    <option value="advanced">{t("browserPermissionAdvanced", "Advanced Browser Mode")}</option>
-                  </select>
-                </Field>
-                <Field label={t("browserCurrentTemporaryPermission", "Current temporary permission")}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <span style={noticeStyle}>
-                      {permissionLabel(
-                        t,
-                        state.runtimeSessionGrants[sessionId]?.permission ??
-                          state.capabilities.sessionPermissions[sessionId] ??
-                          "none",
-                      )}
-                    </span>
-                    {state.runtimeSessionGrants[sessionId] && (
-                      <button
-                        type="button"
-                        style={buttonStyle}
-                        onClick={() =>
-                          void window.piBridge
-                            .browserRevokeTemporarySessionPermission(sessionId)
-                            .then(refresh)
-                            .catch((cause) => setError(messageOf(cause)))
-                        }
-                      >
-                        {t("browserRevokeTemporaryPermission", "Revoke temporary permission")}
-                      </button>
+              <Field label={t("browserCurrentSessionPermission", "Current session permission")}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={noticeStyle}>
+                    {permissionLabel(
+                      t,
+                      state.runtimeSessionGrants[sessionId]?.permission ??
+                        state.capabilities.sessionPermissions[sessionId] ??
+                        "none",
                     )}
-                  </div>
-                </Field>
-              </>
+                  </span>
+                  {state.runtimeSessionGrants[sessionId] && (
+                    <button
+                      type="button"
+                      style={buttonStyle}
+                      onClick={() =>
+                        void window.piBridge
+                          .browserRevokeTemporarySessionPermission(sessionId)
+                          .then(refresh)
+                          .catch((cause) => setError(messageOf(cause)))
+                      }
+                    >
+                      {t("browserRevokeTemporaryPermission", "Revoke permission")}
+                    </button>
+                  )}
+                </div>
+              </Field>
             ) : (
               <div style={noticeStyle}>
                 {t("browserOpenSavedSession", "Open a saved session to manage its Browser permission.")}

@@ -10,7 +10,7 @@ function fixture(options = {}) {
   const resolved = [];
   const grants = [];
   const coordinator = new BrowserAuthorizationCoordinator({
-    getPersistentPermission: () => permission,
+    getDefaultPermission: () => permission,
     isRendererAvailable: () => options.rendererAvailable !== false,
     grant: (...args) => {
       options.grant?.(...args);
@@ -35,7 +35,7 @@ function fixture(options = {}) {
   };
 }
 
-test("persistent policy grants without prompting and explicit deny fails closed", async () => {
+test("global default policy grants without prompting and explicit deny fails closed", async () => {
   const allowed = fixture({ permission: "interact" });
   await allowed.coordinator.request("session", "local", "read");
   assert.equal(allowed.requests.length, 0);
@@ -90,14 +90,7 @@ test("authorization dialogs are globally serialized across sessions", async () =
   await second;
 });
 
-test("settings can resolve a pending request while timeout and unavailable Renderer fail closed", async () => {
-  const value = fixture();
-  const pending = value.coordinator.request("session", "local", "interact");
-  value.setPermission("interact");
-  value.coordinator.persistentPolicyChanged("session");
-  await pending;
-  assert.equal(value.resolved[0][1], "persistent-policy");
-
+test("timeout and unavailable Renderer fail closed", async () => {
   const timed = fixture({ timeoutMs: 10 });
   await assert.rejects(
     timed.coordinator.request("session", "local", "read"),
@@ -138,19 +131,19 @@ test("a prompt grant failure immediately clears pending state and advances the q
   assert.equal(value.coordinator.listPending().length, 0);
 });
 
-test("a persistent-policy grant failure follows the same cleanup rule", async () => {
+test("a default-policy grant failure propagates out of request without leaving pending state", async () => {
   const failure = new Error("policy grant failed");
   const value = fixture({
+    permission: "interact",
     grant: () => {
       throw failure;
     },
   });
-  const pending = value.coordinator.request("session", "local", "interact");
-  value.setPermission("interact");
-
-  assert.throws(() => value.coordinator.persistentPolicyChanged("session"), failure);
-  await assert.rejects(pending, failure);
-  assert.equal(value.resolved[0][1], "denied");
+  // The default-policy grant runs synchronously inside request(): the throw
+  // surfaces to the caller before any dialog or pending state exists.
+  await assert.rejects(value.coordinator.request("session", "local", "read"), failure);
+  await assert.rejects(value.coordinator.request("session", "local", "read"), failure);
+  assert.equal(value.resolved.length, 0);
   assert.equal(value.coordinator.listPending().length, 0);
 });
 

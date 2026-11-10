@@ -3,12 +3,10 @@ import type {
   BrowserAgentAuthorizationDecision,
   BrowserAgentAuthorizationRequest,
   BrowserPermissionLevel,
-  BrowserPersistentSessionPermission,
 } from "../../contract/browser.ts";
 import { BrowserError } from "./browser-error.ts";
 
-const RANK: Record<BrowserPermissionLevel | "ask" | "deny" | "inherit", number> = {
-  inherit: -1,
+const RANK: Record<BrowserPermissionLevel | "ask" | "deny", number> = {
   ask: 0,
   deny: 0,
   none: 0,
@@ -29,7 +27,8 @@ type Pending = {
 };
 
 export interface BrowserAuthorizationCoordinatorOptions {
-  getPersistentPermission: (sessionId: string) => Exclude<BrowserPersistentSessionPermission, "inherit">;
+  /** Global default permission from automation.defaultPermission. */
+  getDefaultPermission: () => "ask" | "deny" | "read" | "interact";
   isRendererAvailable: () => boolean;
   grant: (
     sessionId: string,
@@ -69,11 +68,11 @@ export class BrowserAuthorizationCoordinator {
   }
 
   async request(sessionId: string, source: "local" | "channel", minimumPermission: RequiredPermission): Promise<void> {
-    const persistent = this.options.getPersistentPermission(sessionId);
+    const persistent = this.options.getDefaultPermission();
     if (persistent === "deny") {
       throw new BrowserError("USER_DENIED", "Browser access is denied by the persistent policy");
     }
-    if (RANK[persistent] >= RANK[minimumPermission]) {
+    if (persistent !== "ask" && RANK[persistent] >= RANK[minimumPermission]) {
       this.options.grant(sessionId, minimumPermission, source, "persistent-policy");
       return;
     }
@@ -147,19 +146,6 @@ export class BrowserAuthorizationCoordinator {
       return;
     }
     this.grantAndFinish(pending, "user-prompt", "allowed-session");
-  }
-
-  persistentPolicyChanged(sessionId: string): void {
-    const pending = this.pendingBySession.get(sessionId);
-    if (!pending) return;
-    const permission = this.options.getPersistentPermission(sessionId);
-    if (permission === "deny") {
-      this.finish(pending, "denied", new BrowserError("USER_DENIED", "Browser access is denied by settings"));
-      return;
-    }
-    if (RANK[permission] >= RANK[pending.request.minimumPermission]) {
-      this.grantAndFinish(pending, "persistent-policy", "persistent-policy");
-    }
   }
 
   cancelSession(sessionId: string): void {

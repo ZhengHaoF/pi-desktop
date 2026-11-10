@@ -310,13 +310,6 @@ export interface BrowserSessionGrantInput {
   expiresInMs?: number;
 }
 
-export interface BrowserPersistentSessionGrant {
-  sessionId: string;
-  permission: Exclude<BrowserPersistentSessionPermission, "inherit">;
-  source: "settings";
-  updatedAt: number;
-}
-
 export interface BrowserRuntimeSessionGrant {
   sessionId: string;
   permission: Exclude<BrowserPermissionLevel, "none">;
@@ -703,7 +696,6 @@ export interface BrowserRendererState {
   surfaceVisible: boolean;
   downloads: BrowserDownloadInfo[];
   permissionRequests: BrowserPermissionRequest[];
-  persistentSessionPermissions: Record<string, Exclude<BrowserPersistentSessionPermission, "inherit">>;
   runtimeSessionGrants: Record<string, BrowserRuntimeSessionGrant>;
   diagnostics: BrowserDiagnostics;
 }

@@ -40,7 +40,6 @@ import type {
   BrowserHeaderRule,
   BrowserHeaderRuleDirection,
   BrowserAgentAuthorizationDecision,
-  BrowserPersistentSessionPermission,
   BrowserPermissionDecision,
   BrowserProxyCredentialsInput,
   BrowserSettingsPatch,
@@ -366,11 +365,6 @@ export function installDesktopIpc(options: DesktopIpcOptions): void {
   );
   browserHandler("desktop:browser:set-surface-visible", (browser, input: { tabId?: string; visible: boolean }) =>
     browser.setSurfaceVisible(input),
-  );
-  browserHandler(
-    "desktop:browser:set-persistent-session-permission",
-    (browser, sessionId: string, permission: BrowserPersistentSessionPermission) =>
-      browser.setPersistentSessionPermission(sessionId, permission),
   );
   browserHandler("desktop:browser:revoke-temporary-session-permission", (browser, sessionId: string) =>
     browser.revokeTemporarySessionPermission(sessionId),
