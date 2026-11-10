@@ -39,7 +39,7 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
-class _ChatPageState extends State<ChatPage> {
+class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final _promptController = TextEditingController();
   final _scrollController = ScrollController();
   final _lines = <ChatLine>[];
@@ -52,6 +52,9 @@ class _ChatPageState extends State<ChatPage> {
   Timer? _renderThrottle;
   bool _pendingRender = false;
   Map<String, String>? _currentModel; // {provider, modelId}
+  /// Display names from the PC catalog, keyed by `provider/modelId`.
+  Map<String, String> _modelNames = const {};
+  Timer? _modelRefreshDebounce;
   bool _switchingModel = false;
   String? _sendingText;
   bool _awaitingFirst = false;
@@ -76,7 +79,15 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _attach();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Reconcile the chip when the user returns to the app, even if the
+    // sessions.changed event was missed while suspended.
+    if (state == AppLifecycleState.resumed) _scheduleModelRefresh();
   }
 
   Future<void> _attach() async {
@@ -84,6 +95,10 @@ class _ChatPageState extends State<ChatPage> {
     try {
       await widget.connection.subscribe('agent.events', _sessionId);
       await widget.connection.subscribe('agent.running', _sessionId);
+      // PC writes model_change / messages into the session file; the watcher
+      // broadcasts sessions.changed. Use it to keep the model chip in sync.
+      await widget.connection.subscribe('sessions.changed', _sessionId);
+      unawaited(_loadModelNames());
       // includeState is required or the PC omits agentState entirely,
       // which would break the running-mirror restore below.
       final detail = await widget.connection.request(
@@ -165,9 +180,51 @@ class _ChatPageState extends State<ChatPage> {
     return null;
   }
 
+  /// Full model catalog from the PC. `models.preferences.get` already returns
+  /// every available model; `enabledModels` is Pi's own scoped-picker filter
+  /// and the desktop picker deliberately ignores it (see
+  /// projectModelPreferences in model-catalog.ts), so this sheet must not
+  /// narrow the list either. Also caches display names for the AppBar chip.
+  Future<Map<String, dynamic>> _loadModelNames() async {
+    final prefs = await widget.connection.request('models.preferences.get', null);
+    final names = <String, String>{};
+    final raw = prefs['models'];
+    if (raw is List) {
+      for (final m in raw) {
+        if (m is Map && m['provider'] is String && m['id'] is String && m['name'] is String) {
+          names['${m['provider']}/${m['id']}'] = m['name'] as String;
+        }
+      }
+    }
+    if (mounted) setState(() => _modelNames = names);
+    return prefs;
+  }
+
+  void _scheduleModelRefresh() {
+    _modelRefreshDebounce?.cancel();
+    _modelRefreshDebounce = Timer(const Duration(milliseconds: 600), () => _refreshCurrentModel());
+  }
+
+  /// Re-read only the session's selected model, without rebuilding the
+  /// transcript, so scroll position and the draft survive PC-side switches.
+  Future<void> _refreshCurrentModel() async {
+    if (!mounted) return;
+    try {
+      final detail = await widget.connection.request(
+        'sessions.get',
+        {'id': _sessionId, 'includeState': true},
+      );
+      final model = _modelFromDetail(detail);
+      if (!mounted || model == null) return;
+      setState(() => _currentModel = model);
+    } catch (_) {
+      // Keep the last known selection; transient relay errors are harmless.
+    }
+  }
+
   Future<void> _pickModel() async {
     try {
-      final prefs = await widget.connection.request('models.preferences.get', null);
+      final prefs = await _loadModelNames();
       if (!mounted) return;
       await showModalBottomSheet<void>(
         context: context,
@@ -204,6 +261,12 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _onEvent(RemoteSessionEvent event) {
+    if (event.topic == 'sessions.changed') {
+      // PC wrote to the session (model switch, new message, rename). Collapse
+      // the burst into one lightweight snapshot read.
+      _scheduleModelRefresh();
+      return;
+    }
     if (event.topic == 'remote.approval') {
       final data = Map<String, dynamic>.from(event.data as Map);
       if ((data['sessionId'] as String?) == _sessionId) {
@@ -510,9 +573,12 @@ class _ChatPageState extends State<ChatPage> {
   void dispose() {
     _renderThrottle?.cancel();
     _stopQueuePolling();
+    _modelRefreshDebounce?.cancel();
     _events?.cancel();
     widget.connection.unsubscribe('agent.events', _sessionId);
     widget.connection.unsubscribe('agent.running', _sessionId);
+    widget.connection.unsubscribe('sessions.changed', _sessionId);
+    WidgetsBinding.instance.removeObserver(this);
     _promptController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -572,6 +638,7 @@ class _ChatPageState extends State<ChatPage> {
         actions: [
           _ModelChip(
             model: _currentModel,
+            modelNames: _modelNames,
             busy: _switchingModel,
             onTap: _pickModel,
           ),
@@ -1010,14 +1077,30 @@ class _ToolCard extends StatelessWidget {
 /// Compact current-model chip shown in the AppBar; opens the picker sheet.
 class _ModelChip extends StatelessWidget {
   final Map<String, String>? model;
+  final Map<String, String> modelNames;
   final bool busy;
   final VoidCallback onTap;
 
-  const _ModelChip({required this.model, required this.busy, required this.onTap});
+  const _ModelChip({
+    required this.model,
+    required this.modelNames,
+    required this.busy,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final label = busy ? '切换中…' : (model?['modelId'] ?? '选择模型');
+    // Show the catalog display name (desktop parity) instead of the raw
+    // upstream model id; fall back to the id if the catalog is not loaded yet.
+    var label = '选择模型';
+    if (busy) {
+      label = '切换中…';
+    } else {
+      final m = model;
+      if (m != null) {
+        label = modelNames['${m['provider']}/${m['modelId']}'] ?? m['modelId'] ?? label;
+      }
+    }
     return Padding(
       padding: const EdgeInsets.only(right: 4),
       child: InkWell(
@@ -1051,8 +1134,9 @@ class _ModelChip extends StatelessWidget {
   }
 }
 
-/// Bottom-sheet model picker backed by models.preferences.get. Filters to the
-/// models the user enabled on the desktop (enabledModels), marks the current
+/// Bottom-sheet model picker backed by models.preferences.get. Shows the full
+/// PC catalog (same set as the desktop picker); `enabledModels` is Pi's own
+/// scoped-picker filter and must not narrow this list. Marks the current
 /// selection and the PC-side default.
 class _ModelPickerSheet extends StatelessWidget {
   final Map<String, dynamic> prefs;
@@ -1063,18 +1147,11 @@ class _ModelPickerSheet extends StatelessWidget {
 
   List<Map<String, dynamic>> _models() {
     final raw = prefs['models'];
-    final all = <Map<String, dynamic>>[
+    return <Map<String, dynamic>>[
       if (raw is List)
         for (final m in raw)
           if (m is Map) Map<String, dynamic>.from(m),
     ];
-    final enabled = prefs['enabledModels'];
-    if (enabled is List && enabled.isNotEmpty) {
-      final keys = enabled.map((e) => e.toString()).toSet();
-      final filtered = all.where((m) => keys.contains('${m['provider']}/${m['id']}')).toList();
-      if (filtered.isNotEmpty) return filtered;
-    }
-    return all;
   }
 
   @override
@@ -1083,7 +1160,7 @@ class _ModelPickerSheet extends StatelessWidget {
     final defaultModel = prefs['defaultModel'];
     bool isDefault(Map<String, dynamic>? m) {
       if (m == null || defaultModel is! Map) return false;
-      return defaultModel['provider'] == m['provider'] && defaultModel['modelId'] == m['modelId'];
+      return defaultModel['provider'] == m['provider'] && defaultModel['modelId'] == m['id'];
     }
 
     bool isCurrent(Map<String, dynamic> m) =>
