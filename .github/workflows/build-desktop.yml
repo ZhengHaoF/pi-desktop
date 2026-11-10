@@ -1,4 +1,4 @@
-name: Build desktop apps
+name: Build desktop & mobile
 
 on:
   push:
@@ -15,21 +15,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: desktop-build-${{ github.ref }}
+  group: build-${{ github.ref }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
-  test-platforms:
-    name: Tests (${{ matrix.name }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Windows x64
-            runner: windows-2025
-            timeout_minutes: 45
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: ${{ matrix.timeout_minutes }}
+  test:
+    name: Unit tests & typecheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -43,126 +36,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check runtime architecture and structure
-        run: npm run check:architecture
-
-      - name: Install pinned Rust toolchain (Windows)
-        if: runner.os == 'Windows'
-        run: rustup toolchain install 1.96.1-x86_64-pc-windows-msvc --profile minimal --target x86_64-pc-windows-msvc
-
       - name: Install Electron binary
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci-downloads.mjs electron
 
-      - name: Prepare verified bundled search tools (Windows)
-        if: runner.os == 'Windows'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-downloads.mjs tools win32-x64
+      - name: Typecheck
+        run: npm run typecheck
 
-      - name: Check Windows Electron and MCP integration early
-        if: runner.os == 'Windows'
-        run: |
-          $ErrorActionPreference = "Stop"
-          $PSNativeCommandUseErrorActionPreference = $true
-          npm run build
-          npm run smoke
-
-      - name: Validate native PowerShell 5.1 and 7
-        if: runner.os == 'Windows'
-        run: npm run test:windows-powershell
-
-      - name: Install pinned Windows cross toolchain (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          rustup toolchain install 1.96.1 --profile minimal --target x86_64-pc-windows-msvc
-          cargo install cargo-xwin --locked --version 0.23.1
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends clang-18 lld-18 llvm-18
-
-      - name: Compile-check Windows helper with cargo-xwin (Linux)
-        if: runner.os == 'Linux'
-        run: npm run build:windows-helper
-
-      - name: Install pinned Rust supply-chain gates (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          cargo install cargo-audit --locked --version 0.22.2
-          cargo install cargo-deny --locked --version 0.20.2
-
-      - name: Validate Windows managed process helper
-        if: runner.os == 'Windows'
-        run: |
-          $ErrorActionPreference = "Stop"
-          $PSNativeCommandUseErrorActionPreference = $true
-          python -m pip install --disable-pip-version-check --no-input Flask==3.1.0 fastapi==0.128.0 uvicorn==0.40.0
-          cargo fmt --manifest-path native/windows-managed-process-helper/Cargo.toml --all -- --check
-          cargo clippy --manifest-path native/windows-managed-process-helper/Cargo.toml --locked --all-targets --target x86_64-pc-windows-msvc -- -D warnings
-          cargo test --manifest-path native/windows-managed-process-helper/Cargo.toml --locked --target x86_64-pc-windows-msvc
-          cargo audit --file native/windows-managed-process-helper/Cargo.lock --deny warnings
-          cargo deny --manifest-path native/windows-managed-process-helper/Cargo.toml --config native/windows-managed-process-helper/deny.toml --locked check
-          npm run check:windows-helper-reproducibility
-          $env:PI_WINDOWS_HELPER_HANDLE_LOOPS = "100"
-          npm run test:windows-managed-helper
-          npm run test:managed-process-workflows
-          $env:PI_MANAGED_FLOOD_DURATION_MS = "60000"
-          $env:PI_MANAGED_FLOOD_PROCESSES = "8"
-          $env:PI_MANAGED_FLOOD_STREAMS = "both"
-          npm run test:managed-process-flood
-
-      - name: Run unit and handler tests
+      - name: Unit and handler tests
         run: npm test
 
-      - name: Download pinned Herdr v0.8.2 fixture (macOS/Linux)
-        if: runner.os != 'Windows'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-downloads.mjs herdr-fixture
-
-      - name: Configure Electron sandbox for Herdr Desktop E2E (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo chown root:root node_modules/electron/dist/chrome-sandbox
-          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
-
-      - name: Run pinned Herdr upstream and Desktop E2E (macOS)
-        if: runner.os == 'macOS'
-        env:
-          HERDR_DESKTOP_E2E_STRESS: "1"
-        run: |
-          npm run test:herdr-e2e
-          npm run test:herdr-desktop-e2e
-
-      - name: Run pinned Herdr upstream and Desktop E2E under Xvfb (Linux)
-        if: runner.os == 'Linux'
-        env:
-          HERDR_DESKTOP_E2E_STRESS: "1"
-        run: |
-          npm run test:herdr-e2e
-          xvfb-run --auto-servernum npm run test:herdr-desktop-e2e
-
-      - name: Run cross-platform quality checks (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          npm run format:check
-          npm run lint
-          npm run typecheck
-          npm run check:dependencies
-          npm run check:contract
-          npm run check:pi-compat
-          npm run check:toolchain-contract
-          npm run check:toolchain-catalog
-          npm run check:browser-i18n
-
-  windows-frameworks:
-    name: Windows managed framework acceptance
+  windows-package:
+    name: Windows x64 installer
+    if: github.event_name != 'pull_request'
+    needs: [test]
     runs-on: windows-2025
-    timeout-minutes: 35
-    env:
-      CI: "1"
-      NEXT_TELEMETRY_DISABLED: "1"
-      STORYBOOK_DISABLE_TELEMETRY: "1"
+    timeout-minutes: 30
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -173,238 +63,124 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Set up pinned Java
+      - name: Install dependencies
+        run: npm ci
+
+      # The pinned helper toolchain (1.96.1) comes from
+      # native/windows-managed-process-helper/rust-toolchain.toml; rustup
+      # installs it automatically on the first cargo invocation.
+      - name: Build application
+        run: npm run build
+
+      - name: Prepare verified bundled search tools
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-downloads.mjs tools win32-x64
+
+      - name: Package Windows installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: node scripts/ci-downloads.mjs builder --win nsis --x64 --publish never
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: pi-desktop-windows
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest*.yml
+          if-no-files-found: error
+          retention-days: 14
+
+  android-package:
+    name: Android APK & relay bundle
+    if: github.event_name != 'pull_request'
+    needs: [test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      # Job-level env is the reliable way to branch on a secret: fork PRs and
+      # repos without signing secrets fall back to the debug key (the gradle
+      # build handles that), while pushes/tags sign with the upload keystore.
+      ANDROID_KEYSTORE_SET: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install pinned Rust toolchain
-        run: rustup toolchain install 1.96.1-x86_64-pc-windows-msvc --profile minimal --target x86_64-pc-windows-msvc
-
-      - name: Build authoritative Windows helper
-        run: npm run check:windows-helper-reproducibility
-
-      - name: Prepare pinned framework fixtures
-        shell: pwsh
-        run: |
-          $nodeRoot = Join-Path $env:RUNNER_TEMP "framework-node-root"
-          New-Item -ItemType Directory -Path $nodeRoot -Force | Out-Null
-          Push-Location $nodeRoot
-          try {
-            npm init -y | Out-Null
-            npm install --save-exact --no-audit --no-fund next@16.3.2 react@19.2.4 react-dom@19.2.4 storybook@10.5.10 @storybook/react-vite@10.5.10 vite@6.4.3 typescript@5.9.3
-          } finally {
-            Pop-Location
-          }
-          $springZip = Join-Path $env:RUNNER_TEMP "spring-boot-4.1.1-fixture.zip"
-          $springUrl = "https://start.spring.io/starter.zip?type=maven-project&language=java&bootVersion=4.1.1&baseDir=spring-boot-4.1.1-fixture&groupId=com.example&artifactId=fixture&name=SpringFixture&packageName=com.example.fixture&packaging=jar&javaVersion=21&dependencies=web"
-          curl.exe --fail --location --retry 3 --output $springZip $springUrl
-          if ($LASTEXITCODE -ne 0) { throw "Spring Initializr download exited $LASTEXITCODE" }
-          Expand-Archive -LiteralPath $springZip -DestinationPath $env:RUNNER_TEMP
-          $springRoot = Join-Path $env:RUNNER_TEMP "spring-boot-4.1.1-fixture"
-          if (-not (Test-Path -LiteralPath (Join-Path $springRoot "mvnw.cmd"))) { throw "Spring wrapper is missing" }
-          "PI_FRAMEWORK_NODE_ROOT=$nodeRoot" >> $env:GITHUB_ENV
-          "PI_SPRING_BOOT_FIXTURE=$springRoot" >> $env:GITHUB_ENV
-          "PI_JAVA_EXECUTABLE=$((Get-Command java).Source)" >> $env:GITHUB_ENV
-          "PI_MAVEN_USER_HOME=$(Join-Path $env:RUNNER_TEMP 'maven-user-home-3.9.16')" >> $env:GITHUB_ENV
-
-      - name: Run real managed framework matrix
-        run: npm run test:managed-process-frameworks
-
-  quality:
-    name: Quality gate
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
-          node-version: 22
-          cache: npm
+          channel: stable
+          cache: true
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install pinned Rust toolchain (Windows)
-        if: runner.os == 'Windows'
-        run: rustup toolchain install 1.96.1-x86_64-pc-windows-msvc --profile minimal --target x86_64-pc-windows-msvc
-
-      - name: Install Electron binary
+      - name: Restore upload keystore
+        if: env.ANDROID_KEYSTORE_SET == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-downloads.mjs electron
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/pi-remote-release.jks"
 
-      - name: Prepare verified bundled search tools
+      - name: Run mobile tests
+        working-directory: mobile
+        run: flutter test
+
+      - name: Build release APK
+        working-directory: mobile
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-downloads.mjs tools linux-x64
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/pi-remote-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: flutter build apk --release
 
-      - name: Configure Electron sandbox
+      - name: Verify APK signature
+        if: env.ANDROID_KEYSTORE_SET == 'true'
         run: |
-          sudo chown root:root node_modules/electron/dist/chrome-sandbox
-          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+          set -euo pipefail
+          apk="mobile/build/app/outputs/flutter-apk/app-release.apk"
+          test -s "$apk"
+          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)"
+          "$apksigner" verify "$apk"
 
-      - name: Run full verification
-        run: xvfb-run --auto-servernum npm run verify
+      - name: Build relay bundle
+        run: node scripts/build-relay.mjs
 
-  package:
-    name: ${{ matrix.name }}
-    if: github.ref_type != 'tag'
-    needs: [quality, test-platforms, windows-frameworks]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Windows x64
-            runner: windows-2025
-            platform: win
-            targets: nsis
-            arch: x64
-            tool_target: win32-x64
-            artifact: pi-desktop-windows-x64
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 35
-    env:
-      CSC_IDENTITY_AUTO_DISCOVERY: "false"
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install verified Electron runtime
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-downloads.mjs electron
-
-      - name: Install pinned Rust toolchain (Windows)
-        if: runner.os == 'Windows'
-        run: rustup toolchain install 1.96.1-x86_64-pc-windows-msvc --profile minimal --target x86_64-pc-windows-msvc
-
-      - name: Build application
-        run: npm run build
-
-      - name: Rebuild authoritative Windows helper for packaging
-        if: runner.os == 'Windows'
-        run: npm run check:windows-helper-reproducibility
-
-      - name: Run Windows managed process integration
-        if: runner.os == 'Windows'
-        run: |
-          python -m pip install --disable-pip-version-check --no-input Flask==3.1.0 fastapi==0.128.0 uvicorn==0.40.0
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm run test:windows-managed-helper
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm run test:managed-process-workflows
-
-      - name: Prepare verified bundled search tools
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-downloads.mjs tools ${{ matrix.tool_target }}
-
-      - name: Run native Windows Herdr integration
-        if: runner.os == 'Windows'
-        timeout-minutes: 5
-        run: npm run test:herdr-windows-e2e
-
-      - name: Run Electron smoke on Windows
-        if: runner.os == 'Windows'
-        run: npm run smoke
-
-      - name: Package ${{ matrix.name }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: node scripts/ci-downloads.mjs builder --${{ matrix.platform }} ${{ matrix.targets }} --${{ matrix.arch }} --publish never
-
-      - name: Generate and verify Windows SBOM
-        if: runner.os == 'Windows'
-        run: |
-          npm run build:windows-sbom
-          npm run check:windows-sbom
-
-      - name: Configure packaged Electron sandbox (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo chown root:root dist/linux-unpacked/chrome-sandbox
-          sudo chmod 4755 dist/linux-unpacked/chrome-sandbox
-
-      - name: Verify packaged toolchains and production startup (Linux)
-        if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum npm run check:packaged-toolchains -- ${{ matrix.tool_target }}
-
-      - name: Verify packaged toolchains and production startup (macOS)
-        if: runner.os == 'macOS'
-        run: npm run check:packaged-toolchains -- ${{ matrix.tool_target }}
-
-      - name: Verify packaged toolchains and production startup (Windows)
-        if: runner.os == 'Windows'
-        run: npm run check:packaged-toolchains -- ${{ matrix.tool_target }} --release-helper
-
-      - name: Download pinned previous Windows installer
-        if: runner.os == 'Windows'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: pwsh
-        run: |
-          $previous = Join-Path $env:RUNNER_TEMP "Pi-Agent-Desktop-Unsigned-Beta-Setup-0.1.10.exe"
-          node scripts/ci-downloads.mjs asset "https://github.com/DLYZZT/pi-desktop/releases/download/v0.1.10/Pi-Agent-Desktop-Unsigned-Beta-Setup-0.1.10.exe" $previous "5d99744a18f7495c987146a44718dbb5ba7037cf279ada62669aefc9940313c5"
-          if ($LASTEXITCODE -ne 0) { throw "previous installer download exited $LASTEXITCODE" }
-
-      - name: Run Windows NSIS upgrade and rollback E2E
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          # Intentionally the last upstream-published installer: this reproduces the
-          # first cross-feed upgrade performed by an existing upstream installation.
-          $previous = Join-Path $env:RUNNER_TEMP "Pi-Agent-Desktop-Unsigned-Beta-Setup-0.1.10.exe"
-          $expected = "5d99744a18f7495c987146a44718dbb5ba7037cf279ada62669aefc9940313c5"
-          if ((Get-FileHash -Algorithm SHA256 -LiteralPath $previous).Hash.ToLowerInvariant() -ne $expected) { throw "previous installer hash mismatch" }
-          $current = @(Get-ChildItem -LiteralPath dist -Filter "Pi-Agent-Desktop-Unsigned-Beta-Setup-*.exe" -File)
-          if ($current.Count -ne 1) { throw "expected one current Windows installer, found $($current.Count)" }
-          npm run test:windows-nsis-upgrade -- $previous $current[0].FullName
-
-      - name: Verify update metadata matches the packaged architecture
-        shell: bash
+      - name: Stage mobile artifacts
         run: |
           set -euo pipefail
           version="$(node -p "require('./package.json').version")"
-          metadata="dist/latest.yml"
-          update_artifacts=("dist/Pi-Agent-Desktop-Unsigned-Beta-Setup-${version}.exe")
-          node scripts/verify-update-metadata.mjs "$metadata" "$version" "${update_artifacts[@]}"
+          mkdir -p dist-mobile
+          cp mobile/build/app/outputs/flutter-apk/app-release.apk "dist-mobile/pi-remote-android-${version}.apk"
+          cp out/relay/relay.mjs "dist-mobile/pi-relay-${version}.mjs"
+          cp docs/relay-deploy.md dist-mobile/
+          ls -la dist-mobile/
 
-      - name: Upload ${{ matrix.name }} artifacts
+      - name: Upload Android artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.artifact }}
-          path: |
-            dist/*.exe
-            dist/*.blockmap
-            dist/latest*.yml
-            dist/latest*.yaml
-            dist/*.cdx.json
-            THIRD_PARTY_NOTICES.md
+          name: pi-desktop-android
+          path: dist-mobile/*
           if-no-files-found: error
           retention-days: 14
 
   release-contract:
     name: Validate release contract
     if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
-    needs: [quality, test-platforms, windows-frameworks]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -484,338 +260,16 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: npm run check:toolchain-catalog:upstream
 
-  release-windows:
-    name: Package Windows x64 (Unsigned Beta)
-    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
-    needs: [release-contract]
-    runs-on: windows-2025
-    timeout-minutes: 45
-    env:
-      CSC_IDENTITY_AUTO_DISCOVERY: "false"
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Electron runtime for Windows acceptance
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-downloads.mjs electron
-
-      - name: Install pinned Rust toolchain
-        run: rustup toolchain install 1.96.1-x86_64-pc-windows-msvc --profile minimal --target x86_64-pc-windows-msvc
-
-      - name: Build application
-        run: npm run build
-
-      - name: Rebuild and test authoritative Windows helper
-        run: |
-          python -m pip install --disable-pip-version-check --no-input Flask==3.1.0 fastapi==0.128.0 uvicorn==0.40.0
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm run check:windows-helper-reproducibility
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm run test:windows-managed-helper
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm run test:managed-process-workflows
-
-      - name: Prepare verified bundled search tools
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-downloads.mjs tools win32-x64
-
-      - name: Run native Windows Herdr integration
-        run: npm run test:herdr-windows-e2e
-
-      - name: Package Windows x64
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-downloads.mjs builder --win nsis --x64 --publish never
-
-      - name: Generate and verify Windows SBOM
-        run: |
-          npm run build:windows-sbom
-          npm run check:windows-sbom
-
-      - name: Verify packaged Windows update configuration
-        shell: bash
-        run: |
-          node <<'NODE'
-          const fs = require("node:fs");
-          const path = require("node:path");
-
-          function findUpdateConfigs(directory, matches = []) {
-            for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-              const entryPath = path.join(directory, entry.name);
-              if (entry.isDirectory()) {
-                findUpdateConfigs(entryPath, matches);
-              } else if (
-                entry.isFile() &&
-                entry.name === "app-update.yml" &&
-                /\/win(?:-[^/]+)?-unpacked\/resources\/app-update\.yml$/i.test(
-                  `/${entryPath.split(path.sep).join("/")}`,
-                )
-              ) {
-                matches.push(entryPath);
-              }
-            }
-            return matches;
-          }
-
-          function readScalar(document, key) {
-            const match = document.match(
-              new RegExp(`^\\s*${key}\\s*:\\s*([^#\\r\\n]+)`, "mi"),
-            );
-            if (!match) {
-              throw new Error(`Missing ${key}`);
-            }
-
-            const value = match[1].trim();
-            if (
-              (value.startsWith('"') && value.endsWith('"')) ||
-              (value.startsWith("'") && value.endsWith("'"))
-            ) {
-              return value.slice(1, -1);
-            }
-            return value;
-          }
-
-          function verifyUpdateConfig(file) {
-            const document = fs.readFileSync(file, "utf8");
-            const [expectedOwner, expectedRepo] =
-              process.env.GITHUB_REPOSITORY.split("/");
-            const expected = {
-              provider: "github",
-              owner: expectedOwner,
-              repo: expectedRepo,
-            };
-
-            for (const [key, value] of Object.entries(expected)) {
-              const actual = readScalar(document, key);
-              if (actual !== value) {
-                throw new Error(
-                  `${file}: ${key} does not match the expected release repository`,
-                );
-              }
-            }
-
-            const forbidden = [
-              [
-                "feed override field",
-                /^\s*(?:channel|host|protocol|requestHeaders|url)\s*:/im,
-              ],
-              [
-                "credential field",
-                /^\s*(?:auth(?:orization)?|headers?|password|passphrase|private[-_]?token|secret|token|(?:api|access)[-_]?key|(?:gh|github)[-_]?token)\s*:/im,
-              ],
-              [
-                "credential-bearing URL",
-                /https?:\/\/[^/\s:@]+:[^@\s/]+@/i,
-              ],
-              [
-                "authorization value",
-                /\b(?:Basic|Bearer)\s+[A-Za-z0-9+/_.=-]{8,}/i,
-              ],
-              [
-                "GitHub token",
-                /\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/i,
-              ],
-            ];
-
-            for (const [label, pattern] of forbidden) {
-              if (pattern.test(document)) {
-                throw new Error(`${file}: contains a forbidden ${label}`);
-              }
-            }
-
-            console.log(`Validated ${file}`);
-          }
-
-          const configs = findUpdateConfigs("dist").sort();
-          if (configs.length !== 1) {
-            throw new Error(
-              `Expected one packaged Windows app-update.yml file, found ${configs.length}`,
-            );
-          }
-          for (const file of configs) {
-            const document = fs.readFileSync(file, "utf8");
-            if (/^\s*publisherName\s*:/im.test(document)) {
-              throw new Error(
-                `${file}: contains a publisherName field in an unsigned Windows release`,
-              );
-            }
-            verifyUpdateConfig(file);
-          }
-          NODE
-
-      - name: Verify Windows release artifacts and metadata
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(node -p "require('./package.json').version")"
-          installer="dist/Pi-Agent-Desktop-Unsigned-Beta-Setup-${version}.exe"
-          sbom="dist/Pi-Agent-Desktop-Windows-x64-${version}.cdx.json"
-          test -s "$installer"
-          test "$(find dist -maxdepth 1 -type f -name '*.exe' | wc -l | tr -d ' ')" -eq 1
-          test -s "$sbom"
-          test "$(find dist -maxdepth 1 -type f -name '*.cdx.json' | wc -l | tr -d ' ')" -eq 1
-          test -s THIRD_PARTY_NOTICES.md
-          test -s dist/latest.yml
-          node scripts/verify-update-metadata.mjs dist/latest.yml "$version" "$installer"
-          npm run check:windows-sbom
-
-      - name: Enforce unsigned Windows Beta trust status
-        shell: pwsh
-        run: |
-          $version = node -p "require('./package.json').version"
-          $installer = "dist/Pi-Agent-Desktop-Unsigned-Beta-Setup-$version.exe"
-          $signature = Get-AuthenticodeSignature $installer
-          if ($signature.Status -ne "NotSigned") {
-            throw "Unsigned Beta gate expected NotSigned, received $($signature.Status). Replace this gate with certificate and provenance verification before publishing a signed build."
-          }
-          @"
-          ### Windows release trust: Unsigned Beta
-
-          This artifact has no Authenticode publisher identity. Windows will display **Unknown Publisher**.
-          Do not relabel it as a stable trusted Windows build until certificate-backed signing and provenance verification are enabled.
-          "@ | Add-Content -Path $env:GITHUB_STEP_SUMMARY
-
-      - name: Run packaged toolchain E2E for Windows x64
-        run: npm run check:packaged-toolchains -- win32-x64 --release-helper
-
-      - name: Download pinned previous Windows installer
-        if: runner.os == 'Windows'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: pwsh
-        run: |
-          $previous = Join-Path $env:RUNNER_TEMP "Pi-Agent-Desktop-Unsigned-Beta-Setup-0.1.10.exe"
-          node scripts/ci-downloads.mjs asset "https://github.com/DLYZZT/pi-desktop/releases/download/v0.1.10/Pi-Agent-Desktop-Unsigned-Beta-Setup-0.1.10.exe" $previous "5d99744a18f7495c987146a44718dbb5ba7037cf279ada62669aefc9940313c5"
-          if ($LASTEXITCODE -ne 0) { throw "previous installer download exited $LASTEXITCODE" }
-
-      - name: Run Windows NSIS upgrade and rollback E2E
-        shell: pwsh
-        run: |
-          # Intentionally the last upstream-published installer: this reproduces the
-          # first cross-feed upgrade performed by an existing upstream installation.
-          $previous = Join-Path $env:RUNNER_TEMP "Pi-Agent-Desktop-Unsigned-Beta-Setup-0.1.10.exe"
-          $expected = "5d99744a18f7495c987146a44718dbb5ba7037cf279ada62669aefc9940313c5"
-          if ((Get-FileHash -Algorithm SHA256 -LiteralPath $previous).Hash.ToLowerInvariant() -ne $expected) { throw "previous installer hash mismatch" }
-          $current = @(Get-ChildItem -LiteralPath dist -Filter "Pi-Agent-Desktop-Unsigned-Beta-Setup-*.exe" -File)
-          if ($current.Count -ne 1) { throw "expected one current Windows installer, found $($current.Count)" }
-          npm run test:windows-nsis-upgrade -- $previous $current[0].FullName
-
-      - name: Upload Windows release artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: pi-desktop-windows-release
-          path: |
-            dist/*.exe
-            dist/*.blockmap
-            dist/latest.yml
-            dist/*.cdx.json
-            THIRD_PARTY_NOTICES.md
-          if-no-files-found: error
-          retention-days: 14
-
-  release-mobile-relay:
-    name: Package Android APK and relay bundle
-    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
-    needs: [release-contract]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 40
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Set up Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - name: Restore upload keystore
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          set -euo pipefail
-          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "ANDROID_KEYSTORE_BASE64 secret is not set" >&2; exit 1; }
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/pi-remote-release.jks"
-
-      - name: Run mobile tests
-        working-directory: mobile
-        run: flutter test
-
-      - name: Build signed release APK
-        working-directory: mobile
-        env:
-          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/pi-remote-release.jks
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: flutter build apk --release
-
-      - name: Verify APK signature
-        env:
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-        run: |
-          set -euo pipefail
-          version="$(node -p "require('./package.json').version")"
-          apk="mobile/build/app/outputs/flutter-apk/app-release.apk"
-          test -s "$apk"
-          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$apk" | grep -F "CN=Pi Remote"
-          cp "$apk" "pi-remote-android-${version}.apk"
-
-      - name: Build relay single-file bundle
-        run: node scripts/build-relay.mjs
-
-      - name: Stage mobile and relay release assets
-        run: |
-          set -euo pipefail
-          version="$(node -p "require('./package.json').version")"
-          mkdir -p mobile-relay-dist
-          cp "pi-remote-android-${version}.apk" mobile-relay-dist/
-          cp out/relay/relay.mjs "pi-relay-${version}.mjs"
-          cp docs/relay-deploy.md mobile-relay-dist/
-          ls -la mobile-relay-dist/
-
-      - name: Upload mobile and relay artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: pi-desktop-mobile-relay-release
-          path: mobile-relay-dist/*
-          if-no-files-found: error
-          retention-days: 14
-
   release:
-    name: Create desktop draft release
+    name: Create draft release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [release-windows, release-mobile-relay]
+    needs: [release-contract, windows-package, android-package]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
     steps:
-      - name: Download packaged applications
+      - name: Download packaged artifacts
         uses: actions/download-artifact@v8
         with:
           path: release-artifacts
@@ -829,13 +283,9 @@ jobs:
           set -euo pipefail
 
           files=()
-          windows_artifacts="release-artifacts/pi-desktop-windows-release"
-          mobile_relay_artifacts="release-artifacts/pi-desktop-mobile-relay-release"
-          test -d "$windows_artifacts"
-          test -d "$mobile_relay_artifacts"
           while IFS= read -r -d '' file; do
             files+=("$file")
-          done < <(find "$windows_artifacts" "$mobile_relay_artifacts" -type f \( -name '*.exe' -o -name '*.apk' -o -name '*.mjs' -o -name '*.md' -o -name '*.blockmap' -o -name '*.yml' -o -name '*.yaml' -o -name '*.cdx.json' -o -name 'THIRD_PARTY_NOTICES.md' \) -print0)
+          done < <(find release-artifacts -type f \( -name '*.exe' -o -name '*.apk' -o -name '*.mjs' -o -name '*.md' -o -name '*.blockmap' -o -name '*.yml' \) -print0)
 
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No release files were downloaded" >&2
@@ -849,32 +299,11 @@ jobs:
             exit 1
           fi
 
-          test "$(find "$mac_artifacts" -type f -name 'latest-mac.yml' | wc -l | tr -d ' ')" -eq 1
-          test "$(find "$windows_artifacts" -type f -name '*.exe' | wc -l | tr -d ' ')" -eq 1
-          test "$(find "$windows_artifacts" -type f -name '*.exe.blockmap' | wc -l | tr -d ' ')" -eq 1
-          test "$(find "$windows_artifacts" -type f -name 'latest.yml' | wc -l | tr -d ' ')" -eq 1
-          test "$(find "$windows_artifacts" -type f -name '*.cdx.json' | wc -l | tr -d ' ')" -eq 1
-          test "$(find "$windows_artifacts" -type f -name 'THIRD_PARTY_NOTICES.md' | wc -l | tr -d ' ')" -eq 1
-          test "$(find "$mobile_relay_artifacts" -type f -name '*.apk' | wc -l | tr -d ' ')" -eq 1
-          test "$(find "$mobile_relay_artifacts" -type f -name 'pi-relay-*.mjs' | wc -l | tr -d ' ')" -eq 1
-
           if is_draft="$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq '.isDraft' 2>/dev/null)"; then
             if [ "$is_draft" != "true" ]; then
               echo "Release $GITHUB_REF_NAME is already public; published assets are immutable" >&2
               exit 1
             fi
-
-            declare -A expected_assets=()
-            for file in "${files[@]}"; do
-              expected_assets["${file##*/}"]=1
-            done
-            while IFS= read -r existing_asset; do
-              if [ -n "$existing_asset" ] && [ -z "${expected_assets[$existing_asset]+present}" ]; then
-                echo "Removing stale draft asset: $existing_asset"
-                gh release delete-asset "$GITHUB_REF_NAME" "$existing_asset" --yes
-              fi
-            done < <(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name')
-
             gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
           else
             gh release create "$GITHUB_REF_NAME" "${files[@]}" --draft --generate-notes --verify-tag

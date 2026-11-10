@@ -1,0 +1,105 @@
+name: Deep tests
+
+# Heavyweight regression suites that the push pipeline no longer runs:
+# process-containment stress (60s flood), Electron smoke, the Windows managed
+# helper suite, Herdr E2E, and cross-cutting quality gates. Trigger manually
+# before releases or when touching native/, agent-host process plumbing, or
+# packaging scripts.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deep-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-deep:
+    name: Windows process & helper suites
+    runs-on: windows-2025
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Electron binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-downloads.mjs electron
+
+      - name: Prepare verified bundled search tools
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-downloads.mjs tools win32-x64
+
+      - name: Build application
+        run: npm run build
+
+      - name: Validate Windows managed process helper
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -m pip install --disable-pip-version-check --no-input Flask==3.1.0 fastapi==0.128.0 uvicorn==0.40.0
+          npm run check:windows-helper-reproducibility
+          $env:PI_WINDOWS_HELPER_HANDLE_LOOPS = "100"
+          npm run test:windows-managed-helper
+          npm run test:managed-process-workflows
+          $env:PI_MANAGED_FLOOD_DURATION_MS = "60000"
+          $env:PI_MANAGED_FLOOD_PROCESSES = "8"
+          $env:PI_MANAGED_FLOOD_STREAMS = "both"
+          npm run test:managed-process-flood
+
+      - name: Electron smoke
+        run: npm run smoke
+
+      - name: Native Windows Herdr integration
+        timeout-minutes: 5
+        run: npm run test:herdr-windows-e2e
+
+  linux-quality:
+    name: Full verification gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Electron binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-downloads.mjs electron
+
+      - name: Prepare verified bundled search tools
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-downloads.mjs tools linux-x64
+
+      - name: Configure Electron sandbox
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+
+      - name: Run full verification
+        run: xvfb-run --auto-servernum npm run verify
