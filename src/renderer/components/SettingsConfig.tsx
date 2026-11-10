@@ -448,7 +448,7 @@ function AboutSettings({ onClose }: { onClose: () => void }) {
                     textAlign: "right",
                   }}
                 >
-                  pi-desktop.app ↗
+                  https://zhenghaof.github.io/pi-desktop/ ↗
                 </button>
               }
             />
@@ -472,7 +472,7 @@ function AboutSettings({ onClose }: { onClose: () => void }) {
                     textAlign: "right",
                   }}
                 >
-                  github.com/DLYZZT/pi-desktop ↗
+                  github.com/ZhengHaoF/pi-desktop ↗
                 </button>
               }
               last
