@@ -57,6 +57,20 @@ process.env.PI_CODING_AGENT_DIR = path.join(root, "agent");
 process.env.PI_CODING_AGENT_SESSION_DIR = path.join(root, "sessions");
 process.env.PI_OFFLINE = "1";
 
+// The bypass fixture drives the guarded Bash tool by name. On Windows the default
+// Agent shell is powershell, which swaps "bash" out of the requested preset and the
+// tool-execution policy then blocks every bash call before it can reach the guard.
+// Pin the Agent shell to bash so the bypass flow runs identically on every platform.
+// The host resolves preferences from PI_DESKTOP_USER_DATA (= userData here).
+fs.mkdirSync(path.join(root, "user-data"), { recursive: true, mode: 0o700 });
+fs.writeFileSync(
+  path.join(root, "user-data", "agent-shell.json"),
+  JSON.stringify({ version: 1, shell: "bash" }) + "\n",
+  {
+    mode: 0o600,
+  },
+);
+
 const hostEntryValue = process.env.PI_BROWSER_AGENT_E2E_HOST_ENTRY;
 assert.ok(hostEntryValue && path.isAbsolute(hostEntryValue), "PI_BROWSER_AGENT_E2E_HOST_ENTRY must be absolute");
 const hostEntry = hostEntryValue;
