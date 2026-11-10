@@ -19,12 +19,15 @@ function stepByName(jobName, stepName, source = workflow) {
   return step;
 }
 
-test("main pushes package Windows and Android; pull requests test only", () => {
+test("packaging runs only on version tags; pushes and PRs never package", () => {
   assert.deepEqual(workflow.on.push.branches, ["main"]);
   assert.deepEqual(workflow.on.push.tags, ["v*"]);
-  assert.equal(workflow.jobs["windows-package"].if, "github.event_name != 'pull_request'");
-  assert.equal(workflow.jobs["android-package"].if, "github.event_name != 'pull_request'");
+  const tagOnly = "github.ref_type == 'tag' && startsWith(github.ref_name, 'v')";
+  assert.equal(workflow.jobs["windows-package"].if, tagOnly);
+  assert.equal(workflow.jobs["android-package"].if, tagOnly);
   assert.equal(workflow.jobs.test.if, undefined);
+  // No packaging artifacts on push/PR runs: the test job uploads nothing.
+  assert.ok(!workflow.jobs.test.steps.some((step) => step.uses?.startsWith("actions/upload-artifact")));
 
   const windowsTools = stepByName("windows-package", "Prepare verified bundled search tools");
   assert.match(windowsTools.run, /ci-downloads\.mjs tools win32-x64/);
@@ -49,12 +52,12 @@ test("pull requests run the unit gate but never packaging", () => {
   assert.ok(!workflow.jobs.test.steps.some((step) => step.uses?.startsWith("actions/upload-artifact")));
 });
 
-test("tag releases validate the contract and publish a draft with exact assets", () => {
+test("tag releases validate the contract and publish assets to GitHub Releases", () => {
   assert.equal(workflow.jobs["release-contract"].if, "github.ref_type == 'tag' && startsWith(github.ref_name, 'v')");
   assert.equal(workflow.jobs.release.if, "startsWith(github.ref, 'refs/tags/v')");
   assert.deepEqual(workflow.jobs.release.needs, ["release-contract", "windows-package", "android-package"]);
 
-  const release = stepByName("release", "Create or update draft release").run;
+  const release = stepByName("release", "Publish release to GitHub Releases").run;
   assert.match(release, /-name '\*\.exe'/);
   assert.match(release, /-name '\*\.apk'/);
   assert.match(release, /-name '\*\.blockmap'/);
@@ -62,7 +65,10 @@ test("tag releases validate the contract and publish a draft with exact assets",
   assert.match(release, /-name '\*\.mjs'/);
   assert.match(release, /-name '\*\.md'/);
   assert.match(release, /Duplicate release asset names/);
-  assert.match(release, /--draft --generate-notes --verify-tag/);
+  // Assets publish directly to the release feed, not as a draft.
+  assert.match(release, /--draft=false --latest/);
+  assert.match(release, /gh release create .* --generate-notes --verify-tag --latest/);
+  assert.ok(!release.includes("--draft --generate-notes"), "must not create a draft-only release");
   assert.match(release, /already public; published assets are immutable/);
 });
 
