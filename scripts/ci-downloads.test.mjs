@@ -115,42 +115,52 @@ test("CI release failures are bounded and do not expose response URLs or credent
 
 test("CI uses the API route for installs and packaging without exposing its token to tests", () => {
   const workflow = parse(readFileSync(path.join(root, ".github/workflows/build-desktop.yml"), "utf8"));
-  for (const id of ["test-platforms", "quality", "package"]) {
-    const steps = workflow.jobs[id].steps;
+  const deepTests = parse(readFileSync(path.join(root, ".github/workflows/deep-tests.yml"), "utf8"));
+  for (const [source, id] of [
+    [workflow, "test"],
+    [deepTests, "windows-deep"],
+    [deepTests, "linux-quality"],
+  ]) {
+    const steps = source.jobs[id].steps;
     const install = steps.find((step) => step.run === "node scripts/ci-downloads.mjs electron");
     assert.ok(install, id);
     assert.equal(install.if, undefined);
   }
-  for (const job of Object.values(workflow.jobs)) {
-    for (const step of job.steps) {
-      if (step.run?.includes("ci-downloads.mjs")) assert.equal(step.env?.GH_TOKEN, "${{ github.token }}");
-      if (
-        step.run?.includes("npm run smoke") ||
-        step.run?.includes("npm run verify") ||
-        step.run?.includes("npm run test:")
-      )
-        assert.equal(step.env?.GH_TOKEN, undefined, step.name);
+  for (const parsed of [workflow, deepTests]) {
+    for (const job of Object.values(parsed.jobs)) {
+      for (const step of job.steps) {
+        if (step.run?.includes("ci-downloads.mjs")) assert.equal(step.env?.GH_TOKEN, "${{ github.token }}");
+        if (
+          step.run?.includes("npm run smoke") ||
+          step.run?.includes("npm run verify") ||
+          step.run?.includes("npm run test:")
+        )
+          assert.equal(step.env?.GH_TOKEN, undefined, step.name);
+      }
     }
   }
-  const packaging = workflow.jobs.package.steps.find((step) => step.name === "Package ${{ matrix.name }}");
+  const packaging = workflow.jobs["windows-package"].steps.find((step) => step.name === "Package Windows installer");
   assert.ok(packaging.run.includes("ci-downloads.mjs builder"));
   assert.ok(!packaging.run.includes("electronDist"));
   assert.ok(packaging.run.includes("--publish never"));
 });
 
-test("tag release downloads retain verification (fork: Windows-only, macOS not distributed)", () => {
+test("tag release downloads retain verification (fork: Windows + Android, no macOS/Linux)", () => {
   const workflow = parse(readFileSync(path.join(root, ".github/workflows/build-desktop.yml"), "utf8"));
-  // Fork trim: no macOS signing (no Apple secrets) and no Linux packaging.
+  // Fork trim: no macOS signing (no Apple secrets) and no Linux packaging;
+  // push/tag packaging goes through the same verified ci-downloads transport.
+  assert.equal(workflow.jobs["release-windows"], undefined);
   assert.equal(workflow.jobs["release-macos"], undefined);
   assert.equal(workflow.jobs["verify-macos-x64"], undefined);
   assert.equal(workflow.jobs["release-linux"], undefined);
-  for (const id of ["release-windows", "release-mobile-relay"]) {
+  assert.equal(workflow.jobs["release-mobile-relay"], undefined);
+  for (const id of ["windows-package", "android-package"]) {
     assert.ok(workflow.jobs[id], id);
   }
-  const windows = workflow.jobs["release-windows"];
+  const windows = workflow.jobs["windows-package"];
   const build = windows.steps.find((step) => step.run?.includes("ci-downloads.mjs builder"));
-  assert.ok(build, "release-windows");
-  assert.ok(build.run.includes("--publish never"), "release-windows");
-  assert.ok(!build.run.includes("electronDist"), "release-windows");
+  assert.ok(build, "windows-package");
+  assert.ok(build.run.includes("--publish never"), "windows-package");
+  assert.ok(!build.run.includes("electronDist"), "windows-package");
   assert.equal(build.env.GH_TOKEN, "${{ github.token }}");
 });

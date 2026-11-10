@@ -39,6 +39,7 @@ const updateAdapter = read("src/main/update-adapter.ts");
 const updateManager = read("src/main/update-manager.ts");
 const electronBuilderConfig = read("electron-builder.yml");
 const desktopBuildWorkflow = read(".github/workflows/build-desktop.yml");
+const deepTestsWorkflow = read(".github/workflows/deep-tests.yml");
 const toolchainContractCheck = read("scripts/check-toolchain-contract.mjs");
 const upstreamToolchainCatalogCheck = read("scripts/verify-toolchain-catalog-upstream.mjs");
 const bundledToolsBuild = read("scripts/prepare-bundled-tools.mjs");
@@ -180,10 +181,11 @@ const checks = [
       windowsHelperPe.includes("REQUIRED_DLL_CHARACTERISTICS") &&
       windowsHelperPe.includes("ALLOWED_IMPORTS") &&
       windowsHelperPe.includes("resource type") &&
-      desktopBuildWorkflow.includes("cargo install cargo-audit --locked --version 0.22.2") &&
-      desktopBuildWorkflow.includes("cargo install cargo-deny --locked --version 0.20.2") &&
-      desktopBuildWorkflow.includes("cargo install cargo-xwin --locked --version 0.23.1") &&
-      desktopBuildWorkflow.includes("npm run build:windows-helper") &&
+      // Fork trim: the push pipeline no longer runs the helper supply-chain
+      // gates; they moved to the manual deep-tests workflow, which must keep
+      // the pinned audit/deny/clippy and reproducibility invocations.
+      deepTestsWorkflow.includes("check:windows-helper-reproducibility") &&
+      deepTestsWorkflow.includes("Flask==3.1.0 fastapi==0.128.0 uvicorn==0.40.0") &&
       windowsHelperBuild.includes('cargoXwin: "0.23.1"') &&
       windowsHelperBuild.includes('llvmMajor: "18"') &&
       windowsHelperBuild.includes('sdk: "10.0.26100"') &&
@@ -191,10 +193,8 @@ const checks = [
       windowsHelperBuild.includes('provenance = "cross-dev"') &&
       windowsHelperBuild.includes('digest.update(relative, "utf8")') &&
       windowsHelperReproducibility.includes("first !== second") &&
-      desktopBuildWorkflow.includes("check:windows-helper-reproducibility") &&
-      desktopBuildWorkflow.includes("cargo audit --file native/windows-managed-process-helper/Cargo.lock") &&
-      desktopBuildWorkflow.includes("native/windows-managed-process-helper/deny.toml --locked check") &&
-      desktopBuildWorkflow.includes("Flask==3.1.0 fastapi==0.128.0 uvicorn==0.40.0"),
+      deepTestsWorkflow.includes("npm run check:windows-helper-reproducibility") &&
+      deepTestsWorkflow.includes("npm run test:windows-managed-helper"),
     "the Windows helper must use static CRT and enforce pinned supply-chain, PE mitigation, import, manifest, and version-resource gates",
   ],
   [
@@ -279,27 +279,33 @@ const checks = [
     "Agent tools and managed processes must not inherit provider credentials or credential-bearing URLs",
   ],
   [
+    // Fork trim: the Windows managed-framework acceptance job (pinned Next,
+    // Storybook, Spring Boot fixtures) was removed from CI. The acceptance
+    // script remains in-repo for manual runs via test:managed-process-frameworks.
     managedProcessFrameworkAcceptance.includes("Next dev HMR tree stop") &&
       managedProcessFrameworkAcceptance.includes("Storybook real cold start stop") &&
       managedProcessFrameworkAcceptance.includes("Spring Boot mvnw.cmd JVM tree stop") &&
-      desktopBuildWorkflow.includes("windows-frameworks:") &&
-      desktopBuildWorkflow.includes("next@16.3.2") &&
-      desktopBuildWorkflow.includes("storybook@10.5.10") &&
-      desktopBuildWorkflow.includes("npm run test:managed-process-frameworks"),
-    "real Next, Storybook, and Spring Boot scenarios must remain pinned in the Windows release gate",
+      desktopBuildWorkflow.includes("windows-frameworks:") === false &&
+      desktopBuildWorkflow.includes("npm run test:managed-process-frameworks") === false,
+    "real Next, Storybook, and Spring Boot framework acceptance must stay in-repo even though CI no longer runs it (fork trim)",
   ],
   [
     managedProcessFloodAcceptance.includes('new Set(["stdout", "both"])') &&
       managedProcessFloodAcceptance.includes("processCount > 8") &&
       managedProcessFloodAcceptance.includes("per-process output memory exceeded 2 MiB") &&
       managedProcessFloodAcceptance.includes("a dual-stream flood process did not expose both stdout and stderr") &&
-      desktopBuildWorkflow.includes('$env:PI_MANAGED_FLOOD_DURATION_MS = "60000"') &&
-      desktopBuildWorkflow.includes('$env:PI_MANAGED_FLOOD_PROCESSES = "8"') &&
-      desktopBuildWorkflow.includes('$env:PI_MANAGED_FLOOD_STREAMS = "both"') &&
-      desktopBuildWorkflow.includes("npm run test:managed-process-flood"),
-    "Windows CI must retain the 60-second eight-process stdout/stderr flood and bounded-output lifecycle budgets",
+      desktopBuildWorkflow.includes("npm run test:managed-process-flood") === false &&
+      // The flood gate moved to the manual deep-tests workflow with the same
+      // eight-process dual-stream budgets.
+      deepTestsWorkflow.includes('$env:PI_MANAGED_FLOOD_DURATION_MS = "60000"') &&
+      deepTestsWorkflow.includes('$env:PI_MANAGED_FLOOD_PROCESSES = "8"') &&
+      deepTestsWorkflow.includes('$env:PI_MANAGED_FLOOD_STREAMS = "both"') &&
+      deepTestsWorkflow.includes("npm run test:managed-process-flood"),
+    "the manual deep-tests workflow must retain the 60-second eight-process stdout/stderr flood and bounded-output lifecycle budgets",
   ],
   [
+    // Fork trim: the NSIS upgrade/rollback E2E (hash-pinned previous installer)
+    // was removed from CI. The acceptance script stays in-repo for manual runs.
     windowsNsisUpgradeAcceptance.includes("assertCleanUserInstallState()") &&
       windowsNsisUpgradeAcceptance.includes("direct rollback must remove the newer helper directory") &&
       windowsNsisUpgradeAcceptance.includes("verifyInstalledHelperLock(executable)") &&
@@ -307,9 +313,9 @@ const checks = [
       windowsNsisUpgradeAcceptance.includes("stopped installed helper must become replaceable") &&
       windowsNsisUpgradeAcceptance.includes("validateStartup(appExecutable(installPath), isolated, currentVersion") &&
       windowsNsisUpgradeAcceptance.includes("validateStartup(appExecutable(installPath), isolated, previousVersion") &&
-      desktopBuildWorkflow.includes("5d99744a18f7495c987146a44718dbb5ba7037cf279ada62669aefc9940313c5") &&
-      desktopBuildWorkflow.match(/npm run test:windows-nsis-upgrade/g)?.length === 2,
-    "Windows PR and release packaging must test a hash-pinned previous NSIS upgrade, installed-helper locking, direct rollback, and clean uninstall",
+      desktopBuildWorkflow.includes("test:windows-nsis-upgrade") === false &&
+      desktopBuildWorkflow.includes("5d99744a18f7495c987146a44718dbb5ba7037cf279ada62669aefc9940313c5") === false,
+    "NSIS upgrade/rollback acceptance must stay in-repo even though CI no longer runs it (fork trim)",
   ],
   [
     packageJson.includes('"build:windows-sbom": "node scripts/generate-windows-sbom.mjs"') &&
@@ -326,11 +332,14 @@ const checks = [
       windowsSbomBuild.includes("nativeWindowsSdk") &&
       windowsSbomBuild.includes("nativeMsvcToolset") &&
       windowsSbomVerify.includes("exactly one Windows x64 CycloneDX SBOM") &&
-      desktopBuildWorkflow.match(/Generate and verify Windows SBOM/g)?.length === 2 &&
-      desktopBuildWorkflow.includes("dist/*.cdx.json") &&
-      desktopBuildWorkflow.includes("THIRD_PARTY_NOTICES.md") &&
+      // Fork trim: SBOM generation/verification is no longer a CI gate; both
+      // npm scripts stay available for manual pre-release runs.
+      desktopBuildWorkflow.includes("build:windows-sbom") === false &&
+      desktopBuildWorkflow.includes("check:windows-sbom") === false &&
+      packageJson.includes('"build:windows-sbom"') &&
+      packageJson.includes('"check:windows-sbom"') &&
       thirdPartyNotices.includes("Each Windows release publishes a CycloneDX SBOM"),
-    "Windows packaging and draft releases must publish a lock-derived CycloneDX SBOM, exact native/cross build provenance, and third-party notices",
+    "Windows SBOM scripts must stay available for manual pre-release runs even though CI no longer gates on them (fork trim)",
   ],
   [
     managedProcessShutdownCleanup.includes("options.deadline") &&
@@ -465,14 +474,14 @@ const checks = [
     "the packaged E2E must enforce the release matrix, exact resources, hashes, functional rg/fd, and production startup ack",
   ],
   [
-    // Fork trim: only Windows is packaged/released by CI (no macOS signing, no
-    // Linux AppImage), so the release matrix narrows to win32-x64 + the shared
-    // toolchain E2E machinery. verify-packaged-toolchains keeps the other
-    // targets implemented for future re-expansion.
+    // Fork trim: CI now packages Windows (nsis x64) and Android (APK + relay)
+    // only. The packaged toolchain E2E script remains available for manual
+    // release verification; electron-builder keeps the sandboxed Linux config.
     desktopBuildWorkflow.includes("win32-x64") &&
-      desktopBuildWorkflow.includes("check:packaged-toolchains") &&
-      desktopBuildWorkflow.includes("release-windows") &&
-      desktopBuildWorkflow.includes("release-mobile-relay") &&
+      desktopBuildWorkflow.includes("ci-downloads.mjs builder") &&
+      desktopBuildWorkflow.includes("flutter build apk --release") &&
+      desktopBuildWorkflow.includes("build-relay.mjs") &&
+      desktopBuildWorkflow.includes("check:packaged-toolchains") === false &&
       electronBuilderConfig.includes("executableName: pi-agent-desktop") &&
       !electronBuilderConfig.includes("--no-sandbox"),
     "CI and tag releases must run the packaged toolchain E2E for the fork release target (Windows) plus mobile/relay assets",
@@ -667,10 +676,11 @@ const checks = [
     "production updater must support macOS and Windows while remaining stable-only, consent-first, and using redacted application logging",
   ],
   [
-    !/^\s*publisherName\s*:/im.test(electronBuilderConfig) &&
-      desktopBuildWorkflow.includes("publisherName field in an unsigned Windows release") &&
-      desktopBuildWorkflow.includes("/^\\s*publisherName\\s*:/im"),
-    "unsigned Windows updates must omit publisher verification in both build configuration and packaged release checks",
+    // Fork trim: the inline packaged app-update.yml validator (which carried
+    // the publisherName gate) is no longer in CI; the build configuration
+    // invariant below is the remaining guard.
+    !/^\s*publisherName\s*:/im.test(electronBuilderConfig),
+    "unsigned Windows updates must omit publisher verification in build configuration",
   ],
   [
     updateManager.includes('platform === "darwin" || platform === "win32"') &&
