@@ -156,6 +156,7 @@ export class RelayHub {
           label?: unknown;
           hostId?: unknown;
           auth?: unknown;
+          e2eePub?: unknown;
         }
       | undefined;
     if (!payload || payload.kind !== "hello" || payload.protocolVersion !== 1) {
@@ -188,29 +189,32 @@ export class RelayHub {
     // directory) — it never holds private keys or session keys.
     const e2eePub = isValidE2eePub(payload.e2eePub) ? payload.e2eePub : undefined;
 
-    // Pairing gate (device role): a paired device presents its credential on
-    // every reconnect; a first-time device presents the one-time token from
-    // the desktop QR code. Token → auto-approved binding → issued credential.
+    // Pairing gate (device role): a paired device presents the credential for
+    // the host it is addressing; a first-time device presents the one-time
+    // token from that PC's QR code. Bindings are per (device, host).
     let issuedDeviceSecret: string | undefined;
     if (role === "device") {
       const auth = payload.auth as { pairingToken?: unknown; deviceSecret?: unknown } | undefined;
       const deviceSecret = typeof auth?.deviceSecret === "string" ? auth.deviceSecret : "";
       const pairingToken = typeof auth?.pairingToken === "string" ? auth.pairingToken : "";
+      const declaredHostId = typeof envelope.hostId === "string" ? envelope.hostId : "";
+      // A hello may omit hostId; relay then routes to the first online host
+      // (see ackHostId), so validate the credential against that same host.
+      const targetHostId = declaredHostId || this.registry.onlineHosts()[0]?.id || "";
       let paired = false;
-      // A fresh scan token wins over a stale credential (re-pair replaces the
-      // old binding). Expired/bad tokens fall back to the stored credential.
+      // A fresh scan token wins over a stale credential. Re-pairing only
+      // replaces the binding for the scanned host, other PCs stay paired.
       if (pairingToken) {
-        const targetHostId = typeof envelope.hostId === "string" ? envelope.hostId : "";
-        const submitted = this.pairing.submit(pairingToken, targetHostId, id, e2eePub ?? "");
+        const submitted = this.pairing.submit(pairingToken, declaredHostId, id, e2eePub ?? "");
         if (submitted.ok) {
           this.pairing.approve(pairingToken);
           this.pairing.consume(pairingToken);
-          issuedDeviceSecret = this.pairing.pairDevice(targetHostId, id, label, e2eePub).secret;
+          issuedDeviceSecret = this.pairing.pairDevice(declaredHostId, id, label, e2eePub).secret;
           paired = true;
         }
       }
       if (!paired && deviceSecret) {
-        paired = this.pairing.verifyDevice(id, deviceSecret) !== undefined;
+        paired = this.pairing.verifyDevice(id, deviceSecret, targetHostId) !== undefined;
       }
       if (!paired && pairingToken) {
         // The token was present but did not produce a binding: reject with the
@@ -378,6 +382,35 @@ export class RelayHub {
           payload: { kind: "pair.revoke.result", deviceId, revoked },
         }),
       );
+      return;
+    }
+    // Device-initiated unbind: a phone may drop only its own binding for the
+    // host named in the control frame (never another device's binding).
+    if (envelope.control === "pair.unbind") {
+      if (from.role !== "device") {
+        from.close(4002, "only devices may unbind themselves");
+        return;
+      }
+      const controlPayload = envelope.payload as { hostId?: unknown } | undefined;
+      const hostId =
+        typeof controlPayload?.hostId === "string"
+          ? controlPayload.hostId
+          : typeof envelope.hostId === "string"
+            ? envelope.hostId
+            : "";
+      const removed = hostId ? this.pairing.unbindDevice(from.id, hostId) : false;
+      from.send(
+        JSON.stringify({
+          v: 1,
+          traceId: typeof envelope.traceId === "string" ? envelope.traceId : "pair.unbind",
+          ts: Date.now(),
+          nonce: randomUUID(),
+          role: "relay",
+          payload: { kind: "pair.unbind.result", hostId, removed },
+        }),
+      );
+      // No forced close here: the phone decides whether to disconnect (when
+      // it was addressing this host) or keep its link to another paired PC.
       return;
     }
     if (envelope.control === "pair.devices") {

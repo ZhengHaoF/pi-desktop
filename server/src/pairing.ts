@@ -19,7 +19,7 @@ export interface PairingRecord {
   devicePublicKey?: string;
 }
 
-/** A paired device bound to one host; the secret never leaves the relay hashed. */
+/** One host binding for a device; the secret never leaves the relay hashed. */
 export interface DeviceBinding {
   deviceId: string;
   hostId: string;
@@ -35,8 +35,13 @@ export class PairingService {
   private readonly audit: AuditLog;
   private readonly pairings = new Map<string, PairingRecord>();
   private readonly unknownAttempts = new Map<string, { count: number; windowStart: number }>();
-  /** Paired devices by deviceId (relay restart clears this — M2 persistence). */
+  /** One binding per (deviceId, hostId): a phone may pair with several PCs. */
   private readonly devices = new Map<string, DeviceBinding>();
+
+  /** Composite key keeps per-host bindings independent for the same device. */
+  private bindingKey(deviceId: string, hostId: string): string {
+    return `${deviceId}\u0000${hostId}`;
+  }
 
   constructor(config: RelayConfig, audit: AuditLog) {
     this.config = config;
@@ -63,7 +68,7 @@ export class PairingService {
           typeof record.secretHash !== "string"
         )
           continue;
-        this.devices.set(record.deviceId, {
+        this.devices.set(this.bindingKey(record.deviceId, record.hostId), {
           deviceId: record.deviceId,
           hostId: record.hostId,
           secretHash: record.secretHash,
@@ -201,8 +206,9 @@ export class PairingService {
   }
 
   /**
-   * Bind a device to a host and issue its long-lived credential. Called after
-   * a successful token submit + approve; re-pairing replaces any old binding.
+   * Bind a device to one host and issue its credential. Called after a
+   * successful token submit + approve. Other host bindings for the same
+   * device are kept; re-pairing only replaces this (device, host) pair.
    */
   pairDevice(
     hostId: string,
@@ -219,7 +225,7 @@ export class PairingService {
       ...(publicKey ? { publicKey } : {}),
       pairedAt: Date.now(),
     };
-    this.devices.set(deviceId, binding);
+    this.devices.set(this.bindingKey(deviceId, hostId), binding);
     this.persist();
     this.audit.append({
       actor: hostId,
@@ -231,23 +237,39 @@ export class PairingService {
     return { secret, binding };
   }
 
-  /** Reconnect credential check: deviceId must match a binding for this host. */
-  verifyDevice(deviceId: string, secret: string): DeviceBinding | undefined {
-    const binding = this.devices.get(deviceId);
+  /** Reconnect credential check: the secret must belong to this exact host. */
+  verifyDevice(deviceId: string, secret: string, hostId: string): DeviceBinding | undefined {
+    const binding = this.devices.get(this.bindingKey(deviceId, hostId));
     if (!binding) return undefined;
     if (!PairingService.verifyToken(secret, binding.secretHash)) return undefined;
     return binding;
   }
 
-  /** Host-initiated revocation; returns true when a binding was removed. */
+  /** Host-initiated revocation of one (device, host) binding. */
   revokeDevice(hostId: string, deviceId: string): boolean {
-    const binding = this.devices.get(deviceId);
-    if (!binding || binding.hostId !== hostId) return false;
-    this.devices.delete(deviceId);
+    const key = this.bindingKey(deviceId, hostId);
+    if (!this.devices.has(key)) return false;
+    this.devices.delete(key);
     this.persist();
     this.audit.append({
       actor: hostId,
       action: "device.revoke",
+      targetDigest: this.audit.digest(hostId, deviceId),
+      outcome: "ok",
+      traceId: "pair",
+    });
+    return true;
+  }
+
+  /** Device-initiated unbind: a device may only drop its own binding for one host. */
+  unbindDevice(deviceId: string, hostId: string): boolean {
+    const key = this.bindingKey(deviceId, hostId);
+    if (!this.devices.has(key)) return false;
+    this.devices.delete(key);
+    this.persist();
+    this.audit.append({
+      actor: deviceId,
+      action: "device.unbind",
       targetDigest: this.audit.digest(hostId, deviceId),
       outcome: "ok",
       traceId: "pair",

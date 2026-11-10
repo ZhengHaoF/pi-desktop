@@ -87,7 +87,9 @@ cd mobile && flutter run -d 192.168.31.118:38043 # 真机无线调试
 - [x] **hello 配对闸门**：device hello 的 `auth` 支持 `pairingToken`（一次性扫码令牌 → 自动批准绑定 + 签发 `deviceSecret`）与 `deviceSecret`（重连凭证）；新 token 优先于旧凭证（支持重新配对）；`pairingRequired` 下无有效凭证 close 4003 并审计
 - [x] **桌面**：gateway `sendControl`（traceId 关联 relay 的 `*.result` 帧，5s 超时）；RPC `remote.pair.create/revoke/devices`（契约注册于 registerHandlers）；设置卡片新增「设备配对」区——添加设备（生成含 `{v,relayUrl,hostId,token}` 的配对二维码）、已配对设备列表 + 撤销（撤销即踢掉在线连接）
 - [x] **手机**：`parseRelayQr` 支持 JSON 配对载荷（兼容纯 URL）；deviceId 持久化（`remote.deviceId`）；配对成功自动保存 relay 签发的 `deviceSecret`；重连 hello 携带凭证，免重复扫码
-- [x] 测试：relay 13 项（配对发放/重连/撤销踢线/单次令牌/无效令牌/未配对拒绝）、gateway 12 项（control 往返/header/断链拒绝）、手机 16 项（QR JSON 解析等）；三端 typecheck + 桌面全量 1859 通过
+- [x] **多电脑配对（1:N）** ✅ 2026-11-10：relay `DeviceBinding` 改为按 `(deviceId, hostId)` 复合键存储，一台手机可分别配对多台电脑、各自持有独立凭证；`verifyDevice` 增加目标 `hostId` 校验（旧实现一份凭证可连任意主机），`revokeDevice` 只删对应主机那一条绑定。手机端 `deviceSecret` 按 `(relay, device, host)` 持久化，切换电脑时重载对应凭证。**升级不做旧凭证兼容，需重新扫码一次**
+- [x] **`pair.unbind`**：device 可主动解绑自己与某台电脑（host 调用返回 4002）；「选择电脑」长按删除 → relay 解绑 + 清本机凭证 + 标记「未配对」，提示「删除后，需要重新扫码才能再次连接」
+- [x] 测试：relay 17 项（含 1:N 独立绑定 / 跨主机凭证拒绝 / unbind 权限）、手机 40 项（含按主机凭证隔离与删除互不影响）；三端 typecheck + 桌面全量通过
 - [ ] **真机扫码配对端到端**（需物理相机 + 设置页点「添加设备」）：与「真机扫码端到端」待办合并验证
 
 ### 扫码连接（手机端）✅ 新增

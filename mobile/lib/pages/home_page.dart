@@ -34,6 +34,8 @@ class _HomePageState extends State<HomePage> {
   String? _creatingFor;
   List<RemoteHostInfo> _hosts = const [];
   RemoteHostInfo? _currentHost;
+  /// 已配对（本机持有该电脑凭证）的 hostId 集合。
+  Set<String> _pairedHostIds = const {};
 
   bool _wasTargetOffline = false;
 
@@ -66,6 +68,15 @@ class _HomePageState extends State<HomePage> {
     if (mounted && cached.isNotEmpty && _hosts.isEmpty) {
       setState(() => _hosts = cached);
     }
+    await _reloadPairedHosts();
+  }
+
+  Future<void> _reloadPairedHosts() async {
+    final ids = await loadPairedHostIds(
+      widget.connection.deviceId,
+      relayUrl: widget.connection.relayUrl,
+    );
+    if (mounted) setState(() => _pairedHostIds = ids);
   }
 
   void _syncHostState() {
@@ -83,6 +94,7 @@ class _HomePageState extends State<HomePage> {
       final id = widget.connection.hostId;
       if (id != null) savePreferredHost(id);
     }
+    unawaited(_reloadPairedHosts());
   }
 
   Future<void> _refresh() async {
@@ -425,9 +437,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// 多 PC：设备选择器 sheet（在线优先，离线带上次在线时间）。
-  void _openHostSelector() {
-    // Ask the relay for a fresh directory first.
+  Future<void> _openHostSelector() async {
+    // Ask the relay for a fresh directory first, then refresh local pairing
+    // state so the sheet reflects the latest per-host credentials.
     widget.connection.refreshHosts();
+    await _reloadPairedHosts();
+    if (!mounted) return;
     final currentId = widget.connection.hostId;
     final hosts = [...widget.connection.knownHosts, ..._hosts.where((h) => !widget.connection.knownHosts.any((k) => k.id == h.id))];
     hosts.sort((a, b) {
@@ -457,7 +472,7 @@ class _HomePageState extends State<HomePage> {
                         Future.delayed(const Duration(milliseconds: 600), () {
                           if (sheetContext.mounted) {
                             Navigator.of(sheetContext).pop();
-                            _openHostSelector();
+                            unawaited(_openHostSelector());
                           }
                         });
                       },
@@ -491,11 +506,8 @@ class _HomePageState extends State<HomePage> {
                                 ),
                               ),
                               subtitle: Text(
-                                host.online
-                                    ? '在线'
-                                    : (host.lastSeenAt != null
-                                        ? '离线 · 上次在线 ${relativeTime(DateTime.fromMillisecondsSinceEpoch(host.lastSeenAt!))}'
-                                        : '离线'),
+                                '${host.online ? '在线' : (host.lastSeenAt != null ? '离线 · 上次在线 ${relativeTime(DateTime.fromMillisecondsSinceEpoch(host.lastSeenAt!))}' : '离线')}'
+                                '${_pairedHostIds.contains(host.id) ? '' : ' · 未配对'}',
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: host.online ? Colors.green.shade700 : Colors.black38,
@@ -504,9 +516,19 @@ class _HomePageState extends State<HomePage> {
                               trailing: host.id == currentId
                                   ? Icon(Icons.check_circle, size: 20, color: Theme.of(context).colorScheme.primary)
                                   : const Icon(Icons.chevron_right, size: 18, color: Colors.black26),
+                              onLongPress: () => _confirmDeleteHost(host, sheetContext),
                               onTap: host.id == currentId
                                   ? null
                                   : () async {
+                                      if (!_pairedHostIds.contains(host.id)) {
+                                        Navigator.of(sheetContext).pop();
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('这台电脑尚未配对，请先在连接页扫码配对')),
+                                          );
+                                        }
+                                        return;
+                                      }
                                       Navigator.of(sheetContext).pop();
                                       // 切换时立即清空上一台机器的列表，避免误以为数据没变。
                                       setState(() {
@@ -529,6 +551,48 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  /// 长按删除：relay 侧解绑 + 本机凭证清除，之后必须重新扫码。
+  Future<void> _confirmDeleteHost(RemoteHostInfo host, BuildContext sheetContext) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删除电脑'),
+        content: Text(
+          '确定删除「${host.displayName}」？\n\n删除后，需要重新扫码才能再次连接。'
+          '${host.id == widget.connection.hostId ? '\n\n这台电脑当前正在连接，删除后会断开。' : ''}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final wasCurrent = host.id == widget.connection.hostId;
+    widget.connection.unbindHost(host.id);
+    await deleteDeviceSecret(
+      widget.connection.deviceId,
+      relayUrl: widget.connection.relayUrl,
+      hostId: host.id,
+    );
+    await _reloadPairedHosts();
+    // 当前连接用的是刚删掉的凭证，主动断开避免自动重连循环。
+    if (wasCurrent) widget.connection.disconnect();
+    if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已删除，需要重新扫码才能再次连接')),
+      );
+    }
   }
 
   Widget _searchField() {

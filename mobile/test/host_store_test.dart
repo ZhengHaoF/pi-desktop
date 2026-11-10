@@ -33,24 +33,40 @@ void main() {
     });
   });
 
-  group('device secret per-relay isolation', () {
-    test('secrets saved for one relay are invisible to another', () async {
+  group('device secret per (relay, host) isolation', () {
+    test('a secret saved for one relay is invisible to another', () async {
       const vps = 'ws://82.156.168.149:8788/ws';
       const lan = 'ws://192.168.1.5:8788/ws';
-      await saveDeviceSecret('android-1', 'secret-vps', relayUrl: vps);
+      await saveDeviceSecret('android-1', 'secret-vps', relayUrl: vps, hostId: 'host-a');
 
-      expect(await loadDeviceSecret('android-1', relayUrl: vps), 'secret-vps');
-      expect(await loadDeviceSecret('android-1', relayUrl: lan), isNull);
+      expect(await loadDeviceSecret('android-1', relayUrl: vps, hostId: 'host-a'), 'secret-vps');
+      expect(await loadDeviceSecret('android-1', relayUrl: lan, hostId: 'host-a'), isNull);
     });
 
-    test('same device id can hold distinct secrets per relay', () async {
+    test('one device holds distinct secrets for multiple hosts on the same relay', () async {
+      const vps = 'ws://82.156.168.149:8788/ws';
+      await saveDeviceSecret('android-1', 'secret-a', relayUrl: vps, hostId: 'host-a');
+      await saveDeviceSecret('android-1', 'secret-b', relayUrl: vps, hostId: 'host-b');
+
+      expect(await loadDeviceSecret('android-1', relayUrl: vps, hostId: 'host-a'), 'secret-a');
+      expect(await loadDeviceSecret('android-1', relayUrl: vps, hostId: 'host-b'), 'secret-b');
+      expect(await loadPairedHostIds('android-1', relayUrl: vps), {'host-a', 'host-b'});
+    });
+
+    test('deleting one host binding leaves the other hosts intact', () async {
       const vps = 'ws://82.156.168.149:8788/ws';
       const lan = 'ws://192.168.1.5:8788/ws';
-      await saveDeviceSecret('android-1', 'secret-vps', relayUrl: vps);
-      await saveDeviceSecret('android-1', 'secret-lan', relayUrl: lan);
+      await saveDeviceSecret('android-1', 'secret-a', relayUrl: vps, hostId: 'host-a');
+      await saveDeviceSecret('android-1', 'secret-b', relayUrl: vps, hostId: 'host-b');
+      await saveDeviceSecret('android-1', 'secret-lan', relayUrl: lan, hostId: 'host-a');
 
-      expect(await loadDeviceSecret('android-1', relayUrl: vps), 'secret-vps');
-      expect(await loadDeviceSecret('android-1', relayUrl: lan), 'secret-lan');
+      await deleteDeviceSecret('android-1', relayUrl: vps, hostId: 'host-a');
+
+      expect(await loadDeviceSecret('android-1', relayUrl: vps, hostId: 'host-a'), isNull);
+      expect(await loadDeviceSecret('android-1', relayUrl: vps, hostId: 'host-b'), 'secret-b');
+      expect(await loadDeviceSecret('android-1', relayUrl: lan, hostId: 'host-a'), 'secret-lan');
+      expect(await loadPairedHostIds('android-1', relayUrl: vps), {'host-b'});
+      expect(await loadPairedHostIds('android-1', relayUrl: lan), {'host-a'});
     });
   });
 

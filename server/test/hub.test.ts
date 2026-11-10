@@ -609,7 +609,7 @@ test("relay: host e2eePub flows into host directory + pairing binding", { timeou
     const device = await connect(relay.url, "device");
     device.send(helloEnvelope("device", "dev-e2ee"));
     const ack = JSON.parse(await nextMessage(device)) as {
-      payload: { hosts?: Array<{ id: string; e2eePub?: string }> };
+      payload: { hosts?: Array<{ id: string; online?: boolean; e2eePub?: string }> };
     };
     const online = (ack.payload.hosts ?? []).find((h) => h.online);
     assert.ok(online, "online host present in directory");
@@ -628,7 +628,9 @@ test("relay: host e2eePub flows into host directory + pairing binding", { timeou
         payload: { kind: "hosts.list" },
       }),
     );
-    const listing = JSON.parse(await nextMessage(device)) as { payload: { hosts: Array<{ e2eePub?: string }> } };
+    const listing = JSON.parse(await nextMessage(device)) as {
+      payload: { hosts: Array<{ online?: boolean; e2eePub?: string }> };
+    };
     assert.equal(listing.payload.hosts.find((h) => h.online)?.e2eePub, hostPub);
 
     // Invalid e2eePub (not canonical base64url of 32 bytes) is ignored.
@@ -708,6 +710,185 @@ test("relay: stale-timestamp envelope dropped without closing the link", { timeo
     const listing = JSON.parse(await nextMessage(host)) as { payload: { kind: string } };
     assert.equal(listing.payload.kind, "hosts.list.result");
     host.close();
+  } finally {
+    await relay.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Multi-PC pairing: one device keeps an independent binding per host.
+// ---------------------------------------------------------------------------
+
+async function requestPairToken(host: WebSocket, traceId: string): Promise<string> {
+  host.send(
+    JSON.stringify({
+      v: 1,
+      traceId,
+      ts: Date.now(),
+      nonce: traceId,
+      role: "host",
+      control: "pair.create",
+      payload: { kind: "pair.create" },
+    }),
+  );
+  const created = JSON.parse(await nextMessage(host)) as { payload: { token: string } };
+  assert.ok(created.payload.token.length > 20);
+  return created.payload.token;
+}
+
+async function pairDeviceWithToken(url: string, deviceId: string, hostId: string, token: string): Promise<string> {
+  const device = await connect(url, "device");
+  device.send(pairingHello("device", { deviceId, hostId, auth: { pairingToken: token } }));
+  const ack = JSON.parse(await nextMessage(device)) as { payload: { deviceSecret?: string } };
+  assert.ok(ack.payload.deviceSecret, "pairing must issue a credential");
+  device.close();
+  return ack.payload.deviceSecret as string;
+}
+
+async function reconnectWithSecret(
+  url: string,
+  deviceId: string,
+  hostId: string,
+  secret: string,
+): Promise<"ok" | "rejected"> {
+  const ws = await connect(url, "device");
+  const outcome = await new Promise<"ok" | "rejected">((resolve) => {
+    ws.once("message", (data: Buffer) => {
+      const frame = JSON.parse(data.toString("utf8")) as { payload?: { kind?: string } };
+      resolve(frame.payload?.kind === "hello_ack" ? "ok" : "rejected");
+    });
+    ws.once("close", () => resolve("rejected"));
+    ws.send(pairingHello("device", { deviceId, hostId, auth: { deviceSecret: secret } }));
+  });
+  if (outcome === "ok") ws.close();
+  return outcome;
+}
+
+test("relay: one device pairs with two hosts; credentials are host-scoped", { timeout: 20000 }, async () => {
+  const relay = await startRelay(testConfig({ pairingRequired: true }));
+  try {
+    const { ws: hostA } = await helloHostWithId(relay.url, "host-multi-a");
+    const { ws: hostB } = await helloHostWithId(relay.url, "host-multi-b");
+    const secretA = await pairDeviceWithToken(
+      relay.url,
+      "dev-multi",
+      "host-multi-a",
+      await requestPairToken(hostA, "pc-multi-a"),
+    );
+    const secretB = await pairDeviceWithToken(
+      relay.url,
+      "dev-multi",
+      "host-multi-b",
+      await requestPairToken(hostB, "pc-multi-b"),
+    );
+    assert.notEqual(secretA, secretB, "each host must issue its own credential");
+
+    assert.equal(await reconnectWithSecret(relay.url, "dev-multi", "host-multi-a", secretA), "ok");
+    assert.equal(await reconnectWithSecret(relay.url, "dev-multi", "host-multi-b", secretB), "ok");
+    assert.equal(
+      await reconnectWithSecret(relay.url, "dev-multi", "host-multi-b", secretA),
+      "rejected",
+      "a credential for host A must not authenticate against host B",
+    );
+
+    // Revoking one host leaves the other binding untouched.
+    hostA.send(
+      JSON.stringify({
+        v: 1,
+        traceId: "pr-multi",
+        ts: Date.now(),
+        nonce: "n-pr-multi",
+        role: "host",
+        control: "pair.revoke",
+        deviceId: "dev-multi",
+        payload: { kind: "pair.revoke" },
+      }),
+    );
+    const revoked = JSON.parse(await nextMessage(hostA)) as { payload: { revoked: boolean } };
+    assert.equal(revoked.payload.revoked, true);
+    assert.equal(await reconnectWithSecret(relay.url, "dev-multi", "host-multi-a", secretA), "rejected");
+    assert.equal(
+      await reconnectWithSecret(relay.url, "dev-multi", "host-multi-b", secretB),
+      "ok",
+      "revoking one host must not unbind the other",
+    );
+    hostA.close();
+    hostB.close();
+  } finally {
+    await relay.close();
+  }
+});
+
+test("relay: pair.unbind lets a device drop only its own host binding", { timeout: 20000 }, async () => {
+  const relay = await startRelay(testConfig({ pairingRequired: true }));
+  try {
+    const { ws: hostB } = await helloHostWithId(relay.url, "host-unbind-b");
+    const { ws: hostA } = await helloHostWithId(relay.url, "host-unbind-a");
+    const secretA = await pairDeviceWithToken(
+      relay.url,
+      "dev-unbind",
+      "host-unbind-a",
+      await requestPairToken(hostA, "pc-unbind-a"),
+    );
+    const secretB = await pairDeviceWithToken(
+      relay.url,
+      "dev-unbind",
+      "host-unbind-b",
+      await requestPairToken(hostB, "pc-unbind-b"),
+    );
+
+    // A host cannot unbind on a device's behalf.
+    const hostClosed = nextClose(hostA);
+    hostA.send(
+      JSON.stringify({
+        v: 1,
+        traceId: "hu-host",
+        ts: Date.now(),
+        nonce: "n-hu-host",
+        role: "host",
+        control: "pair.unbind",
+        hostId: "host-unbind-a",
+        payload: { kind: "pair.unbind", hostId: "host-unbind-a" },
+      }),
+    );
+    assert.equal((await hostClosed).code, 4002);
+
+    // The device unbinds host A. The relay answers and drops the link.
+    const device = await connect(relay.url, "device");
+    device.send(
+      pairingHello("device", {
+        deviceId: "dev-unbind",
+        hostId: "host-unbind-a",
+        auth: { deviceSecret: secretA },
+      }),
+    );
+    await nextMessage(device);
+    const settled = new Promise<void>((resolve) => {
+      device.once("message", () => resolve());
+      device.once("close", () => resolve());
+    });
+    device.send(
+      JSON.stringify({
+        v: 1,
+        traceId: "hu-device",
+        ts: Date.now(),
+        nonce: "n-hu-device",
+        role: "device",
+        deviceId: "dev-unbind",
+        hostId: "host-unbind-a",
+        control: "pair.unbind",
+        payload: { kind: "pair.unbind", hostId: "host-unbind-a" },
+      }),
+    );
+    await settled;
+
+    assert.equal(await reconnectWithSecret(relay.url, "dev-unbind", "host-unbind-a", secretA), "rejected");
+    assert.equal(
+      await reconnectWithSecret(relay.url, "dev-unbind", "host-unbind-b", secretB),
+      "ok",
+      "unbinding one host must leave the other usable",
+    );
+    hostB.close();
   } finally {
     await relay.close();
   }

@@ -55,16 +55,48 @@ Future<String?> loadLastRelayUrl() async {
   return (value == null || value.isEmpty) ? null : value;
 }
 
-/// 设备凭证按 relay 作用域隔离：scope 用 [relayScope] 从 relay 地址派生。
-Future<void> saveDeviceSecret(String deviceId, String secret, {required String relayUrl}) async {
+/// 配对凭证按 (relay, device, host) 隔离：一台手机可分别配对多台电脑，
+/// 每台电脑持有独立凭证，删除/解绑一台不影响其他电脑。
+String _deviceSecretKey(String deviceId, String relayUrl, String hostId) =>
+    '$_kDeviceSecretPrefix${relayScope(relayUrl)}.$deviceId.$hostId';
+
+Future<void> saveDeviceSecret(
+  String deviceId,
+  String secret, {
+  required String relayUrl,
+  required String hostId,
+}) async {
   final prefs = await SharedPreferences.getInstance();
-  await prefs.setString('$_kDeviceSecretPrefix${relayScope(relayUrl)}.$deviceId', secret);
+  await prefs.setString(_deviceSecretKey(deviceId, relayUrl, hostId), secret);
 }
 
-Future<String?> loadDeviceSecret(String deviceId, {required String relayUrl}) async {
+Future<String?> loadDeviceSecret(
+  String deviceId, {
+  required String relayUrl,
+  required String hostId,
+}) async {
   final prefs = await SharedPreferences.getInstance();
-  final value = prefs.getString('$_kDeviceSecretPrefix${relayScope(relayUrl)}.$deviceId');
+  final value = prefs.getString(_deviceSecretKey(deviceId, relayUrl, hostId));
   return (value == null || value.isEmpty) ? null : value;
+}
+
+Future<void> deleteDeviceSecret(
+  String deviceId, {
+  required String relayUrl,
+  required String hostId,
+}) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove(_deviceSecretKey(deviceId, relayUrl, hostId));
+}
+
+/// 已配对的主机 ID 集合（供「选择电脑」显示配对状态）。
+Future<Set<String>> loadPairedHostIds(String deviceId, {required String relayUrl}) async {
+  final prefs = await SharedPreferences.getInstance();
+  final prefix = '$_kDeviceSecretPrefix${relayScope(relayUrl)}.$deviceId.';
+  return {
+    for (final key in prefs.getKeys())
+      if (key.startsWith(prefix)) key.substring(prefix.length),
+  };
 }
 
 /// E2EE host key pinning (TOFU): the first-seen X25519 public key of a host

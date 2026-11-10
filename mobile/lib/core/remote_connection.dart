@@ -146,14 +146,22 @@ class RemoteConnection {
   /// 多 PC：切换目标主机并刷新 hello_ack（后续 RPC 自动路由到新 host）。
   Future<void> selectHost(String hostId) async {
     _preferredHostId = hostId;
-    // Re-handshake: hello_ack re-resolves hostId, including offline targets
-    // (frames route-drop until that PC comes back online).
+    // The credential is per host: point hello at the new target and reload
+    // its own deviceSecret before re-handshaking.
+    _hostId = hostId;
+    _deviceSecret = null;
     await reconnect();
   }
 
   /// 多 PC：向 relay 请求最新主机目录。
   void refreshHosts() {
     _sendEnvelopeWithControl('hosts.list', {'kind': 'hosts.list'});
+  }
+
+  /// 让 relay 删掉本设备与某台电脑的配对绑定。手机端随后清本地凭证；
+  /// 其他电脑的绑定不受影响。控制帧为明文元数据，在 cipher gate 之前处理。
+  void unbindHost(String hostId) {
+    _sendEnvelopeWithControl('pair.unbind', {'kind': 'pair.unbind', 'hostId': hostId});
   }
 
   void _setState(LinkState next) {
@@ -179,7 +187,15 @@ class RemoteConnection {
       onDone: () => _onLinkDown('link closed'),
       onError: (_) => _onLinkDown('link error'),
     );
-    _deviceSecret ??= await loadDeviceSecret(deviceId, relayUrl: relayUrl);
+    // Resolve the target before hello: the credential is scoped to
+    // (device, host) and the relay validates it against the same hostId.
+    // No legacy fallback — an upgraded phone must re-scan each PC once.
+    _hostId ??= targetHostId ?? _preferredHostId ?? await loadPreferredHost();
+    _deviceSecret = await loadDeviceSecret(
+      deviceId,
+      relayUrl: relayUrl,
+      hostId: _hostId ?? '',
+    );
     // E2EE: ephemeral X25519 key pair per connection; the host derives the
     // shared secret from our public key + its static key.
     _deviceKeys = await E2eeKeyPair.generate();
@@ -415,11 +431,22 @@ class RemoteConnection {
         }
         final hid = payload['hostId'];
         String? resolved = hid is String && hid.isNotEmpty ? hid : null;
-        // 首次配对成功：relay 签发的设备凭证落本地，后续连接免扫码。
+        // 配对成功：凭证按二维码指定的电脑分别保存，后续连接免扫码。
+        // 必须绑定 targetHostId（relay 的 pairDevice 用的就是它），不能用
+        // hello_ack 里「第一台在线主机」的 id，否则会存错主机。
         final issuedSecret = payload['deviceSecret'];
         if (issuedSecret is String && issuedSecret.isNotEmpty) {
+          final pairedHostId = targetHostId ?? _hostId ?? '';
           _deviceSecret = issuedSecret;
-          unawaited(saveDeviceSecret(deviceId, issuedSecret, relayUrl: relayUrl));
+          _hostId = pairedHostId;
+          _preferredHostId = pairedHostId;
+          unawaited(saveDeviceSecret(
+            deviceId,
+            issuedSecret,
+            relayUrl: relayUrl,
+            hostId: pairedHostId,
+          ));
+          unawaited(savePreferredHost(pairedHostId));
         }
         if (_preferredHostId != null &&
             _knownHosts.any((h) => h.id == _preferredHostId) &&
