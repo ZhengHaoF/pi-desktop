@@ -17,6 +17,17 @@ test("tool preset detection distinguishes none, default, full, and custom built-
   assert.ok(getToolNamesForPreset("full").includes("tool_search"));
 });
 
+test("preset detection accepts shell-executor swaps like stored Windows selections", () => {
+  // Windows sessions persist PowerShell in place of bash with an explicit grant; the grant is still the preset.
+  const granted = (names) => names.map((name) => ({ name, description: name, active: true, executionAllowed: true }));
+  const powershellFull = PRESET_FULL.map((name) => (name === "bash" ? "powershell" : name));
+  assert.equal(getPresetFromTools(granted(powershellFull)), "full");
+  assert.equal(
+    getPresetFromTools(granted(PRESET_DEFAULT.map((name) => (name === "bash" ? "powershell" : name)))),
+    "default",
+  );
+});
+
 test("preset tool arrays are defensive copies", () => {
   const selected = getToolNamesForPreset("full");
   selected.pop();

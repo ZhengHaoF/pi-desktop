@@ -1,7 +1,7 @@
 import { ORCHESTRATION_TOOL_NAMES } from "./orchestration-tools.ts";
 import { WEB_SEARCH_TOOL_NAMES } from "./web-search.ts";
 import { isMcpManagedTool } from "./mcp-tool-policy.ts";
-import { isAgentShell, type AgentShell } from "./agent-shell.ts";
+import { isAgentShell, useAgentShell, type AgentShell } from "./agent-shell.ts";
 
 export interface ToolEntry {
   name: string;
@@ -53,6 +53,13 @@ export function codingToolAvailability(
   }));
 }
 
+/** Selecting a shell swaps the executor in a stored selection without changing the grant. */
+function shellVariants(names: string[]): string[] {
+  return [names, useAgentShell(names, "bash"), useAgentShell(names, "powershell")].map((variant) =>
+    [...variant].sort().join(","),
+  );
+}
+
 export function getPresetFromTools(tools: ToolEntry[]): ToolPreset {
   const activeTools = getSelectedToolNames(tools);
   if (activeTools.length === 0) return "none";
@@ -62,20 +69,9 @@ export function getPresetFromTools(tools: ToolEntry[]): ToolPreset {
     .sort()
     .join(",");
 
+  if (shellVariants(PRESET_DEFAULT).includes(active)) return "default";
   if (
-    active === [...PRESET_DEFAULT].sort().join(",") ||
-    active ===
-      PRESET_DEFAULT.map((name) => (name === "bash" ? "powershell" : name))
-        .sort()
-        .join(",")
-  )
-    return "default";
-  if (
-    active ===
-    getToolNamesForPreset("full", tools)
-      .filter((name) => BUILTIN_TOOL_NAMES.has(name))
-      .sort()
-      .join(",")
+    shellVariants(getToolNamesForPreset("full", tools).filter((name) => BUILTIN_TOOL_NAMES.has(name))).includes(active)
   )
     return ORCHESTRATION_TOOL_NAMES.every(
       (name) => !tools.some((tool) => tool.name === name && !activeTools.includes(name)),
