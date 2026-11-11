@@ -200,24 +200,18 @@ export function ToolchainStateView({
                       aria-label={`${CAPABILITY_LABELS[capability]} · ${healthLabel(itemState?.health ?? "missing", t)}`}
                       aria-current={selectedItem ? "true" : undefined}
                       onClick={() => setSelected(capability)}
+                      aria-pressed={selectedItem}
+                      className="pi-btn pi-btn-ghost"
                       style={{
                         width: "100%",
                         display: "flex",
                         alignItems: "center",
                         gap: 7,
                         padding: "8px 8px",
-                        border: "none",
                         borderRadius: 5,
-                        cursor: "pointer",
-                        background: selectedItem ? "var(--bg-selected)" : "transparent",
+                        background: selectedItem ? "var(--bg-selected)" : undefined,
                         color: "var(--text)",
                         textAlign: "left",
-                      }}
-                      onMouseEnter={(event) => {
-                        if (!selectedItem) event.currentTarget.style.background = "var(--bg-hover)";
-                      }}
-                      onMouseLeave={(event) => {
-                        if (!selectedItem) event.currentTarget.style.background = "transparent";
                       }}
                     >
                       <span
@@ -276,24 +270,18 @@ export function ToolchainStateView({
               aria-label={`Herdr · ${healthLabel(state?.components.herdr?.health ?? "missing", t)}`}
               aria-current={herdrSelected ? "true" : undefined}
               onClick={() => setSelected("component.herdr")}
+              aria-pressed={herdrSelected}
+              className="pi-btn pi-btn-ghost"
               style={{
                 width: "100%",
                 display: "flex",
                 alignItems: "center",
                 gap: 7,
                 padding: "8px 8px",
-                border: "none",
                 borderRadius: 5,
-                cursor: "pointer",
-                background: herdrSelected ? "var(--bg-selected)" : "transparent",
+                background: herdrSelected ? "var(--bg-selected)" : undefined,
                 color: "var(--text)",
                 textAlign: "left",
-              }}
-              onMouseEnter={(event) => {
-                if (!herdrSelected) event.currentTarget.style.background = "var(--bg-hover)";
-              }}
-              onMouseLeave={(event) => {
-                if (!herdrSelected) event.currentTarget.style.background = "transparent";
               }}
             >
               <span
@@ -1095,18 +1083,15 @@ function ActionButton({
       disabled={disabled}
       aria-busy={busy || undefined}
       onClick={onClick}
+      className={primary ? "pi-btn pi-btn-primary" : "pi-btn"}
       style={{
         width: fullWidth ? "100%" : undefined,
         minHeight: 32,
         padding: "6px 11px",
-        border: `1px solid ${primary ? "var(--accent)" : "var(--border)"}`,
         borderRadius: 6,
-        background: primary ? "var(--accent)" : "var(--bg)",
-        color: primary ? "var(--on-accent)" : "var(--text)",
         fontSize: 11,
         fontWeight: 600,
-        cursor: disabled ? "not-allowed" : busy ? "wait" : "pointer",
-        opacity: disabled ? 0.55 : 1,
+        cursor: !disabled && busy ? "wait" : undefined,
       }}
     >
       {busy ? "…" : children}

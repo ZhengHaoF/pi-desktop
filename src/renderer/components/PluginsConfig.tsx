@@ -164,18 +164,10 @@ function ScopeTag({ scope }: { scope: PluginScope }) {
   );
 }
 
-function buttonStyle(disabled?: boolean, danger?: boolean): React.CSSProperties {
-  return {
-    padding: "6px 12px",
-    background: danger ? "rgba(239,68,68,0.08)" : "none",
-    border: "1px solid var(--border)",
-    borderRadius: 6,
-    color: danger ? "var(--danger)" : "var(--text-muted)",
-    cursor: disabled ? "not-allowed" : "pointer",
-    fontSize: 12,
-    opacity: disabled ? 0.5 : 1,
-  };
-}
+const buttonLayout: React.CSSProperties = {
+  padding: "6px 12px",
+  fontSize: 12,
+};
 
 function Toggle({
   enabled,
@@ -196,6 +188,7 @@ function Toggle({
       title={label}
       aria-label={label}
       aria-pressed={enabled}
+      className="pi-switch"
       style={{
         flexShrink: 0,
         width: 40,
@@ -206,7 +199,6 @@ function Toggle({
         cursor: loading ? "wait" : "pointer",
         background: enabled ? "var(--accent)" : "var(--border)",
         position: "relative",
-        transition: "background 0.18s",
         outline: "none",
         opacity: loading ? 0.65 : 1,
       }}
@@ -246,13 +238,13 @@ function SegmentedScope({ value, onChange }: { value: PluginScope; onChange: (sc
           <button
             key={scope}
             onClick={() => onChange(scope)}
+            aria-pressed={active}
+            className="pi-btn pi-btn-ghost"
             style={{
               width: 76,
               border: "none",
               borderRight: scope === "global" ? "1px solid var(--border)" : "none",
-              background: active ? "var(--bg-selected)" : "none",
-              color: active ? "var(--text)" : "var(--text-muted)",
-              cursor: "pointer",
+              borderRadius: 0,
               fontSize: 12,
             }}
           >
@@ -334,12 +326,8 @@ function AddPluginPanel({
           type="button"
           onClick={onInstall}
           disabled={busy || !source.trim()}
-          style={{
-            ...buttonStyle(busy || !source.trim()),
-            background: "var(--accent)",
-            color: "var(--on-accent)",
-            borderColor: "var(--accent)",
-          }}
+          className="pi-btn pi-btn-primary"
+          style={buttonLayout}
         >
           {busy ? t("installing", "Installing…") : t("install", "Install")}
         </button>
@@ -355,26 +343,15 @@ function AddPluginPanel({
               key={example}
               type="button"
               onClick={() => onSourceChange(example)}
+              className="pi-btn"
               style={{
                 width: "100%",
                 minHeight: 30,
                 textAlign: "left",
                 padding: "6px 9px",
-                border: "1px solid var(--border)",
                 borderRadius: 6,
-                background: "var(--bg-panel)",
-                color: "var(--text-dim)",
-                cursor: "pointer",
                 fontFamily: "var(--font-mono)",
                 fontSize: 11,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--bg-hover)";
-                e.currentTarget.style.color = "var(--text-muted)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "var(--bg-panel)";
-                e.currentTarget.style.color = "var(--text-dim)";
               }}
             >
               {example}
@@ -480,14 +457,16 @@ function PackageDetail({
           <button
             onClick={() => onAction("update", pkg)}
             disabled={busy || reloadBusy}
-            style={buttonStyle(busy || reloadBusy)}
+            className="pi-btn"
+            style={buttonLayout}
           >
             {busyKey === `update:${key}` ? t("pluginUpdating", "Updating…") : t("pluginUpdate", "Update")}
           </button>
           <button
             onClick={onReloadSession}
             disabled={!sessionId || reloadBusy || busy}
-            style={buttonStyle(!sessionId || reloadBusy || busy)}
+            className="pi-btn"
+            style={buttonLayout}
             title={
               sessionId
                 ? t("pluginReloadCurrentSession", "Reload current session")
@@ -499,7 +478,8 @@ function PackageDetail({
           <button
             onClick={() => onAction("remove", pkg)}
             disabled={busy || reloadBusy}
-            style={buttonStyle(busy || reloadBusy, true)}
+            className="pi-btn pi-btn-danger"
+            style={buttonLayout}
           >
             {busyKey === `remove:${key}` ? t("pluginRemoving", "Removing…") : t("pluginRemove", "Remove")}
           </button>
@@ -794,11 +774,8 @@ export function PluginsConfig({
             </div>
             <button
               onClick={onClose}
+              className="pi-btn pi-btn-ghost"
               style={{
-                background: "none",
-                border: "none",
-                color: "var(--text-muted)",
-                cursor: "pointer",
                 fontSize: 20,
                 lineHeight: 1,
                 padding: "2px 6px",
@@ -940,6 +917,7 @@ export function PluginsConfig({
                   setActionError(null);
                   setActionMessage(null);
                 }}
+                className="pi-btn pi-btn-ghost"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -948,16 +926,9 @@ export function PluginsConfig({
                   borderRadius: 5,
                   border: "none",
                   width: "100%",
-                  cursor: "pointer",
-                  background: addMode ? "var(--bg-selected)" : "none",
+                  background: addMode ? "var(--bg-selected)" : undefined,
                   color: addMode ? "var(--accent)" : "var(--text-dim)",
                   fontSize: 12,
-                }}
-                onMouseEnter={(e) => {
-                  if (!addMode) e.currentTarget.style.background = "var(--bg-hover)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!addMode) e.currentTarget.style.background = "none";
                 }}
               >
                 <svg
@@ -1084,12 +1055,13 @@ export function PluginsConfig({
           <button
             onClick={() => void loadPlugins()}
             disabled={loading || busyKey !== null}
-            style={buttonStyle(loading || busyKey !== null)}
+            className="pi-btn"
+            style={buttonLayout}
           >
             {t("refresh", "Refresh")}
           </button>
           {!embedded && (
-            <button onClick={onClose} style={buttonStyle(false)}>
+            <button onClick={onClose} className="pi-btn" style={buttonLayout}>
               {t("close", "Close")}
             </button>
           )}

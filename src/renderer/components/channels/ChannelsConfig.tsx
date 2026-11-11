@@ -37,18 +37,11 @@ export const FEISHU_PERMISSION_IMPORT_JSON = JSON.stringify(
   2,
 );
 
-function buttonStyle(primary = false): React.CSSProperties {
-  return {
-    border: `1px solid ${primary ? "var(--accent)" : "var(--border)"}`,
-    borderRadius: 6,
-    background: primary ? "var(--accent)" : "var(--bg)",
-    color: primary ? "var(--on-accent)" : "var(--text-muted)",
-    minHeight: 36,
-    fontSize: 13,
-    padding: "0 12px",
-    cursor: "pointer",
-  };
-}
+const buttonLayout: React.CSSProperties = {
+  minHeight: 36,
+  fontSize: 13,
+  padding: "0 12px",
+};
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -360,7 +353,8 @@ export function ChannelsConfig({ onSnapshotChange }: { onSnapshotChange?: (snaps
             <button
               type="button"
               disabled={busy}
-              style={buttonStyle()}
+              className="pi-btn"
+              style={buttonLayout}
               onClick={() => {
                 setFeishuError("");
                 setFeishuDialogOpen(true);
@@ -371,7 +365,8 @@ export function ChannelsConfig({ onSnapshotChange }: { onSnapshotChange?: (snaps
             <button
               type="button"
               disabled={busy}
-              style={buttonStyle()}
+              className="pi-btn"
+              style={buttonLayout}
               onClick={() => {
                 setTelegramError("");
                 setTelegramDialogOpen(true);
@@ -379,7 +374,7 @@ export function ChannelsConfig({ onSnapshotChange }: { onSnapshotChange?: (snaps
             >
               {t("connectTelegram", "Connect Telegram")}
             </button>
-            <button type="button" disabled={busy} style={buttonStyle()} onClick={beginLogin}>
+            <button type="button" disabled={busy} className="pi-btn" style={buttonLayout} onClick={beginLogin}>
               {t("connectWeixin", "Connect WeChat")}
             </button>
           </div>
@@ -874,7 +869,8 @@ export function AccountCard({
             />
             <button
               type="button"
-              style={buttonStyle()}
+              className="pi-btn"
+              style={buttonLayout}
               onClick={() =>
                 void window.piBridge.selectDirectory().then((cwd) => cwd && setDraft({ ...draft, defaultCwd: cwd }))
               }
@@ -905,7 +901,8 @@ export function AccountCard({
             <button
               type="button"
               disabled={busy || updatingToken || !telegramToken.trim()}
-              style={buttonStyle()}
+              className="pi-btn"
+              style={buttonLayout}
               onClick={() => void handleTokenUpdate()}
             >
               {updatingToken ? t("saving", "Saving…") : t("updateTelegramToken", "Update token")}
@@ -955,7 +952,8 @@ export function AccountCard({
           <button
             type="button"
             disabled={busy || updatingToken || !draft.appId?.trim() || !feishuAppSecret.trim()}
-            style={buttonStyle()}
+            className="pi-btn"
+            style={buttonLayout}
             onClick={() => void handleFeishuCredentialUpdate()}
           >
             {updatingToken ? t("saving", "Saving…") : t("updateFeishuCredential", "Update credentials")}
@@ -982,7 +980,8 @@ export function AccountCard({
         <button
           type="button"
           disabled={busy}
-          style={buttonStyle(true)}
+          className="pi-btn pi-btn-primary"
+          style={buttonLayout}
           onClick={() => {
             const elevated =
               draft.dmPolicy === "open" ||
@@ -1008,26 +1007,33 @@ export function AccountCard({
           {t("save", "Save")}
         </button>
         {status?.state === "running" ? (
-          <button type="button" disabled={busy} style={buttonStyle()} onClick={onStop}>
+          <button type="button" disabled={busy} className="pi-btn" style={buttonLayout} onClick={onStop}>
             {t("stop", "Stop")}
           </button>
         ) : (
-          <button type="button" disabled={busy || !draft.enabled} style={buttonStyle()} onClick={onStart}>
+          <button
+            type="button"
+            disabled={busy || !draft.enabled}
+            className="pi-btn"
+            style={buttonLayout}
+            onClick={onStart}
+          >
             {t("start", "Start")}
           </button>
         )}
-        <button type="button" disabled={busy} style={buttonStyle()} onClick={onRestart}>
+        <button type="button" disabled={busy} className="pi-btn" style={buttonLayout} onClick={onRestart}>
           {t("restart", "Restart")}
         </button>
         <button
           type="button"
           disabled={busy || probing}
-          style={{ ...buttonStyle(), opacity: probing ? 0.65 : 1 }}
+          className="pi-btn"
+          style={{ ...buttonLayout, opacity: probing ? 0.65 : 1 }}
           onClick={() => void handleProbe()}
         >
           {probing ? t("testingConnection", "Testing…") : t("testConnection", "Test connection")}
         </button>
-        <button type="button" disabled={busy} style={{ ...buttonStyle(), color: "var(--danger)" }} onClick={onDelete}>
+        <button type="button" disabled={busy} className="pi-btn pi-btn-danger" style={buttonLayout} onClick={onDelete}>
           {t("delete", "Delete")}
         </button>
       </div>
@@ -1075,7 +1081,8 @@ export function AccountCard({
         <button
           type="button"
           disabled={busy || !testPeer.trim() || !testMessage.trim()}
-          style={buttonStyle()}
+          className="pi-btn"
+          style={buttonLayout}
           onClick={() => onTestSend(testPeer.trim(), testMessage.trim())}
         >
           {t("testSend", "Test send")}
@@ -1129,14 +1136,16 @@ function PairingSection({
             <div style={{ display: "flex", gap: 6 }}>
               <button
                 disabled={busy}
-                style={buttonStyle(true)}
+                className="pi-btn pi-btn-primary"
+                style={buttonLayout}
                 onClick={() => void run(() => call("channels.pairingApprove", { pairingId: pairing.id }))}
               >
                 {t("approve", "Approve")}
               </button>
               <button
                 disabled={busy}
-                style={buttonStyle()}
+                className="pi-btn"
+                style={buttonLayout}
                 onClick={() => void run(() => call("channels.pairingReject", { pairingId: pairing.id }))}
               >
                 {t("reject", "Reject")}
@@ -1216,7 +1225,8 @@ function BindingRow({
       <div style={{ display: "flex", gap: 5 }}>
         <button
           disabled={busy}
-          style={buttonStyle()}
+          className="pi-btn"
+          style={buttonLayout}
           onClick={() =>
             void run(() =>
               call("channels.bindingUpsert", {
@@ -1229,7 +1239,8 @@ function BindingRow({
         </button>
         <button
           disabled={busy}
-          style={{ ...buttonStyle(), color: "var(--danger)" }}
+          className="pi-btn pi-btn-danger"
+          style={buttonLayout}
           onClick={() => void run(() => call("channels.bindingDelete", { bindingId: binding.id }))}
           title={t("deleteBinding", "Delete binding")}
           aria-label={t("deleteBinding", "Delete binding")}
@@ -1261,6 +1272,7 @@ function ActivitySection({ snapshot }: { snapshot: ChannelsSnapshot }) {
         data-testid="channel-activity-toggle"
         aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
+        className="pi-btn pi-btn-ghost"
         style={{
           width: "100%",
           minHeight: 50,
@@ -1270,9 +1282,7 @@ function ActivitySection({ snapshot }: { snapshot: ChannelsSnapshot }) {
           gap: 12,
           padding: 0,
           border: 0,
-          background: "none",
           color: "var(--text)",
-          cursor: "pointer",
           textAlign: "left",
         }}
       >
@@ -1329,7 +1339,8 @@ function ActivitySection({ snapshot }: { snapshot: ChannelsSnapshot }) {
           {snapshot.activities.length > 12 && (
             <button
               type="button"
-              style={{ ...buttonStyle(), marginTop: 9 }}
+              className="pi-btn"
+              style={{ ...buttonLayout, marginTop: 9 }}
               onClick={() => setShowAll((value) => !value)}
             >
               {showAll
@@ -1404,13 +1415,14 @@ export function TelegramTokenDialog({
           </div>
         )}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 7, marginTop: 16 }}>
-          <button type="button" disabled={busy} style={buttonStyle()} onClick={onClose}>
+          <button type="button" disabled={busy} className="pi-btn" style={buttonLayout} onClick={onClose}>
             {t("cancel", "Cancel")}
           </button>
           <button
             type="button"
             disabled={busy || !token.trim()}
-            style={buttonStyle(true)}
+            className="pi-btn pi-btn-primary"
+            style={buttonLayout}
             onClick={() => onConnect(token.trim())}
           >
             {busy ? t("testingConnection", "Testing…") : t("saveAndConnect", "Save and connect")}
@@ -1487,7 +1499,8 @@ export function FeishuCredentialDialog({
             role="tab"
             aria-selected={mode === "scan"}
             data-testid="feishu-scan-tab"
-            style={buttonStyle(mode === "scan")}
+            className={mode === "scan" ? "pi-btn pi-btn-primary" : "pi-btn"}
+            style={buttonLayout}
             onClick={() => setMode("scan")}
           >
             {t("feishuScanCreate", "Scan to create (recommended)")}
@@ -1497,7 +1510,8 @@ export function FeishuCredentialDialog({
             role="tab"
             aria-selected={mode === "manual"}
             data-testid="feishu-manual-tab"
-            style={buttonStyle(mode === "manual")}
+            className={mode === "manual" ? "pi-btn pi-btn-primary" : "pi-btn"}
+            style={buttonLayout}
             onClick={() => setMode("manual")}
           >
             {t("feishuExistingApp", "Existing app")}
@@ -1546,14 +1560,15 @@ export function FeishuCredentialDialog({
             </div>
             <FeishuDialogError error={error} />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 7, marginTop: 16 }}>
-              <button type="button" disabled={busy} style={buttonStyle()} onClick={onClose}>
+              <button type="button" disabled={busy} className="pi-btn" style={buttonLayout} onClick={onClose}>
                 {t("cancel", "Cancel")}
               </button>
               <button
                 type="button"
                 data-testid="start-feishu-scan"
                 disabled={busy}
-                style={buttonStyle(true)}
+                className="pi-btn pi-btn-primary"
+                style={buttonLayout}
                 onClick={() => onStartScan(domain)}
               >
                 {busy ? t("creatingQrCode", "Creating QR code…") : t("createQrCode", "Create QR code")}
@@ -1709,7 +1724,8 @@ function FeishuManualForm({
           <button
             type="button"
             data-testid="copy-feishu-permission-json"
-            style={buttonStyle(true)}
+            className="pi-btn pi-btn-primary"
+            style={buttonLayout}
             onClick={() => void copyPermissionJson()}
           >
             {permissionCopyState === "copied"
@@ -1718,7 +1734,8 @@ function FeishuManualForm({
           </button>
           <button
             type="button"
-            style={buttonStyle()}
+            className="pi-btn"
+            style={buttonLayout}
             onClick={() => void window.piBridge.openExternal(`${docsBase}/app`)}
           >
             {t("openDeveloperConsole", "Open developer console")}
@@ -1728,13 +1745,14 @@ function FeishuManualForm({
 
       <FeishuDialogError error={error} />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 7, marginTop: 16 }}>
-        <button type="button" disabled={busy} style={buttonStyle()} onClick={onClose}>
+        <button type="button" disabled={busy} className="pi-btn" style={buttonLayout} onClick={onClose}>
           {t("cancel", "Cancel")}
         </button>
         <button
           type="button"
           disabled={busy || !appId.trim() || !appSecret.trim()}
-          style={buttonStyle(true)}
+          className="pi-btn pi-btn-primary"
+          style={buttonLayout}
           onClick={() => onConnect(appId.trim(), appSecret.trim(), domain)}
         >
           {busy ? t("testingConnection", "Testing…") : t("saveAndConnect", "Save and connect")}
@@ -1847,7 +1865,7 @@ export function LoginDialog({
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
               placeholder={t("verificationNumber", "Verification number")}
             />
-            <button type="button" style={buttonStyle(true)} onClick={onSubmitCode}>
+            <button type="button" className="pi-btn pi-btn-primary" style={buttonLayout} onClick={onSubmitCode}>
               {t("submit", "Submit")}
             </button>
           </div>
@@ -1861,11 +1879,11 @@ export function LoginDialog({
         )}
         <div style={{ display: "flex", justifyContent: "center", gap: 7, marginTop: 16 }}>
           {retryable && onRetry && (
-            <button type="button" style={buttonStyle(true)} onClick={onRetry}>
+            <button type="button" className="pi-btn pi-btn-primary" style={buttonLayout} onClick={onRetry}>
               {t("regenerateQrCode", "Generate a new QR code")}
             </button>
           )}
-          <button type="button" style={buttonStyle()} onClick={onClose}>
+          <button type="button" className="pi-btn" style={buttonLayout} onClick={onClose}>
             {terminal ? t("close", "Close") : t("cancel", "Cancel")}
           </button>
         </div>

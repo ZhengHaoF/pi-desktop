@@ -15,15 +15,10 @@ const inputStyle = {
   fontSize: 13,
 } as const;
 
-const buttonStyle = {
+const buttonLayout = {
   minHeight: 36,
   padding: "7px 14px",
-  border: "1px solid var(--border)",
-  borderRadius: 6,
-  background: "var(--bg-panel)",
-  color: "var(--text)",
   fontSize: 13,
-  cursor: "pointer",
 } as const;
 
 const hintStyle = { margin: "8px 0 0", fontSize: 12, lineHeight: 1.55, color: "var(--text-dim)" } as const;
@@ -166,7 +161,8 @@ export function WebSearchSettings() {
             />
             <button
               type="button"
-              style={{ ...buttonStyle, opacity: keyDirty && !busy ? 1 : 0.6 }}
+              className="pi-btn"
+              style={{ ...buttonLayout, opacity: keyDirty && !busy ? 1 : 0.6 }}
               disabled={!keyDirty || busy}
               onClick={() => void save({ apiKeyOverride: keyDraft.trim() })}
             >
@@ -174,7 +170,8 @@ export function WebSearchSettings() {
             </button>
             <button
               type="button"
-              style={{ ...buttonStyle, opacity: testing ? 0.65 : 1 }}
+              className="pi-btn"
+              style={{ ...buttonLayout, opacity: testing ? 0.65 : 1 }}
               disabled={busy || testing}
               onClick={() => void test()}
             >

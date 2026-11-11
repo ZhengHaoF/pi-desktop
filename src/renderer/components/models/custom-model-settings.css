@@ -49,6 +49,19 @@
   color: var(--text);
   font-size: 12px;
   cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.custom-model-secondary-action:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--accent-soft-border);
+}
+.custom-model-secondary-action:active:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .custom-model-tabs button {
   flex: 1;
@@ -61,11 +74,25 @@
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+.custom-model-tabs button:hover:not([aria-pressed="true"]) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.custom-model-tabs button:active:not([aria-pressed="true"]) {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 .custom-model-tabs button[aria-pressed="true"] {
   background: var(--bg-selected);
   color: var(--accent);
   font-weight: 600;
+}
+.custom-model-tabs button[aria-pressed="true"]:hover {
+  background: color-mix(in srgb, var(--bg-selected) 60%, var(--accent-soft-border));
 }
 .custom-model-fields {
   display: flex;
@@ -217,6 +244,9 @@
   border: none;
   background: transparent;
   color: var(--text-muted);
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 .custom-model-tree-provider[data-selected="true"],
 .custom-model-tree-model[data-selected="true"] {
@@ -292,8 +322,14 @@
   padding: 7px;
   font-size: 11px;
 }
-.custom-model-tree button:hover {
+.custom-model-tree button:hover:not(:disabled) {
   background: var(--bg-hover);
+}
+.custom-model-tree button:active:not(:disabled) {
+  background: var(--accent-soft);
+}
+.custom-model-tree .custom-model-tree-model[data-selected="true"]:hover {
+  background: color-mix(in srgb, var(--bg-selected) 60%, var(--accent-soft-border));
 }
 .custom-model-tree button:focus-visible,
 .custom-model-form button:focus-visible,
@@ -312,5 +348,12 @@
   .custom-thinking-table th {
     padding-left: 4px;
     padding-right: 4px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .custom-model-secondary-action,
+  .custom-model-tabs button,
+  .custom-model-tree button {
+    transition: none;
   }
 }

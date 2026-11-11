@@ -12,13 +12,9 @@ import { Field, Check, NumInput, Select, SectionTitle } from "../form-controls";
 import { JsonObjectField } from "./JsonObjectField";
 import { THINKING_LEVELS } from "@shared/thinking-levels";
 
-const buttonStyle = {
+const buttonLayout = {
   padding: "7px 12px",
-  border: "1px solid var(--border)",
   borderRadius: 5,
-  background: "var(--bg-panel)",
-  color: "var(--text)",
-  cursor: "pointer",
 };
 
 const mutedHintStyle = { color: "var(--text-muted)", fontSize: 12, lineHeight: 1.6, margin: 0 } as const;
@@ -98,10 +94,10 @@ function SettingsActions({
       )}
       {saved && <p role="status">{t("saved", "Saved")}</p>}
       <div style={{ display: "flex", gap: 8 }}>
-        <button style={buttonStyle} disabled={busy || !canSave} onClick={onSave}>
+        <button className="pi-btn" style={buttonLayout} disabled={busy || !canSave} onClick={onSave}>
           {t("save", "Save")}
         </button>
-        <button style={buttonStyle} disabled={busy} onClick={onReload}>
+        <button className="pi-btn" style={buttonLayout} disabled={busy} onClick={onReload}>
           {t("reload", "Reload")}
         </button>
       </div>

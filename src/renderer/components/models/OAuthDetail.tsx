@@ -338,16 +338,8 @@ export function OAuthDetail({
                 <button
                   key={option.id}
                   onClick={() => submitSelection(loginState.token, option.id)}
-                  style={{
-                    padding: "6px 9px",
-                    background: "var(--bg)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 5,
-                    color: "var(--text)",
-                    cursor: "pointer",
-                    fontSize: 12,
-                    textAlign: "left",
-                  }}
+                  className="pi-btn"
+                  style={{ padding: "6px 9px", borderRadius: 5, fontSize: 12, textAlign: "left" }}
                 >
                   {option.label}
                 </button>
@@ -411,17 +403,8 @@ export function OAuthDetail({
               <button
                 onClick={() => submitCode(loginState.token, inputValue)}
                 disabled={!inputValue.trim()}
-                style={{
-                  padding: "6px 12px",
-                  background: inputValue.trim() ? "var(--accent)" : "var(--bg-panel)",
-                  border: "none",
-                  borderRadius: 5,
-                  color: inputValue.trim() ? "#fff" : "var(--text-dim)",
-                  cursor: inputValue.trim() ? "pointer" : "not-allowed",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  flexShrink: 0,
-                }}
+                className="pi-btn pi-btn-primary"
+                style={{ padding: "6px 12px", borderRadius: 5, fontSize: 12, fontWeight: 600, flexShrink: 0 }}
               >
                 {t("submit", "Submit")}
               </button>
@@ -501,15 +484,8 @@ export function OAuthDetail({
         {isWorking ? (
           <button
             onClick={handleCancelLogin}
-            style={{
-              padding: "5px 12px",
-              background: "none",
-              border: "1px solid var(--border)",
-              borderRadius: 5,
-              color: "var(--text-muted)",
-              cursor: "pointer",
-              fontSize: 12,
-            }}
+            className="pi-btn"
+            style={{ padding: "5px 12px", borderRadius: 5, fontSize: 12 }}
           >
             {t("cancel", "Cancel")}
           </button>
@@ -517,16 +493,8 @@ export function OAuthDetail({
           <>
             <button
               onClick={requestLogin}
-              style={{
-                padding: "5px 14px",
-                background: "var(--accent)",
-                border: "none",
-                borderRadius: 5,
-                color: "#fff",
-                cursor: "pointer",
-                fontSize: 12,
-                fontWeight: 600,
-              }}
+              className="pi-btn pi-btn-primary"
+              style={{ padding: "5px 14px", borderRadius: 5, fontSize: 12, fontWeight: 600 }}
             >
               {authType === "api_key"
                 ? t("modelConfigureCredentials", "Configure credentials")
@@ -537,15 +505,8 @@ export function OAuthDetail({
             {provider.loggedIn && (
               <button
                 onClick={handleLogout}
-                style={{
-                  padding: "5px 12px",
-                  background: "none",
-                  border: "1px solid rgba(239,68,68,0.3)",
-                  borderRadius: 5,
-                  color: "#ef4444",
-                  cursor: "pointer",
-                  fontSize: 12,
-                }}
+                className="pi-btn pi-btn-danger"
+                style={{ padding: "5px 12px", borderRadius: 5, fontSize: 12 }}
               >
                 {t("modelDisconnect", "Disconnect")}
               </button>

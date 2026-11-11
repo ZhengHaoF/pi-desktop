@@ -59,14 +59,10 @@ export function AddProviderPicker({
     alignItems: "center",
     gap: 8,
     padding: "10px 12px",
-    background: "var(--bg-panel)",
-    border: "1px solid var(--border)",
     borderRadius: 7,
     boxSizing: "border-box",
-    cursor: "pointer",
     minWidth: 0,
     textAlign: "left",
-    transition: "border-color 0.12s, background 0.12s",
     width: "100%",
   };
 
@@ -184,15 +180,8 @@ export function AddProviderPicker({
                     onAddCustom();
                     onClose();
                   }}
+                  className="pi-btn"
                   style={cardStyle}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "var(--accent)";
-                    e.currentTarget.style.background = "var(--bg-hover)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "var(--border)";
-                    e.currentTarget.style.background = "var(--bg-panel)";
-                  }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
@@ -265,15 +254,8 @@ export function AddProviderPicker({
                     onSelectOAuth(p.id);
                     onClose();
                   }}
+                  className="pi-btn"
                   style={cardStyle}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "var(--accent)";
-                    e.currentTarget.style.background = "var(--bg-hover)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "var(--border)";
-                    e.currentTarget.style.background = "var(--bg-panel)";
-                  }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
@@ -317,15 +299,8 @@ export function AddProviderPicker({
                     onSelectApiKey(p.id);
                     onClose();
                   }}
+                  className="pi-btn"
                   style={cardStyle}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "var(--accent)";
-                    e.currentTarget.style.background = "var(--bg-hover)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "var(--border)";
-                    e.currentTarget.style.background = "var(--bg-panel)";
-                  }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div

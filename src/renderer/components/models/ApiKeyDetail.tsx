@@ -210,19 +210,17 @@ export function ApiKeyDetail({
           <button
             onClick={handleSave}
             disabled={saving || !apiKey.trim() || savedOk}
+            className="pi-btn pi-btn-primary"
             style={{
               padding: "6px 12px",
-              background: savedOk ? "#16a34a" : apiKey.trim() ? "var(--accent)" : "var(--bg-panel)",
-              border: "none",
               borderRadius: 5,
-              color: apiKey.trim() || savedOk ? "#fff" : "var(--text-dim)",
-              cursor: saving || !apiKey.trim() || savedOk ? "not-allowed" : "pointer",
               fontSize: 12,
               fontWeight: 600,
               flexShrink: 0,
               display: "flex",
               alignItems: "center",
               gap: 5,
+              ...(savedOk ? { background: "#16a34a", color: "#fff" } : {}),
             }}
           >
             {savedOk && (
@@ -253,16 +251,8 @@ export function ApiKeyDetail({
         <button
           onClick={handleRemove}
           disabled={removing}
-          style={{
-            alignSelf: "flex-start",
-            padding: "5px 12px",
-            background: "none",
-            border: "1px solid rgba(239,68,68,0.3)",
-            borderRadius: 5,
-            color: "#ef4444",
-            cursor: removing ? "not-allowed" : "pointer",
-            fontSize: 12,
-          }}
+          className="pi-btn pi-btn-danger"
+          style={{ alignSelf: "flex-start", padding: "5px 12px", borderRadius: 5, fontSize: 12 }}
         >
           {removing ? t("modelRemoving", "Removing…") : t("modelDisconnect", "Disconnect")}
         </button>

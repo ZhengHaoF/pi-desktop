@@ -316,7 +316,8 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                   {state.runtimeSessionGrants[sessionId] && (
                     <button
                       type="button"
-                      style={buttonStyle}
+                      className="pi-btn"
+                      style={buttonLayout}
                       onClick={() =>
                         void window.piBridge
                           .browserRevokeTemporarySessionPermission(sessionId)
@@ -494,7 +495,8 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                 <div style={{ display: "flex", gap: 8 }}>
                   <input style={{ ...inputStyle, flex: 1 }} readOnly value={settings.downloads.directory ?? ""} />
                   <button
-                    style={buttonStyle}
+                    className="pi-btn"
+                    style={buttonLayout}
                     onClick={() =>
                       void window.piBridge.selectDirectory().then((directory) => {
                         if (directory) void update({ downloads: { directory } });
@@ -566,7 +568,8 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <button
-                    style={buttonStyle}
+                    className="pi-btn"
+                    style={buttonLayout}
                     disabled={!proxyUsername || !proxyPassword}
                     onClick={() =>
                       void window.piBridge
@@ -583,7 +586,8 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                   </button>
                   {settings.proxy.credentialSecretRef && (
                     <button
-                      style={buttonStyle}
+                      className="pi-btn"
+                      style={buttonLayout}
                       onClick={() =>
                         void window.piBridge
                           .browserSetProxyCredentials(null)
@@ -680,7 +684,8 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button
-                style={buttonStyle}
+                className="pi-btn"
+                style={buttonLayout}
                 onClick={() =>
                   void Promise.all(
                     state.profiles.map((profile) => window.piBridge.browserClearProfileData(profile.id, "all")),
@@ -691,14 +696,19 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
               >
                 {t("browserClearAllData", "Clear all browser data")}
               </button>
-              <button style={buttonStyle} onClick={() => void window.piBridge.exportDiagnostics()}>
+              <button className="pi-btn" style={buttonLayout} onClick={() => void window.piBridge.exportDiagnostics()}>
                 {t("browserExportDiagnostics", "Export redacted diagnostics")}
               </button>
-              <button style={buttonStyle} onClick={() => void window.piBridge.browserCloseAllTabs().then(refresh)}>
+              <button
+                className="pi-btn"
+                style={buttonLayout}
+                onClick={() => void window.piBridge.browserCloseAllTabs().then(refresh)}
+              >
                 {t("browserCloseAllTabs", "Close all tabs")}
               </button>
               <button
-                style={{ ...buttonStyle, color: "#c43" }}
+                className="pi-btn pi-btn-danger"
+                style={buttonLayout}
                 onClick={() => {
                   if (
                     window.confirm(
@@ -879,7 +889,8 @@ function HeaderRulesSection({
               <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{rule.urlPattern}</div>
             </div>
             <button
-              style={smallButtonStyle}
+              className="pi-btn"
+              style={smallButtonLayout}
               disabled={disabled || !directionEnabled}
               onClick={() =>
                 void (async () => {
@@ -936,7 +947,8 @@ function HeaderRulesSection({
         </>
       )}
       <button
-        style={buttonStyle}
+        className="pi-btn"
+        style={buttonLayout}
         disabled={
           disabled ||
           !directionEnabled ||
@@ -1009,7 +1021,8 @@ function SnippetSection({
                 </div>
               </div>
               <button
-                style={smallButtonStyle}
+                className="pi-btn"
+                style={smallButtonLayout}
                 onClick={() =>
                   void window.piBridge
                     .browserSetPageSnippetEnabled(snippet.id, !snippet.enabled)
@@ -1020,7 +1033,8 @@ function SnippetSection({
                 {snippet.enabled ? t("browserDisable", "Disable") : t("browserEnable", "Enable")}
               </button>
               <button
-                style={smallButtonStyle}
+                className="pi-btn"
+                style={smallButtonLayout}
                 onClick={() =>
                   void window.piBridge
                     .browserDeletePageSnippet(snippet.id)
@@ -1035,7 +1049,8 @@ function SnippetSection({
         </div>
       )}
       <button
-        style={buttonStyle}
+        className="pi-btn"
+        style={buttonLayout}
         disabled={snippets.length === 0}
         onClick={() =>
           void window.piBridge
@@ -1125,16 +1140,17 @@ function ProfileSection({
                   {proxyModeLabel(t, profile.proxyMode)}
                 </div>
               </div>
-              <button style={smallButtonStyle} onClick={() => void clear(profile.id, "all")}>
+              <button className="pi-btn" style={smallButtonLayout} onClick={() => void clear(profile.id, "all")}>
                 {t("browserClearData", "Clear data")}
               </button>
               {profile.id !== "temporary" && (
                 <>
-                  <button style={smallButtonStyle} onClick={() => void rename(profile)}>
+                  <button className="pi-btn" style={smallButtonLayout} onClick={() => void rename(profile)}>
                     {t("browserRename", "Rename")}
                   </button>
                   <button
-                    style={smallButtonStyle}
+                    className="pi-btn"
+                    style={smallButtonLayout}
                     onClick={() => {
                       if (
                         window.confirm(
@@ -1158,12 +1174,21 @@ function ProfileSection({
           ))}
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button style={buttonStyle} onClick={() => void create(saveLoginState ? "persistent" : "ephemeral")}>
+          <button
+            className="pi-btn"
+            style={buttonLayout}
+            onClick={() => void create(saveLoginState ? "persistent" : "ephemeral")}
+          >
             {formatMessage(t("browserNewProfile", "New Profile ({mode})"), {
               mode: saveLoginState ? profileModeLabel(t, "persistent") : t("browserModeEphemeral", "temporary"),
             })}
           </button>
-          <button style={buttonStyle} disabled={!advancedModeEnabled} onClick={() => void create("unsafe")}>
+          <button
+            className="pi-btn"
+            style={buttonLayout}
+            disabled={!advancedModeEnabled}
+            onClick={() => void create("unsafe")}
+          >
             {t("browserNewAdvancedProfile", "New advanced Profile")}
           </button>
         </div>
@@ -1291,10 +1316,15 @@ function TextPromptDialog({
           onChange={(event) => setValue(event.target.value)}
         />
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <button type="button" style={buttonStyle} onClick={() => onRespond(null)}>
+          <button type="button" className="pi-btn" style={buttonLayout} onClick={() => onRespond(null)}>
             {cancelLabel}
           </button>
-          <button type="submit" style={primaryButtonStyle} disabled={!canSubmit}>
+          <button
+            type="submit"
+            className="pi-btn pi-btn-primary"
+            style={{ ...buttonLayout, color: "var(--accent-contrast)" }}
+            disabled={!canSubmit}
+          >
             {prompt.confirmLabel}
           </button>
         </div>
@@ -1511,23 +1541,13 @@ const inputStyle = {
   color: "var(--text)",
   fontSize: 12,
 };
-const buttonStyle = {
+const buttonLayout = {
   minHeight: 32,
-  border: "1px solid var(--border)",
   borderRadius: 6,
   padding: "0 11px",
-  background: "var(--bg)",
-  color: "var(--text-muted)",
-  cursor: "pointer",
   fontSize: 11,
 };
-const primaryButtonStyle = {
-  ...buttonStyle,
-  borderColor: "var(--accent)",
-  background: "var(--accent)",
-  color: "var(--accent-contrast)",
-};
-const smallButtonStyle = { ...buttonStyle, minHeight: 27, padding: "0 8px" };
+const smallButtonLayout = { ...buttonLayout, minHeight: 27, padding: "0 8px" };
 const promptBackdropStyle = {
   position: "fixed" as const,
   inset: 0,

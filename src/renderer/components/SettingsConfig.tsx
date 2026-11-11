@@ -228,11 +228,8 @@ export function SettingsConfig({
             type="button"
             onClick={() => requestSettingsTransition(onClose)}
             aria-label={t("close", "Close")}
+            className="pi-btn pi-btn-ghost"
             style={{
-              background: "none",
-              border: "none",
-              color: "var(--text-muted)",
-              cursor: "pointer",
               fontSize: 20,
               lineHeight: 1,
               width: 36,
@@ -294,20 +291,15 @@ export function SettingsConfig({
                       document.getElementById(`settings-tab-${nextTab.id}`)?.focus();
                     });
                   }}
+                  className="pi-settings-tab"
                   style={{
                     position: "relative",
                     width: "100%",
                     minHeight: 40,
                     padding: isMobile ? "8px 10px" : "8px 12px",
-                    border: `1px solid ${active ? "var(--accent)" : "transparent"}`,
-                    borderRadius: 7,
-                    background: active ? "var(--accent-soft)" : "transparent",
-                    color: active ? "var(--accent)" : "var(--text-muted)",
                     fontSize: 12,
                     lineHeight: 1.35,
-                    fontWeight: active ? 650 : 500,
                     textAlign: "left",
-                    cursor: "pointer",
                     overflowWrap: "anywhere",
                   }}
                 >
@@ -435,15 +427,12 @@ function AboutSettings({ onClose }: { onClose: () => void }) {
                   type="button"
                   title={t("openOfficialWebsite", "Open official website")}
                   onClick={() => void window.piBridge.openExternal(APP_WEBSITE_URL)}
+                  className="pi-btn pi-btn-link"
                   style={{
                     maxWidth: "100%",
                     padding: 0,
-                    border: 0,
-                    background: "none",
-                    color: "var(--accent)",
                     fontFamily: "var(--font-mono)",
                     fontSize: 12,
-                    cursor: "pointer",
                     overflowWrap: "anywhere",
                     textAlign: "right",
                   }}
@@ -459,15 +448,12 @@ function AboutSettings({ onClose }: { onClose: () => void }) {
                   type="button"
                   title={t("openGithubRepository", "Open GitHub repository")}
                   onClick={() => void window.piBridge.openExternal(APP_GITHUB_URL)}
+                  className="pi-btn pi-btn-link"
                   style={{
                     maxWidth: "100%",
                     padding: 0,
-                    border: 0,
-                    background: "none",
-                    color: "var(--accent)",
                     fontFamily: "var(--font-mono)",
                     fontSize: 12,
-                    cursor: "pointer",
                     overflowWrap: "anywhere",
                     textAlign: "right",
                   }}
@@ -856,17 +842,12 @@ function UpdateButton({
       aria-busy={busy || undefined}
       disabled={disabled}
       onClick={onClick}
+      className={primary ? "pi-btn pi-btn-primary" : "pi-btn"}
       style={{
         minHeight: 34,
         padding: "7px 12px",
-        border: `1px solid ${primary ? "var(--accent)" : "var(--border)"}`,
-        borderRadius: 6,
-        background: primary ? "var(--accent)" : "var(--bg)",
-        color: primary ? "white" : "var(--text)",
         fontSize: 12,
         fontWeight: 600,
-        cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.6 : 1,
       }}
     >
       {label}

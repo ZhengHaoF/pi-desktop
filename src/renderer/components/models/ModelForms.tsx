@@ -71,16 +71,8 @@ export function ProviderDetail({
           <button
             type="button"
             onClick={onDelete}
-            style={{
-              minHeight: 32,
-              padding: "0 10px",
-              border: "1px solid var(--danger-border)",
-              borderRadius: 5,
-              background: "none",
-              color: "var(--danger)",
-              fontSize: 12,
-              cursor: "pointer",
-            }}
+            className="pi-btn pi-btn-danger"
+            style={{ minHeight: 32, padding: "0 10px", borderRadius: 5, fontSize: 12 }}
           >
             {t("delete", "Delete")}
           </button>
@@ -572,15 +564,8 @@ export function ModelDetail({
             onClick={() => void window.piBridge?.openExternal(MODELS_DEV_URL)}
             title={t("modelFillInfoOpenSource", "Open models.dev")}
             aria-label={t("modelFillInfoOpenSource", "Open models.dev")}
-            style={{
-              background: "none",
-              border: "none",
-              padding: 0,
-              color: "var(--accent)",
-              cursor: "pointer",
-              fontSize: 11,
-              textDecoration: "underline",
-            }}
+            className="pi-btn pi-btn-link"
+            style={{ padding: 0, fontSize: 11, textDecoration: "underline" }}
           >
             ↗
           </button>
@@ -589,15 +574,8 @@ export function ModelDetail({
           <button
             type="button"
             onClick={handleUndoFill}
-            style={{
-              background: "none",
-              border: "none",
-              padding: 0,
-              color: "var(--text-muted)",
-              cursor: "pointer",
-              fontSize: 11,
-              textDecoration: "underline",
-            }}
+            className="pi-btn pi-btn-ghost"
+            style={{ padding: "0 2px", fontSize: 11, textDecoration: "underline", borderRadius: 3 }}
           >
             {t("modelFillInfoUndo", "Undo")}
           </button>
@@ -652,25 +630,20 @@ export function ModelDetail({
             onClick={handleTest}
             disabled={!model.id.trim() || testState.phase === "testing"}
             title={t("modelTestConnection", "Test model connection")}
+            className="pi-btn"
             style={{
               height: 32,
               padding: "0 10px",
-              background: testState.phase === "success" ? "var(--success)" : "none",
-              border: `1px solid ${testState.phase === "success" ? "var(--success)" : "var(--border)"}`,
               borderRadius: 4,
-              color:
-                testState.phase === "success"
-                  ? "var(--on-accent)"
-                  : !model.id.trim() || testState.phase === "testing"
-                    ? "var(--text-dim)"
-                    : "var(--text-muted)",
-              cursor: !model.id.trim() || testState.phase === "testing" ? "not-allowed" : "pointer",
               fontSize: 12,
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
               boxSizing: "border-box",
               gap: 5,
+              ...(testState.phase === "success"
+                ? { background: "var(--success)", borderColor: "var(--success)", color: "var(--on-accent)" }
+                : {}),
             }}
           >
             {testState.phase === "success" && (
@@ -721,14 +694,11 @@ export function ModelDetail({
             onClick={handleSetDefault}
             disabled={isDefault || !model.id.trim() || savingDefault}
             title={t("modelSetAsDefaultHint", "New conversations start with this model")}
+            className="pi-btn"
             style={{
               height: 32,
               padding: "0 10px",
-              background: "none",
-              border: "1px solid var(--border)",
               borderRadius: 4,
-              color: isDefault || !model.id.trim() || savingDefault ? "var(--text-dim)" : "var(--text-muted)",
-              cursor: isDefault || !model.id.trim() || savingDefault ? "not-allowed" : "pointer",
               fontSize: 12,
               display: "inline-flex",
               alignItems: "center",
@@ -746,17 +716,8 @@ export function ModelDetail({
           <button
             type="button"
             onClick={onDelete}
-            style={{
-              height: 32,
-              padding: "0 10px",
-              background: "none",
-              border: "1px solid rgba(239,68,68,0.3)",
-              borderRadius: 4,
-              color: "#ef4444",
-              cursor: "pointer",
-              fontSize: 12,
-              boxSizing: "border-box",
-            }}
+            className="pi-btn pi-btn-danger"
+            style={{ height: 32, padding: "0 10px", borderRadius: 4, fontSize: 12, boxSizing: "border-box" }}
           >
             {t("modelRemove", "Remove")}
           </button>
@@ -804,6 +765,7 @@ export function ModelDetail({
             "modelFillInfoHint",
             "Fills context window, max output tokens, and pricing from the models.dev database.",
           )}
+          className="pi-btn"
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -811,11 +773,7 @@ export function ModelDetail({
             gap: 6,
             minHeight: 30,
             padding: "0 12px",
-            background: "none",
-            border: "1px solid var(--border)",
             borderRadius: 4,
-            color: !model.id.trim() || fillState.phase === "loading" ? "var(--text-dim)" : "var(--text-muted)",
-            cursor: !model.id.trim() || fillState.phase === "loading" ? "not-allowed" : "pointer",
             fontSize: 12,
           }}
         >
@@ -926,16 +884,8 @@ export function ModelDetail({
                     set("thinkingLevelMap", undefined);
                     validField("thinkingLevelMap", true);
                   }}
-                  style={{
-                    minHeight: 32,
-                    fontSize: 12,
-                    padding: "0 9px",
-                    background: "none",
-                    border: "1px solid var(--border)",
-                    borderRadius: 4,
-                    color: "var(--text-dim)",
-                    cursor: "pointer",
-                  }}
+                  className="pi-btn"
+                  style={{ minHeight: 32, fontSize: 12, padding: "0 9px", borderRadius: 4 }}
                 >
                   {t("modelClearAll", "Clear all")}
                 </button>

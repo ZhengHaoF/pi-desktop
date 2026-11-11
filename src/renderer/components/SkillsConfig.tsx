@@ -42,6 +42,7 @@ function Toggle({ enabled, loading, onToggle }: { enabled: boolean; loading: boo
       }
       onClick={onToggle}
       disabled={loading}
+      className="pi-switch"
       title={
         enabled
           ? t("visibleSkillInModelPrompt", "Visible in model prompt — click to disable")
@@ -57,7 +58,6 @@ function Toggle({ enabled, loading, onToggle }: { enabled: boolean; loading: boo
         cursor: loading ? "wait" : "pointer",
         background: enabled ? "var(--accent)" : "var(--border)",
         position: "relative",
-        transition: "background 0.18s",
         outline: "none",
       }}
     >
@@ -220,14 +220,11 @@ const SkillDetail = forwardRef<
             type="button"
             onClick={() => void saveContent()}
             disabled={contentLoading || contentSaving || content === savedContent}
+            className={content !== savedContent ? "pi-btn pi-btn-primary" : "pi-btn"}
             style={{
               minHeight: 32,
               padding: "0 11px",
               borderRadius: 5,
-              border: "1px solid var(--border)",
-              background: content !== savedContent ? "var(--accent)" : "var(--bg-panel)",
-              color: content !== savedContent ? "#fff" : "var(--text-dim)",
-              cursor: contentLoading || contentSaving || content === savedContent ? "default" : "pointer",
               fontSize: 12,
             }}
           >
@@ -386,16 +383,12 @@ function AddSkillPanel({ cwd, onInstalled }: { cwd: string; onInstalled: () => v
             type="button"
             onClick={() => search(query)}
             disabled={searching || !query.trim()}
+            className="pi-btn pi-btn-primary"
             style={{
               minHeight: 36,
               padding: "7px 16px",
               fontSize: 13,
               borderRadius: 6,
-              border: "none",
-              background: "var(--accent)",
-              color: "#fff",
-              cursor: searching || !query.trim() ? "not-allowed" : "pointer",
-              opacity: searching || !query.trim() ? 0.5 : 1,
               flexShrink: 0,
             }}
           >
@@ -419,12 +412,12 @@ function AddSkillPanel({ cwd, onInstalled }: { cwd: string; onInstalled: () => v
               <button
                 key={s}
                 onClick={() => setScope(s)}
+                aria-pressed={scope === s}
+                className="pi-btn pi-btn-ghost"
                 style={{
                   padding: "3px 10px",
                   border: "none",
-                  cursor: "pointer",
-                  background: scope === s ? "var(--bg-selected)" : "none",
-                  color: scope === s ? "var(--text)" : "var(--text-dim)",
+                  borderRadius: 0,
                   fontWeight: scope === s ? 600 : 400,
                   borderRight: s === "global" ? "1px solid var(--border)" : "none",
                 }}
@@ -547,17 +540,15 @@ function AddSkillPanel({ cwd, onInstalled }: { cwd: string; onInstalled: () => v
                 <button
                   onClick={() => !isInstalled && !isInstalling && install(r.package)}
                   disabled={isInstalled || isInstalling || installing !== null}
+                  className="pi-btn"
                   style={{
                     flexShrink: 0,
                     padding: "5px 14px",
                     fontSize: 12,
                     fontWeight: 500,
                     borderRadius: 5,
-                    border: "1px solid var(--border)",
-                    cursor: isInstalled || isInstalling || installing !== null ? "not-allowed" : "pointer",
-                    background: isInstalled ? "rgba(34,197,94,0.1)" : "none",
-                    color: isInstalled ? "#16a34a" : isInstalling ? "var(--accent)" : "var(--text-muted)",
-                    transition: "color 0.12s",
+                    background: isInstalled ? "rgba(34,197,94,0.1)" : undefined,
+                    color: isInstalled ? "#16a34a" : isInstalling ? "var(--accent)" : undefined,
                   }}
                 >
                   {isInstalled
@@ -801,11 +792,8 @@ export const SkillsConfig = forwardRef<
             </div>
             <button
               onClick={() => requestTransition(onClose)}
+              className="pi-btn pi-btn-ghost"
               style={{
-                background: "none",
-                border: "none",
-                color: "var(--text-muted)",
-                cursor: "pointer",
                 fontSize: 20,
                 lineHeight: 1,
                 padding: "2px 6px",
@@ -891,6 +879,7 @@ export const SkillsConfig = forwardRef<
                             key={skill.filePath}
                             type="button"
                             aria-current={isSelected ? "true" : undefined}
+                            aria-pressed={isSelected}
                             onClick={() => {
                               if (isSelected) return;
                               requestTransition(() => {
@@ -898,6 +887,7 @@ export const SkillsConfig = forwardRef<
                                 setAddMode(false);
                               });
                             }}
+                            className="pi-btn pi-btn-ghost"
                             style={{
                               display: "flex",
                               alignItems: "center",
@@ -908,14 +898,6 @@ export const SkillsConfig = forwardRef<
                               fontFamily: "inherit",
                               padding: "8px 8px",
                               borderRadius: 5,
-                              cursor: "pointer",
-                              background: isSelected ? "var(--bg-selected)" : "none",
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!isSelected) e.currentTarget.style.background = "var(--bg-hover)";
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!isSelected) e.currentTarget.style.background = "none";
                             }}
                           >
                             <span
@@ -962,7 +944,9 @@ export const SkillsConfig = forwardRef<
               <button
                 type="button"
                 aria-current={addMode ? "true" : undefined}
+                aria-pressed={addMode}
                 onClick={() => requestTransition(() => setAddMode(true))}
+                className="pi-btn pi-btn-ghost"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -973,16 +957,8 @@ export const SkillsConfig = forwardRef<
                   fontFamily: "inherit",
                   padding: "7px 8px",
                   borderRadius: 5,
-                  cursor: "pointer",
-                  background: addMode ? "var(--bg-selected)" : "none",
-                  color: addMode ? "var(--accent)" : "var(--text-dim)",
+                  color: addMode ? "var(--accent)" : undefined,
                   fontSize: 12,
-                }}
-                onMouseEnter={(e) => {
-                  if (!addMode) e.currentTarget.style.background = "var(--bg-hover)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!addMode) e.currentTarget.style.background = "none";
                 }}
               >
                 <svg
@@ -1055,13 +1031,10 @@ export const SkillsConfig = forwardRef<
           >
             <button
               onClick={() => requestTransition(onClose)}
+              className="pi-btn"
               style={{
                 padding: "6px 14px",
-                background: "none",
-                border: "1px solid var(--border)",
                 borderRadius: 6,
-                color: "var(--text-muted)",
-                cursor: "pointer",
                 fontSize: 13,
               }}
             >
@@ -1118,7 +1091,8 @@ export const SkillsConfig = forwardRef<
                 type="button"
                 disabled={transitionSaving}
                 onClick={discardAndContinue}
-                style={leavePromptButtonStyle}
+                className="pi-btn"
+                style={leavePromptButtonLayout}
               >
                 {t("discard", "Discard")}
               </button>
@@ -1126,7 +1100,8 @@ export const SkillsConfig = forwardRef<
                 type="button"
                 disabled={transitionSaving}
                 onClick={() => setPendingTransition(null)}
-                style={leavePromptButtonStyle}
+                className="pi-btn"
+                style={leavePromptButtonLayout}
               >
                 {t("cancel", "Cancel")}
               </button>
@@ -1134,12 +1109,8 @@ export const SkillsConfig = forwardRef<
                 type="button"
                 disabled={transitionSaving}
                 onClick={() => void saveAndContinue()}
-                style={{
-                  ...leavePromptButtonStyle,
-                  borderColor: "var(--accent)",
-                  background: "var(--accent)",
-                  color: "#fff",
-                }}
+                className="pi-btn pi-btn-primary"
+                style={leavePromptButtonLayout}
               >
                 {transitionSaving ? t("saving", "Saving…") : t("save", "Save")}
               </button>
@@ -1151,13 +1122,9 @@ export const SkillsConfig = forwardRef<
   );
 });
 
-const leavePromptButtonStyle: React.CSSProperties = {
+const leavePromptButtonLayout: React.CSSProperties = {
   minHeight: 34,
   padding: "6px 12px",
-  border: "1px solid var(--border)",
   borderRadius: 6,
-  background: "var(--bg-panel)",
-  color: "var(--text-muted)",
-  cursor: "pointer",
   fontSize: 12,
 };

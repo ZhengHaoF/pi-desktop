@@ -514,11 +514,8 @@ export function ModelsConfig({
                 onClick={onClose}
                 title={t("modelCloseModels", "Close models")}
                 aria-label={t("modelCloseModels", "Close models")}
+                className="pi-btn pi-btn-ghost"
                 style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--text-muted)",
-                  cursor: "pointer",
                   fontSize: 20,
                   lineHeight: 1,
                   width: 36,
@@ -583,6 +580,8 @@ export function ModelsConfig({
                     key={type}
                     type="button"
                     onClick={() => setSelection({ type })}
+                    aria-pressed={selection?.type === type}
+                    className="pi-btn pi-btn-ghost"
                     style={{
                       display: "block",
                       width: "100%",
@@ -591,9 +590,6 @@ export function ModelsConfig({
                       marginBottom: 4,
                       border: "none",
                       borderRadius: 5,
-                      background: selection?.type === type ? "var(--bg-selected)" : "transparent",
-                      color: "var(--text)",
-                      cursor: "pointer",
                       fontSize: 12,
                     }}
                   >
@@ -708,6 +704,7 @@ export function ModelsConfig({
                   ref={addProviderButtonRef}
                   aria-label={t("addProvider", "Add provider")}
                   onClick={() => setPickerOpen(true)}
+                  className="pi-btn pi-btn-dashed"
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -715,20 +712,8 @@ export function ModelsConfig({
                     gap: 5,
                     width: "100%",
                     padding: "6px 0",
-                    background: "none",
-                    border: "1px dashed var(--border)",
                     borderRadius: 5,
-                    color: "var(--text-muted)",
-                    cursor: "pointer",
                     fontSize: 12,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "var(--accent)";
-                    e.currentTarget.style.color = "var(--accent)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "var(--border)";
-                    e.currentTarget.style.color = "var(--text-muted)";
                   }}
                 >
                   + {t("addProvider", "Add provider")}
@@ -795,13 +780,9 @@ export function ModelsConfig({
                   onClick={() => void loadModelsConfig()}
                   disabled={loading || saving}
                   title={t("modelReloadDiskVersionHint", "Discard local edits and load the current models.json")}
+                  className="pi-btn"
                   style={{
                     padding: "6px 12px",
-                    background: "none",
-                    border: "1px solid var(--border)",
-                    borderRadius: 6,
-                    color: "var(--text)",
-                    cursor: loading || saving ? "default" : "pointer",
                     fontSize: 12,
                   }}
                 >
@@ -811,13 +792,9 @@ export function ModelsConfig({
               {!embedded && (
                 <button
                   onClick={onClose}
+                  className="pi-btn"
                   style={{
                     padding: "6px 14px",
-                    background: "none",
-                    border: "1px solid var(--border)",
-                    borderRadius: 6,
-                    color: "var(--text-muted)",
-                    cursor: "pointer",
                     fontSize: 13,
                   }}
                 >
@@ -833,15 +810,15 @@ export function ModelsConfig({
                     ? t("modelCannotSaveBeforeLoad", "Cannot save until config loads successfully")
                     : undefined)
                 }
+                className="pi-btn pi-btn-primary"
                 style={{
                   position: "relative",
                   padding: "6px 16px",
                   minWidth: 92,
-                  background: savedOk ? "#16a34a" : saveDisabled ? "var(--bg-panel)" : "var(--accent)",
+                  background: savedOk ? "#16a34a" : undefined,
                   border: "none",
                   borderRadius: 6,
-                  color: savedOk || !saveDisabled ? "#fff" : "var(--text-muted)",
-                  cursor: saveDisabled ? "default" : "pointer",
+                  color: savedOk ? "#fff" : undefined,
                   fontSize: 13,
                   fontWeight: 600,
                   display: "inline-flex",

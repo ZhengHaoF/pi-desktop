@@ -115,6 +115,7 @@ export function SecretTextInput({
         onClick={() => setVisible((v) => !v)}
         aria-label={visible ? "Hide API key" : "Show API key"}
         title={visible ? "Hide API key" : "Show API key"}
+        className="pi-btn pi-btn-ghost"
         style={{
           position: "absolute",
           right: 2,
@@ -124,9 +125,6 @@ export function SecretTextInput({
           height: 32,
           padding: 0,
           border: "none",
-          background: "transparent",
-          color: "var(--text-dim)",
-          cursor: "pointer",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",

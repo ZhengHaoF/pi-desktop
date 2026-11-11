@@ -19,13 +19,8 @@ export function ModelConnectionTest({
       <button
         type="button"
         disabled={busy}
-        style={{
-          padding: "4px 8px",
-          border: "1px solid var(--border)",
-          borderRadius: 4,
-          background: "var(--bg)",
-          color: "var(--text)",
-        }}
+        className="pi-btn"
+        style={{ padding: "4px 8px", borderRadius: 4, fontSize: 11 }}
         onClick={async () => {
           setBusy(true);
           setResult(undefined);
@@ -49,7 +44,7 @@ export function ModelConnectionTest({
       {result && (
         <div
           role="status"
-          style={{ marginTop: 5, color: result.ok ? "var(--text-muted)" : "#ef4444", overflowWrap: "anywhere" }}
+          style={{ marginTop: 5, color: result.ok ? "var(--text-muted)" : "var(--danger)", overflowWrap: "anywhere" }}
         >
           {result.text}
         </div>

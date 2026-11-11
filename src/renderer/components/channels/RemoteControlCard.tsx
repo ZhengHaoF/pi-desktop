@@ -304,7 +304,8 @@ export function RemoteControlCard() {
             <button
               type="button"
               disabled={reconnecting}
-              style={{ padding: "4px 10px", borderRadius: 7, border: "1px solid var(--border)", fontSize: 11 }}
+              className="pi-btn"
+              style={{ padding: "4px 10px", borderRadius: 7, fontSize: 11 }}
               onClick={reconnect}
             >
               {reconnecting ? t("remoteReconnecting", "Reconnecting…") : t("remoteReconnect", "Reconnect")}
@@ -360,14 +361,16 @@ export function RemoteControlCard() {
               <button
                 type="button"
                 disabled={saving || draft.lanPort === (config?.lanPort ?? DEFAULT_PORT)}
-                style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 }}
+                className="pi-btn"
+                style={{ padding: "7px 12px", borderRadius: 8, fontSize: 12 }}
                 onClick={() => void save(draft)}
               >
                 {t("remoteApplyPort", "Apply")}
               </button>
               <button
                 type="button"
-                style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 }}
+                className="pi-btn"
+                style={{ padding: "7px 12px", borderRadius: 8, fontSize: 12 }}
                 onClick={() => void loadLanAddresses()}
               >
                 {t("relayRefreshAddresses", "Refresh addresses")}
@@ -392,17 +395,12 @@ export function RemoteControlCard() {
                         type="button"
                         onClick={() => setSelectedUrl(entry.url)}
                         title={entry.url}
+                        aria-pressed={entry.url === active.url}
+                        className="pi-btn"
                         style={{
                           padding: "4px 8px",
                           borderRadius: 6,
                           fontSize: 10.5,
-                          cursor: "pointer",
-                          border: `1px solid ${entry.url === active.url ? "var(--accent, #534AB7)" : "var(--border)"}`,
-                          color: "var(--text)",
-                          background:
-                            entry.url === active.url
-                              ? "color-mix(in srgb, var(--accent, #534AB7) 12%, transparent)"
-                              : "transparent",
                         }}
                       >
                         {entry.iface}
@@ -431,7 +429,8 @@ export function RemoteControlCard() {
                     </code>
                     <button
                       type="button"
-                      style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }}
+                      className="pi-btn"
+                      style={{ padding: "6px 10px", borderRadius: 6, fontSize: 11 }}
                       onClick={() => copy(active.url, "url")}
                     >
                       {copied === "url" ? t("remoteCopied", "Copied") : t("remoteCopy", "Copy")}
@@ -471,7 +470,8 @@ export function RemoteControlCard() {
                 <button
                   type="button"
                   disabled={saving || draft.relayUrl.trim() === (config?.relayUrl ?? "")}
-                  style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 }}
+                  className="pi-btn"
+                  style={{ padding: "8px 14px", borderRadius: 8, fontSize: 12 }}
                   onClick={() => void save(draft)}
                 >
                   {t("remoteApplyUrl", "Apply URL")}
@@ -480,7 +480,8 @@ export function RemoteControlCard() {
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <button
                   type="button"
-                  style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }}
+                  className="pi-btn"
+                  style={{ padding: "6px 10px", borderRadius: 6, fontSize: 11 }}
                   onClick={() => copy(draft.relayUrl.trim(), "custom-url")}
                 >
                   {copied === "custom-url" ? t("remoteCopied", "Copied") : t("remoteCopy", "Copy")}
@@ -507,7 +508,8 @@ export function RemoteControlCard() {
           <button
             type="button"
             disabled={saving || draft.name.trim() === (config?.name ?? "")}
-            style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 }}
+            className="pi-btn"
+            style={{ padding: "8px 14px", borderRadius: 8, fontSize: 12 }}
             onClick={() => void save(draft)}
           >
             {t("remoteApplyName", "Apply")}
@@ -524,7 +526,8 @@ export function RemoteControlCard() {
             <button
               type="button"
               disabled={pairingBusy || !draft.enabled}
-              style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 }}
+              className="pi-btn"
+              style={{ padding: "6px 10px", borderRadius: 8, fontSize: 12 }}
               onClick={() => void createPairingQr()}
             >
               {pairingBusy ? t("remotePairingCreating", "Generating…") : t("remotePairingAdd", "Add device")}
@@ -532,7 +535,8 @@ export function RemoteControlCard() {
             <button
               type="button"
               disabled={!draft.enabled}
-              style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 }}
+              className="pi-btn"
+              style={{ padding: "6px 10px", borderRadius: 8, fontSize: 12 }}
               onClick={() => void loadDevices()}
             >
               {t("remotePairingRefresh", "Refresh devices")}
@@ -561,11 +565,11 @@ export function RemoteControlCard() {
                 </span>
                 <button
                   type="button"
+                  className="pi-btn"
                   style={{
                     justifySelf: "start",
                     padding: "5px 10px",
                     borderRadius: 8,
-                    border: "1px solid var(--border)",
                     fontSize: 11.5,
                   }}
                   onClick={() => copy(pairingQrValue, "pairing-qr")}
@@ -598,7 +602,8 @@ export function RemoteControlCard() {
                   </span>
                   <button
                     type="button"
-                    style={{ padding: "4px 9px", borderRadius: 7, border: "1px solid var(--border)", fontSize: 11.5 }}
+                    className="pi-btn pi-btn-danger"
+                    style={{ padding: "4px 9px", borderRadius: 7, fontSize: 11.5 }}
                     onClick={() => void revokeDevice(device.deviceId)}
                   >
                     {t("remotePairingRevoke", "Revoke")}

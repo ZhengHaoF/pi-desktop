@@ -116,14 +116,10 @@ export function ProviderModelDiscovery({
   };
 
   const disabled = busy || !supported || !provider.baseUrl?.trim();
-  const subtleButton: React.CSSProperties = {
+  const subtleLayout: React.CSSProperties = {
     minHeight: 30,
     padding: "0 12px",
-    background: "none",
-    border: "1px solid var(--border)",
     borderRadius: 5,
-    color: "var(--text-muted)",
-    cursor: "pointer",
     fontSize: 12,
   };
 
@@ -133,17 +129,8 @@ export function ProviderModelDiscovery({
         type="button"
         onClick={() => void discover()}
         disabled={disabled}
-        style={{
-          alignSelf: "flex-start",
-          minHeight: 32,
-          padding: "0 12px",
-          background: "var(--bg-panel)",
-          color: disabled ? "var(--text-dim)" : "var(--text)",
-          border: "1px solid var(--border)",
-          borderRadius: 4,
-          cursor: disabled ? "not-allowed" : "pointer",
-          fontSize: 12,
-        }}
+        className="pi-btn"
+        style={{ alignSelf: "flex-start", minHeight: 32, padding: "0 12px", borderRadius: 4, fontSize: 12 }}
       >
         {busy ? t("modelDiscovering", "Fetching models…") : t("modelDiscover", "Fetch model list")}
       </button>
@@ -167,7 +154,12 @@ export function ProviderModelDiscovery({
         <div role="alert" style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
           <span style={{ color: "var(--danger)", lineHeight: 1.5, overflowWrap: "anywhere" }}>{current.message}</span>
           {!current.unsupported && (
-            <button type="button" onClick={() => void discover()} style={{ ...subtleButton, alignSelf: "flex-start" }}>
+            <button
+              type="button"
+              onClick={() => void discover()}
+              className="pi-btn"
+              style={{ ...subtleLayout, alignSelf: "flex-start" }}
+            >
               {t("modelImportRetry", "Retry")}
             </button>
           )}
@@ -205,18 +197,8 @@ export function ProviderModelDiscovery({
               onClick={close}
               title={t("modelImportClose", "Done")}
               aria-label={t("modelImportClose", "Done")}
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--text-dim)",
-                cursor: "pointer",
-                fontSize: 16,
-                lineHeight: 1,
-                width: 28,
-                height: 28,
-                padding: 0,
-                borderRadius: 5,
-              }}
+              className="pi-btn pi-btn-ghost"
+              style={{ width: 28, height: 28, padding: 0, borderRadius: 5, fontSize: 16, lineHeight: 1 }}
             >
               ×
             </button>
@@ -355,24 +337,15 @@ export function ProviderModelDiscovery({
                 : t("modelImportFetchedCount", "Fetched {count} models").replace("{count}", String(models.length))}
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <button type="button" onClick={close} style={subtleButton}>
+              <button type="button" onClick={close} className="pi-btn" style={subtleLayout}>
                 {t("modelImportClose", "Done")}
               </button>
               <button
                 type="button"
                 onClick={addSelected}
                 disabled={pendingSelected.length === 0}
-                style={{
-                  minHeight: 30,
-                  padding: "0 14px",
-                  background: pendingSelected.length === 0 ? "var(--bg-hover)" : "var(--accent)",
-                  border: "none",
-                  borderRadius: 5,
-                  color: pendingSelected.length === 0 ? "var(--text-dim)" : "#fff",
-                  cursor: pendingSelected.length === 0 ? "not-allowed" : "pointer",
-                  fontSize: 12,
-                  fontWeight: 600,
-                }}
+                className="pi-btn pi-btn-primary"
+                style={{ minHeight: 30, padding: "0 14px", borderRadius: 5, fontSize: 12, fontWeight: 600 }}
               >
                 {t("modelImportAddSelectedCount", "Add selected models ({count})").replace(
                   "{count}",

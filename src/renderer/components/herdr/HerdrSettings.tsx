@@ -275,11 +275,18 @@ export function HerdrSettings() {
                 type="button"
                 disabled={diagnosticsLoading}
                 onClick={() => void refreshDiagnostics()}
-                style={buttonStyle}
+                className="pi-btn"
+                style={buttonLayout}
               >
                 {diagnosticsLoading ? t("loading", "Loading…") : t("refresh", "Refresh")}
               </button>
-              <button type="button" disabled={!diagnostics} onClick={() => void copyDiagnostics()} style={buttonStyle}>
+              <button
+                type="button"
+                disabled={!diagnostics}
+                onClick={() => void copyDiagnostics()}
+                className="pi-btn"
+                style={buttonLayout}
+              >
                 {diagnosticsCopied ? t("copied", "Copied") : t("copyDiagnostics", "Copy diagnostics")}
               </button>
             </div>
@@ -360,14 +367,21 @@ export function HerdrSettings() {
         </section>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button type="button" disabled={loading || saving} onClick={() => void save()} style={primaryButtonStyle}>
+          <button
+            type="button"
+            disabled={loading || saving}
+            onClick={() => void save()}
+            className="pi-btn pi-btn-primary"
+            style={buttonLayout}
+          >
             {saving ? t("saving", "Saving…") : t("saveAndApply", "Save and apply")}
           </button>
           <button
             type="button"
             disabled={loading || saving || dirty}
             onClick={() => void action("probe")}
-            style={buttonStyle}
+            className="pi-btn"
+            style={buttonLayout}
           >
             {t("probe", "Probe")}
           </button>
@@ -375,7 +389,8 @@ export function HerdrSettings() {
             type="button"
             disabled={loading || saving || dirty || !settings.enabled}
             onClick={() => void action("connect")}
-            style={buttonStyle}
+            className="pi-btn"
+            style={buttonLayout}
           >
             {t("connect", "Connect")}
           </button>
@@ -384,7 +399,8 @@ export function HerdrSettings() {
               type="button"
               disabled={loading || saving || dirty || !settings.enabled}
               onClick={() => void action("restart")}
-              style={buttonStyle}
+              className="pi-btn"
+              style={buttonLayout}
             >
               {t("restartManagedHerdr", "Restart managed Herdr")}
             </button>
@@ -393,7 +409,8 @@ export function HerdrSettings() {
             type="button"
             disabled={loading || saving || !canDisconnect}
             onClick={() => void action("disconnect")}
-            style={buttonStyle}
+            className="pi-btn"
+            style={buttonLayout}
           >
             {t("disconnect", "Disconnect")}
           </button>
@@ -484,21 +501,10 @@ const selectStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
-const buttonStyle: React.CSSProperties = {
+const buttonLayout: React.CSSProperties = {
   minHeight: 34,
   padding: "0 14px",
-  border: "1px solid var(--border)",
   borderRadius: 7,
-  background: "var(--bg-panel)",
-  color: "var(--text)",
-  cursor: "pointer",
   fontFamily: "inherit",
   fontSize: 12,
-};
-
-const primaryButtonStyle: React.CSSProperties = {
-  ...buttonStyle,
-  background: "var(--accent)",
-  color: "white",
-  borderColor: "var(--accent)",
 };
