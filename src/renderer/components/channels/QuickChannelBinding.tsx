@@ -182,6 +182,7 @@ export function QuickChannelBinding({ sessionId, snapshot, isMobile, onSnapshotC
             setError("");
             setOpen((value) => !value);
           }}
+          className="pi-btn"
           style={{
             minWidth: 0,
             maxWidth: isMobile ? 148 : 280,
@@ -189,13 +190,17 @@ export function QuickChannelBinding({ sessionId, snapshot, isMobile, onSnapshotC
             display: "flex",
             alignItems: "center",
             gap: 6,
-            border: `1px solid ${bound ? `color-mix(in srgb, ${accent} 38%, var(--border))` : "var(--border)"}`,
             borderRadius: 999,
-            background: bound ? `color-mix(in srgb, ${accent} 9%, var(--bg-panel))` : "var(--bg)",
-            color: "var(--text-muted)",
+            // Bound state carries the channel's brand tint; the unbound state
+            // takes the shared class palette (and its hover).
+            ...(bound
+              ? {
+                  border: `1px solid color-mix(in srgb, ${accent} 38%, var(--border))`,
+                  background: `color-mix(in srgb, ${accent} 9%, var(--bg-panel))`,
+                }
+              : {}),
             fontSize: 11,
             whiteSpace: "nowrap",
-            cursor: "pointer",
             overflow: "hidden",
           }}
         >
@@ -263,7 +268,9 @@ export function QuickChannelBinding({ sessionId, snapshot, isMobile, onSnapshotC
             </div>
 
             {error && (
-              <div style={{ marginTop: 9, color: "#ef4444", fontSize: 11, overflowWrap: "anywhere" }}>{error}</div>
+              <div style={{ marginTop: 9, color: "var(--danger)", fontSize: 11, overflowWrap: "anywhere" }}>
+                {error}
+              </div>
             )}
 
             <div style={{ display: "grid", gap: 8, marginTop: 11 }}>
@@ -353,16 +360,15 @@ export function QuickChannelBinding({ sessionId, snapshot, isMobile, onSnapshotC
                         type="button"
                         disabled={busyBindingId !== null}
                         onClick={() => void updateBinding(binding, !boundHere)}
+                        className={boundHere ? "pi-btn pi-btn-danger" : "pi-btn pi-btn-primary"}
                         style={{
-                          border: `1px solid ${boundHere ? "#ef444466" : "var(--accent)"}`,
                           borderRadius: 6,
-                          background: boundHere ? "var(--bg)" : "var(--accent)",
-                          color: boundHere ? "#ef4444" : "white",
                           padding: "6px 9px",
                           fontSize: 10,
                           whiteSpace: "nowrap",
-                          cursor: busyBindingId !== null ? "default" : "pointer",
-                          opacity: busyBindingId !== null && !busy ? 0.55 : 1,
+                          // The resting unbind border keeps its danger tint; the
+                          // shared class owns the hover palette.
+                          ...(boundHere ? { borderColor: "var(--danger-border)" } : {}),
                         }}
                       >
                         {busy

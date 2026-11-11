@@ -96,10 +96,11 @@ export function PiAgentTitle() {
   return (
     <button
       onClick={handleClick}
+      className="pi-btn pi-btn-ghost"
       style={{
-        background: "none",
         border: "none",
         padding: 0,
+        // The title reads as text, not as an action button.
         cursor: "default",
         display: "flex",
         alignItems: "center",

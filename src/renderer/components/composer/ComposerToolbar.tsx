@@ -284,6 +284,7 @@ function ComposerToolbarView({
         }}
       >
         <button
+          className="pi-btn"
           onClick={onAttach}
           title={t(
             "attachLocalFilesDescription",
@@ -298,21 +299,9 @@ function ComposerToolbarView({
             width: 32,
             height: 32,
             padding: 0,
-            background: hasAttachments ? "var(--accent-soft)" : "var(--bg-panel)",
-            border: "1px solid var(--border)",
+            background: hasAttachments ? "var(--accent-soft)" : undefined,
             borderRadius: 9,
-            color: hasAttachments ? "var(--accent)" : "var(--text-muted)",
-            cursor: "pointer",
-            opacity: 1,
-            transition: "background 0.12s, color 0.12s",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "var(--bg-hover)";
-            e.currentTarget.style.color = hasAttachments ? "var(--accent)" : "var(--text)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = hasAttachments ? "var(--accent-soft)" : "var(--bg-panel)";
-            e.currentTarget.style.color = hasAttachments ? "var(--accent)" : "var(--text-muted)";
+            color: hasAttachments ? "var(--accent)" : undefined,
           }}
         >
           <svg
@@ -335,6 +324,7 @@ function ComposerToolbarView({
           <div ref={dropdownRef} style={{ position: "relative", flex: isMobile ? "1 1 auto" : undefined, minWidth: 0 }}>
             <button
               ref={modelButtonRef}
+              className="pi-btn"
               onClick={() => {
                 updateModelDropdownRect();
                 setModelDropdownOpen((v) => !v);
@@ -350,23 +340,9 @@ function ComposerToolbarView({
                 width: isMobile ? "100%" : undefined,
                 maxWidth: isMobile ? "100%" : 220,
                 overflow: "hidden",
-                background: modelDropdownOpen ? "var(--bg-selected)" : "var(--bg-panel)",
-                border: "1px solid var(--border)",
+                background: modelDropdownOpen ? "var(--bg-selected)" : undefined,
                 borderRadius: 9,
-                color: "var(--text-muted)",
-                cursor: isStreaming ? "not-allowed" : "pointer",
                 fontSize: scaledChatFont(12),
-                opacity: isStreaming ? 0.5 : 1,
-                transition: "background 0.12s, color 0.12s",
-              }}
-              onMouseEnter={(e) => {
-                if (isStreaming) return;
-                e.currentTarget.style.background = "var(--bg-hover)";
-                e.currentTarget.style.color = "var(--text)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = modelDropdownOpen ? "var(--bg-selected)" : "var(--bg-panel)";
-                e.currentTarget.style.color = "var(--text-muted)";
               }}
             >
               <svg
@@ -435,14 +411,13 @@ function ComposerToolbarView({
                         >
                           <button
                             type="button"
+                            className="pi-btn"
                             disabled={modelRefreshing}
                             onClick={() => void onModelsRefresh?.()}
                             style={{
                               width: "100%",
                               padding: "7px 9px",
-                              border: "1px solid var(--border)",
                               borderRadius: 6,
-                              background: "var(--bg-panel)",
                               color: "var(--text)",
                               cursor: modelRefreshing ? "wait" : "pointer",
                               fontSize: scaledChatFont(12),
@@ -496,6 +471,7 @@ function ComposerToolbarView({
                             return (
                               <button
                                 key={`${opt.provider}:${opt.modelId}`}
+                                className="pi-btn pi-btn-ghost"
                                 onClick={() => {
                                   setModelDropdownOpen(false);
                                   if (!isActive || isAutoModelSelection) onModelChange?.(opt.provider, opt.modelId);
@@ -506,20 +482,14 @@ function ComposerToolbarView({
                                   gap: 8,
                                   width: "100%",
                                   padding: "7px 12px",
-                                  background: isActive ? "var(--bg-selected)" : "none",
+                                  background: isActive ? "var(--bg-selected)" : undefined,
                                   border: "none",
-                                  color: isActive ? "var(--text)" : "var(--text-muted)",
-                                  cursor: "pointer",
+                                  borderRadius: 0,
+                                  color: isActive ? "var(--text)" : undefined,
                                   fontSize: scaledChatFont(12),
                                   textAlign: "left",
-                                  fontWeight: isActive ? 600 : 400,
+                                  fontWeight: isActive ? 600 : undefined,
                                   whiteSpace: "nowrap",
-                                }}
-                                onMouseEnter={(e) => {
-                                  if (!isActive) e.currentTarget.style.background = "var(--bg-hover)";
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (!isActive) e.currentTarget.style.background = "none";
                                 }}
                               >
                                 {isActive ? (
@@ -574,6 +544,7 @@ function ComposerToolbarView({
         {isStreaming && (
           <button
             type="button"
+            className="pi-btn pi-btn-danger"
             onClick={() => {
               closeControlDropdowns();
               onAbort();
@@ -587,22 +558,13 @@ function ComposerToolbarView({
               width: isMobile ? 32 : undefined,
               padding: isMobile ? 0 : "8px 14px",
               minHeight: 32,
-              background: "rgba(239,68,68,0.08)",
-              border: "1px solid rgba(239,68,68,0.3)",
+              background: "var(--danger-soft)",
+              border: "1px solid var(--danger-border)",
               borderRadius: 9,
-              color: "var(--danger)",
-              cursor: "pointer",
               fontSize: scaledChatFont(12),
               fontWeight: 600,
               whiteSpace: "nowrap",
               letterSpacing: "-0.01em",
-              transition: "background 0.12s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(239,68,68,0.16)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(239,68,68,0.08)";
             }}
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -617,6 +579,7 @@ function ComposerToolbarView({
               <button
                 ref={thinkingButtonRef}
                 type="button"
+                className="pi-btn"
                 aria-haspopup="menu"
                 aria-expanded={thinkingDropdownOpen}
                 onClick={() => {
@@ -636,23 +599,9 @@ function ComposerToolbarView({
                   padding: isMobile ? 0 : "0 9px",
                   minWidth: 32,
                   minHeight: 32,
-                  background: thinkingDropdownOpen ? "var(--bg-selected)" : "var(--bg-panel)",
-                  border: "1px solid var(--border)",
+                  background: thinkingDropdownOpen ? "var(--bg-selected)" : undefined,
                   borderRadius: 9,
-                  color: "var(--text-muted)",
-                  cursor: isStreaming ? "not-allowed" : "pointer",
                   fontSize: scaledChatFont(12),
-                  opacity: isStreaming ? 0.5 : 1,
-                  transition: "background 0.12s, color 0.12s",
-                }}
-                onMouseEnter={(e) => {
-                  if (isStreaming) return;
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                  e.currentTarget.style.color = "var(--text)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = thinkingDropdownOpen ? "var(--bg-selected)" : "var(--bg-panel)";
-                  e.currentTarget.style.color = "var(--text-muted)";
                 }}
               >
                 <svg
@@ -702,6 +651,7 @@ function ComposerToolbarView({
                         type="button"
                         role="menuitemradio"
                         aria-checked={isActive}
+                        className="pi-btn pi-btn-ghost"
                         onClick={() => {
                           if (!isActive) onThinkingLevelChange(lvl);
                           setThinkingDropdownOpen(false);
@@ -713,20 +663,14 @@ function ComposerToolbarView({
                           gap: 8,
                           width: "100%",
                           padding: "7px 12px",
-                          background: isActive ? "var(--bg-selected)" : "none",
+                          background: isActive ? "var(--bg-selected)" : undefined,
                           border: "none",
-                          color: isActive ? "var(--text)" : "var(--text-muted)",
-                          cursor: "pointer",
+                          borderRadius: 0,
+                          color: isActive ? "var(--text)" : undefined,
                           fontSize: scaledChatFont(12),
                           textAlign: "left",
-                          fontWeight: isActive ? 600 : 400,
+                          fontWeight: isActive ? 600 : undefined,
                           whiteSpace: "nowrap",
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isActive) e.currentTarget.style.background = "var(--bg-hover)";
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isActive) e.currentTarget.style.background = "none";
                         }}
                       >
                         {isActive ? (
@@ -762,6 +706,7 @@ function ComposerToolbarView({
               <button
                 ref={toolButtonRef}
                 type="button"
+                className="pi-btn"
                 aria-haspopup="menu"
                 aria-expanded={toolDropdownOpen}
                 onClick={() => {
@@ -781,23 +726,10 @@ function ComposerToolbarView({
                   padding: isMobile ? 0 : "0 9px",
                   minWidth: 32,
                   minHeight: 32,
-                  background: toolDropdownOpen ? "var(--bg-selected)" : "var(--bg-panel)",
-                  border: `1px solid ${toolPresetKey === "full" ? "rgba(239,68,68,0.35)" : "var(--border)"}`,
+                  background: toolDropdownOpen ? "var(--bg-selected)" : undefined,
+                  border: `1px solid ${toolPresetKey === "full" ? "var(--danger-border)" : "var(--border)"}`,
                   borderRadius: 9,
-                  color: "var(--text-muted)",
-                  cursor: isStreaming ? "not-allowed" : "pointer",
                   fontSize: scaledChatFont(12),
-                  opacity: isStreaming ? 0.5 : 1,
-                  transition: "background 0.12s, color 0.12s",
-                }}
-                onMouseEnter={(e) => {
-                  if (isStreaming) return;
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                  e.currentTarget.style.color = "var(--text)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = toolDropdownOpen ? "var(--bg-selected)" : "var(--bg-panel)";
-                  e.currentTarget.style.color = "var(--text-muted)";
                 }}
               >
                 <svg
@@ -849,6 +781,7 @@ function ComposerToolbarView({
                         type="button"
                         role="menuitemradio"
                         aria-checked={isActive}
+                        className="pi-btn pi-btn-ghost"
                         onClick={() => {
                           onToolPresetChange(preset);
                           setToolDropdownOpen(false);
@@ -860,20 +793,14 @@ function ComposerToolbarView({
                           gap: 8,
                           width: "100%",
                           padding: "7px 12px",
-                          background: isActive ? "var(--bg-selected)" : "none",
+                          background: isActive ? "var(--bg-selected)" : undefined,
                           border: "none",
-                          color: isActive ? "var(--text)" : "var(--text-muted)",
-                          cursor: "pointer",
+                          borderRadius: 0,
+                          color: isActive ? "var(--text)" : undefined,
                           fontSize: scaledChatFont(12),
                           textAlign: "left",
-                          fontWeight: isActive ? 600 : 400,
+                          fontWeight: isActive ? 600 : undefined,
                           whiteSpace: "nowrap",
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isActive) e.currentTarget.style.background = "var(--bg-hover)";
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isActive) e.currentTarget.style.background = "none";
                         }}
                       >
                         {isActive ? (
@@ -934,6 +861,7 @@ function ComposerToolbarView({
               )}
               <button
                 type="button"
+                className="pi-btn"
                 onClick={() => {
                   closeControlDropdowns();
                   if (isCompacting) onAbortCompaction?.();
@@ -948,23 +876,11 @@ function ComposerToolbarView({
                   padding: isMobile ? 0 : "0 9px",
                   minWidth: 32,
                   minHeight: 32,
-                  background: isCompacting ? "rgba(239,68,68,0.08)" : "var(--bg-panel)",
-                  border: `1px solid ${isCompacting ? "rgba(239,68,68,0.3)" : "var(--border)"}`,
+                  background: isCompacting ? "var(--danger-soft)" : undefined,
+                  border: `1px solid ${isCompacting ? "var(--danger-border)" : "var(--border)"}`,
                   borderRadius: 9,
-                  color: isCompacting ? "var(--danger)" : "var(--text-muted)",
-                  cursor: isStreaming && !isCompacting ? "not-allowed" : "pointer",
+                  color: isCompacting ? "var(--danger)" : undefined,
                   fontSize: scaledChatFont(12),
-                  opacity: isStreaming && !isCompacting ? 0.5 : 1,
-                  transition: "background 0.12s, color 0.12s",
-                }}
-                onMouseEnter={(e) => {
-                  if (isStreaming && !isCompacting) return;
-                  e.currentTarget.style.background = isCompacting ? "rgba(239,68,68,0.16)" : "var(--bg-hover)";
-                  e.currentTarget.style.color = isCompacting ? "var(--danger)" : "var(--text)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = isCompacting ? "rgba(239,68,68,0.08)" : "var(--bg-panel)";
-                  e.currentTarget.style.color = isCompacting ? "var(--danger)" : "var(--text-muted)";
                 }}
                 title={isCompacting ? t("stopCompaction", "Stop compaction") : t("compact", "Compact context")}
                 aria-label={isCompacting ? t("stopCompaction", "Stop compaction") : t("compact", "Compact context")}
@@ -1003,6 +919,7 @@ function ComposerToolbarView({
           {onSoundToggle !== undefined && (
             <button
               type="button"
+              className="pi-btn"
               aria-pressed={soundEnabled === true}
               onClick={() => {
                 closeControlDropdowns();
@@ -1025,23 +942,8 @@ function ComposerToolbarView({
                 width: 32,
                 height: 32,
                 padding: 0,
-                background: "var(--bg-panel)",
-                border: "1px solid var(--border)",
                 borderRadius: 9,
-                color: soundEnabled ? "var(--text-muted)" : "var(--text-dim)",
-                cursor: "pointer",
                 opacity: soundEnabled ? 1 : 0.55,
-                transition: "background 0.12s, color 0.12s, opacity 0.12s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--bg-hover)";
-                e.currentTarget.style.color = "var(--text)";
-                e.currentTarget.style.opacity = "1";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "var(--bg-panel)";
-                e.currentTarget.style.color = soundEnabled ? "var(--text-muted)" : "var(--text-dim)";
-                e.currentTarget.style.opacity = soundEnabled ? "1" : "0.55";
               }}
             >
               {soundEnabled ? (

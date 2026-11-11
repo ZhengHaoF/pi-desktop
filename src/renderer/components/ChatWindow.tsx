@@ -585,14 +585,11 @@ export function ChatWindow({
                     >
                       <button
                         type="button"
+                        className="pi-btn"
                         disabled={loadingOlder}
                         onClick={() => void loadOlder()}
                         style={{
-                          border: "1px solid var(--border)",
                           borderRadius: 7,
-                          background: "var(--bg-panel)",
-                          color: "var(--text-muted)",
-                          cursor: loadingOlder ? "default" : "pointer",
                           fontSize: scaledChatFont(11),
                           padding: "5px 10px",
                         }}
@@ -1010,11 +1007,11 @@ function NoticeShelf({
       {notices.map((notice, index) => {
         const color =
           notice.type === "error"
-            ? "#ef4444"
+            ? "var(--danger)"
             : notice.type === "warning"
-              ? "#d97706"
+              ? "var(--warning)"
               : notice.type === "success"
-                ? "#10b981"
+                ? "var(--success)"
                 : "var(--accent)";
         return (
           <div
@@ -1159,15 +1156,13 @@ function ExtensionDialog({
               {request.options.map((option) => (
                 <button
                   key={option}
+                  className="pi-btn"
                   onClick={() => onRespond(request, { value: option })}
                   style={{
                     width: "100%",
                     padding: "9px 10px",
                     borderRadius: 7,
-                    border: "1px solid var(--border)",
-                    background: "var(--bg-panel)",
                     color: "var(--text)",
-                    cursor: "pointer",
                     textAlign: "left",
                     fontSize: scaledChatFont(13),
                   }}
@@ -1237,42 +1232,33 @@ function ExtensionDialog({
           }}
         >
           <button
+            className="pi-btn"
             onClick={() => onRespond(request, { cancelled: true })}
             style={{
               padding: "6px 10px",
               borderRadius: 6,
-              border: "1px solid var(--border)",
-              background: "var(--bg)",
-              color: "var(--text-muted)",
-              cursor: "pointer",
             }}
           >
             {t("cancel", "Cancel")}
           </button>
           {request.method === "confirm" ? (
             <button
+              className="pi-btn pi-btn-primary"
               onClick={submitValue}
               style={{
                 padding: "6px 10px",
                 borderRadius: 6,
-                border: "1px solid var(--accent)",
-                background: "var(--accent)",
-                color: "#fff",
-                cursor: "pointer",
               }}
             >
               {confirmCopy?.confirmLabel ?? t("confirm", "Confirm")}
             </button>
           ) : request.method !== "select" ? (
             <button
+              className="pi-btn pi-btn-primary"
               onClick={submitValue}
               style={{
                 padding: "6px 10px",
                 borderRadius: 6,
-                border: "1px solid var(--accent)",
-                background: "var(--accent)",
-                color: "#fff",
-                cursor: "pointer",
               }}
             >
               {t("submit", "Submit")}
@@ -1393,14 +1379,11 @@ function ExtensionCustomPanel({
         >
           <div style={{ color: "var(--text)", fontSize: scaledChatFont(13), fontWeight: 650 }}>Extension panel</div>
           <button
+            className="pi-btn"
             onClick={() => onInput(request, "\x03")}
             style={{
               padding: "5px 9px",
               borderRadius: 6,
-              border: "1px solid var(--border)",
-              background: "var(--bg-panel)",
-              color: "var(--text-muted)",
-              cursor: "pointer",
               fontSize: scaledChatFont(12),
             }}
           >

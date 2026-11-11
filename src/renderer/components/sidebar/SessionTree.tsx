@@ -197,9 +197,6 @@ const sessionMenuItemStyle: CSSProperties = {
   padding: "0 9px",
   border: 0,
   borderRadius: 6,
-  background: "transparent",
-  color: "var(--text-muted)",
-  cursor: "pointer",
   fontSize: 13,
   textAlign: "left",
 };
@@ -230,7 +227,6 @@ function SessionItem({
   onToggleCollapse?: () => void;
 }) {
   const { language, t } = useI18n();
-  const [hovered, setHovered] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -338,10 +334,6 @@ function SessionItem({
   return (
     <div
       role="listitem"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => {
-        setHovered(false);
-      }}
       style={{
         height: ITEM_HEIGHT,
         position: "relative",
@@ -356,9 +348,7 @@ function SessionItem({
           ? "color-mix(in srgb, var(--danger) 8%, transparent)"
           : isSelected
             ? "var(--bg-selected)"
-            : hovered
-              ? "var(--bg-hover)"
-              : "transparent",
+            : "transparent",
         border: confirmDelete
           ? "1px solid color-mix(in srgb, var(--danger) 40%, transparent)"
           : isSelected
@@ -393,6 +383,7 @@ function SessionItem({
           <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
             <button
               onClick={handleDeleteConfirm}
+              className="pi-btn pi-btn-danger"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -400,14 +391,14 @@ function SessionItem({
                 gap: 4,
                 height: 32,
                 padding: "0 11px",
-                background: "#ef4444",
-                border: "none",
                 borderRadius: 6,
-                color: "#fff",
-                cursor: "pointer",
                 fontSize: 12,
                 fontWeight: 600,
                 whiteSpace: "nowrap",
+                // Solid destructive confirm keeps its filled danger palette.
+                background: "var(--danger)",
+                borderColor: "var(--danger)",
+                color: "#fff",
               }}
             >
               <svg
@@ -429,17 +420,14 @@ function SessionItem({
             </button>
             <button
               onClick={handleDeleteCancel}
+              className="pi-btn"
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 height: 32,
                 padding: "0 11px",
-                background: "var(--bg)",
-                border: "1px solid var(--border)",
                 borderRadius: 6,
-                color: "var(--text-muted)",
-                cursor: "pointer",
                 fontSize: 12,
                 fontWeight: 500,
                 whiteSpace: "nowrap",
@@ -490,6 +478,7 @@ function SessionItem({
                   ? `${title} · ${t("newSessionActivity", "New activity")}`
                   : title
             }
+            className="pi-btn pi-btn-ghost"
             style={{
               alignSelf: "stretch",
               flex: 1,
@@ -499,9 +488,10 @@ function SessionItem({
               gap: 6,
               padding: 0,
               border: 0,
-              background: "transparent",
+              // Selected rows keep the wrapper's bg-selected painting; otherwise
+              // the ghost class owns hover feedback across the row's main area.
+              background: isSelected ? "transparent" : undefined,
               color: "inherit",
-              cursor: "pointer",
               font: "inherit",
               textAlign: "left",
             }}
@@ -639,6 +629,7 @@ function SessionItem({
               title={collapsed ? t("expandForks", "Expand forks") : t("collapseForks", "Collapse forks")}
               aria-label={collapsed ? t("expandForks", "Expand forks") : t("collapseForks", "Collapse forks")}
               aria-expanded={!collapsed}
+              className="pi-btn pi-btn-ghost"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -647,12 +638,8 @@ function SessionItem({
                 height: 32,
                 padding: 0,
                 flexShrink: 0,
-                background: hovered ? "var(--bg-hover)" : "none",
                 border: "none",
                 borderRadius: 7,
-                color: "var(--text-dim)",
-                cursor: "pointer",
-                transition: "background 0.12s, color 0.12s",
               }}
             >
               <svg
@@ -691,7 +678,7 @@ function SessionItem({
             <button
               type="button"
               ref={actionsSummaryRef}
-              className="session-actions-summary"
+              className="session-actions-summary pi-btn pi-btn-ghost"
               title={t("sessionActions", "Session actions")}
               aria-label={t("sessionActionsFor", "Session actions for {title}").replace("{title}", title)}
               aria-haspopup="menu"
@@ -707,11 +694,11 @@ function SessionItem({
                 width: 32,
                 height: 32,
                 padding: 0,
-                background: actionsOpen || hovered ? "var(--bg-hover)" : "transparent",
-                border: actionsOpen ? "1px solid var(--border)" : "1px solid transparent",
                 borderRadius: 7,
-                color: actionsOpen ? "var(--text)" : "var(--text-dim)",
-                cursor: "pointer",
+                // The open menu keeps its trigger highlighted.
+                ...(actionsOpen
+                  ? { background: "var(--bg-hover)", border: "1px solid var(--border)", color: "var(--text)" }
+                  : {}),
               }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -740,7 +727,7 @@ function SessionItem({
                 <button
                   type="button"
                   role="menuitem"
-                  className="session-menu-item"
+                  className="pi-btn pi-btn-ghost session-menu-item"
                   onClick={startRename}
                   style={sessionMenuItemStyle}
                 >
@@ -762,7 +749,7 @@ function SessionItem({
                 <button
                   type="button"
                   role="menuitem"
-                  className="session-menu-item"
+                  className="pi-btn pi-btn-ghost session-menu-item"
                   onClick={handleDeleteClick}
                   style={{ ...sessionMenuItemStyle, color: "var(--danger)" }}
                 >

@@ -134,19 +134,17 @@ function SettingsLoading({
           <button
             ref={closeButtonRef}
             type="button"
+            className="pi-btn pi-btn-ghost"
             onClick={onClose}
             aria-label={t("close", "Close")}
             style={{
-              background: "none",
-              border: "none",
-              color: "var(--text-muted)",
-              cursor: "pointer",
               fontSize: 20,
               lineHeight: 1,
               width: 36,
               height: 36,
               padding: 0,
               borderRadius: 7,
+              border: "none",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",

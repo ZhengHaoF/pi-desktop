@@ -80,8 +80,9 @@ export function ReplyImage({
           {failed && (
             <button
               type="button"
+              className="pi-btn pi-btn-link"
               onClick={() => setAttempt((value) => value + 1)}
-              style={{ marginLeft: 10, color: "var(--accent)", cursor: "pointer" }}
+              style={{ marginLeft: 10, padding: 0 }}
             >
               {t("replyImageRetry", "Retry loading image")}
             </button>

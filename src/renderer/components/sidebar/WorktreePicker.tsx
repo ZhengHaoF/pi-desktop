@@ -112,6 +112,7 @@ export function WorktreePicker({
                     ? t("switchWorktreePath", "Switch worktree: {path}").replace("{path}", currentWt.path)
                     : t("switchWorktree", "Switch worktree")
                 }
+                className="pi-btn"
                 style={{
                   width: "100%",
                   height: 29,
@@ -120,13 +121,9 @@ export function WorktreePicker({
                   alignItems: "center",
                   gap: 6,
                   padding: "0 10px",
-                  background: "var(--bg-hover)",
-                  border: "1px solid var(--border)",
                   borderRadius: 7,
-                  cursor: "pointer",
                   fontSize: 11,
                   lineHeight: 1.35,
-                  color: "var(--text-muted)",
                   textAlign: "left",
                 }}
               >

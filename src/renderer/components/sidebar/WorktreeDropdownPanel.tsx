@@ -103,7 +103,7 @@ export function WorktreeDropdownPanel({
                   gap: 6,
                   padding: "7px 10px",
                   borderBottom: "1px solid var(--border)",
-                  background: "rgba(239,68,68,0.06)",
+                  background: "var(--danger-soft)",
                 }}
               >
                 <span
@@ -121,30 +121,28 @@ export function WorktreeDropdownPanel({
                 <button
                   onClick={() => void handleRemoveWorktree(wt.path, true)}
                   disabled={busy}
+                  className="pi-btn pi-btn-danger"
                   style={{
                     padding: "3px 9px",
-                    background: "#ef4444",
-                    border: "none",
                     borderRadius: 5,
-                    color: "#fff",
                     fontSize: 11,
                     fontWeight: 600,
-                    cursor: "pointer",
                     flexShrink: 0,
+                    // Solid destructive confirm keeps its filled danger palette.
+                    background: "var(--danger)",
+                    borderColor: "var(--danger)",
+                    color: "#fff",
                   }}
                 >
                   {t("force", "Force")}
                 </button>
                 <button
                   onClick={() => setConfirmRemove(null)}
+                  className="pi-btn"
                   style={{
                     padding: "3px 9px",
-                    background: "var(--bg-hover)",
-                    border: "1px solid var(--border)",
                     borderRadius: 5,
-                    color: "var(--text-muted)",
                     fontSize: 11,
-                    cursor: "pointer",
                     flexShrink: 0,
                   }}
                 >
@@ -164,6 +162,8 @@ export function WorktreeDropdownPanel({
                   onSelectWorktree(wt.path);
                 }}
                 title={wt.path}
+                aria-pressed={isCurrent}
+                className="pi-btn pi-btn-ghost"
                 style={{
                   flex: 1,
                   minWidth: 0,
@@ -171,10 +171,8 @@ export function WorktreeDropdownPanel({
                   alignItems: "center",
                   gap: 7,
                   padding: "8px 10px",
-                  background: "var(--bg)",
                   border: "none",
-                  color: isCurrent ? "var(--text)" : "var(--text-muted)",
-                  cursor: "pointer",
+                  background: isCurrent ? "var(--bg-selected)" : undefined,
                   textAlign: "left",
                   fontSize: 11,
                   fontFamily: "var(--font-mono)",
@@ -212,6 +210,7 @@ export function WorktreeDropdownPanel({
                     "{path}",
                     wt.path,
                   )}
+                  className="pi-btn pi-btn-danger"
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -220,21 +219,9 @@ export function WorktreeDropdownPanel({
                     height: 28,
                     padding: 0,
                     marginRight: 4,
-                    background: "none",
                     border: "none",
-                    color: "var(--text-dim)",
-                    cursor: "pointer",
                     borderRadius: 5,
                     flexShrink: 0,
-                    transition: "color 0.12s, background 0.12s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = "#ef4444";
-                    e.currentTarget.style.background = "rgba(239,68,68,0.08)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = "var(--text-dim)";
-                    e.currentTarget.style.background = "none";
                   }}
                 >
                   <svg
@@ -268,16 +255,14 @@ export function WorktreeDropdownPanel({
             deferFocus(() => newInputRef.current?.focus());
           }}
           title={t("createWorktreeHint", "Create a worktree checkout for a branch")}
+          className="pi-btn pi-btn-ghost"
           style={{
             display: "flex",
             alignItems: "center",
             gap: 7,
             width: "100%",
             padding: "8px 10px",
-            background: "none",
             border: "none",
-            color: "var(--text-muted)",
-            cursor: "pointer",
             textAlign: "left",
             fontSize: 11,
           }}
@@ -335,17 +320,13 @@ export function WorktreeDropdownPanel({
             <button
               onClick={() => void handleCreateWorktree()}
               disabled={busy || !newBranch.trim()}
+              className="pi-btn pi-btn-primary"
               style={{
                 flex: 1,
                 padding: "4px 0",
-                background: "var(--accent)",
-                border: "none",
                 borderRadius: 5,
-                color: "#fff",
                 fontSize: 11,
                 fontWeight: 600,
-                cursor: busy || !newBranch.trim() ? "not-allowed" : "pointer",
-                opacity: busy || !newBranch.trim() ? 0.65 : 1,
               }}
             >
               {busy ? t("creating", "Creating…") : t("create", "Create")}
@@ -356,15 +337,12 @@ export function WorktreeDropdownPanel({
                 setNewBranch("");
                 setError(null);
               }}
+              className="pi-btn"
               style={{
                 flex: 1,
                 padding: "4px 0",
-                background: "var(--bg-hover)",
-                border: "1px solid var(--border)",
                 borderRadius: 5,
-                color: "var(--text-muted)",
                 fontSize: 11,
-                cursor: "pointer",
               }}
             >
               {t("cancel", "Cancel")}
@@ -376,7 +354,7 @@ export function WorktreeDropdownPanel({
         <div
           style={{
             padding: "5px 10px 8px",
-            color: "#dc2626",
+            color: "var(--danger)",
             fontSize: 11,
             lineHeight: 1.35,
             overflowWrap: "anywhere",

@@ -33,6 +33,7 @@ export function ProcessDetailsGroup({ messageCount, toolCallCount, children, sta
     <div style={{ marginBottom: 14 }}>
       <button
         type="button"
+        className="pi-btn pi-btn-ghost"
         aria-expanded={expanded}
         onClick={() => expansionStore.toggle(stateKey)}
         style={{
@@ -43,9 +44,6 @@ export function ProcessDetailsGroup({ messageCount, toolCallCount, children, sta
           minHeight: 24,
           padding: "2px 0",
           border: "none",
-          background: "transparent",
-          color: "var(--text-muted)",
-          cursor: "pointer",
           fontSize: scaledChatFont(12),
           textAlign: "left",
         }}

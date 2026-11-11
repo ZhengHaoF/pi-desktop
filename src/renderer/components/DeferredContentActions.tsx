@@ -28,6 +28,7 @@ export function DeferredContentActions({
           <button
             key={key}
             type="button"
+            className="pi-btn"
             disabled={loading}
             onClick={() => {
               setLoadingKey(key);
@@ -37,11 +38,7 @@ export function DeferredContentActions({
                 .finally(() => setLoadingKey(null));
             }}
             style={{
-              border: "1px solid var(--border)",
-              borderRadius: 6,
-              background: "var(--bg-panel)",
               color: "var(--accent)",
-              cursor: loading ? "default" : "pointer",
               fontSize: scaledChatFont(11),
               padding: "4px 8px",
             }}

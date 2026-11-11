@@ -289,6 +289,7 @@ function UserMessageView({
         >
           <button
             type="button"
+            className="pi-btn pi-btn-ghost"
             onClick={copyContent}
             disabled={!copyableContent}
             title={copyableContent ? "Copy message" : "Nothing to copy"}
@@ -298,22 +299,12 @@ function UserMessageView({
               gap: 4,
               padding: "3px 8px",
               height: 32,
-              background: "none",
               border: "none",
               borderRadius: 5,
-              color: copied ? "var(--accent)" : "var(--text-dim)",
-              cursor: copyableContent ? "pointer" : "not-allowed",
-              opacity: copyableContent ? 1 : 0.55,
+              color: copied ? "var(--accent)" : undefined,
               fontSize: scaledChatFont(12),
               fontWeight: 400,
               whiteSpace: "nowrap",
-              transition: "color 0.12s",
-            }}
-            onMouseEnter={(e) => {
-              if (!copied) e.currentTarget.style.color = "var(--accent)";
-            }}
-            onMouseLeave={(e) => {
-              if (!copied) e.currentTarget.style.color = "var(--text-dim)";
             }}
           >
             {copied ? (
@@ -361,6 +352,7 @@ function UserMessageView({
             {canNavigate && (
               <button
                 type="button"
+                className="pi-btn pi-btn-ghost"
                 onClick={() => {
                   onNavigate!(prevAssistantEntryId!);
                   onEditContent?.(editableContent);
@@ -372,21 +364,11 @@ function UserMessageView({
                   gap: 4,
                   padding: "3px 8px",
                   height: 32,
-                  background: "none",
                   border: "none",
                   borderRadius: 5,
-                  color: "var(--text-dim)",
-                  cursor: "pointer",
                   fontSize: scaledChatFont(12),
                   fontWeight: 400,
                   whiteSpace: "nowrap",
-                  transition: "color 0.12s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = "var(--accent)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = "var(--text-dim)";
                 }}
               >
                 <svg
@@ -408,6 +390,7 @@ function UserMessageView({
             {canFork && (
               <button
                 type="button"
+                className="pi-btn pi-btn-ghost"
                 onClick={() => {
                   onFork!(entryId!);
                 }}
@@ -419,21 +402,12 @@ function UserMessageView({
                   gap: 4,
                   padding: "3px 8px",
                   height: 32,
-                  background: "none",
                   border: "none",
                   borderRadius: 5,
-                  color: forking ? "var(--accent)" : "var(--text-dim)",
-                  cursor: forking ? "not-allowed" : "pointer",
+                  color: forking ? "var(--accent)" : undefined,
                   fontSize: scaledChatFont(12),
                   fontWeight: 400,
                   whiteSpace: "nowrap",
-                  transition: "color 0.12s",
-                }}
-                onMouseEnter={(e) => {
-                  if (!forking) e.currentTarget.style.color = "var(--accent)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!forking) e.currentTarget.style.color = "var(--text-dim)";
                 }}
               >
                 <svg
@@ -811,7 +785,7 @@ function AssistantMessageView({
         {textContent && !isStreaming && (
           <button
             type="button"
-            className="message-hover-action"
+            className="message-hover-action pi-btn pi-btn-ghost"
             onClick={copyContent}
             title="Copy message"
             style={{
@@ -820,23 +794,15 @@ function AssistantMessageView({
               gap: 4,
               padding: "3px 8px",
               height: 32,
-              background: "none",
               border: "none",
               borderRadius: 5,
-              color: copied ? "var(--accent)" : "var(--text-dim)",
-              cursor: "pointer",
+              color: copied ? "var(--accent)" : undefined,
               fontSize: scaledChatFont(12),
               fontWeight: 400,
               whiteSpace: "nowrap",
               opacity: hovered ? 1 : 0,
               pointerEvents: hovered ? "auto" : "none",
               transition: "opacity 0.12s, color 0.12s",
-            }}
-            onMouseEnter={(e) => {
-              if (!copied) e.currentTarget.style.color = "var(--accent)";
-            }}
-            onMouseLeave={(e) => {
-              if (!copied) e.currentTarget.style.color = "var(--text-dim)";
             }}
           >
             {copied ? (
@@ -1000,16 +966,14 @@ function ThinkingBlock({
     >
       <button
         onClick={toggleExpanded}
+        className="pi-btn pi-btn-ghost"
         style={{
           display: "flex",
           alignItems: "center",
           gap: 8,
           width: "100%",
           padding: "7px 12px",
-          background: "none",
           border: "none",
-          color: "var(--text-dim)",
-          cursor: "pointer",
           fontSize: scaledChatFont(11.5),
           fontFamily: "var(--font-mono)",
           textAlign: "left",
@@ -1105,6 +1069,7 @@ function ToolCallBlock({
       {/* ── Tool call header ── */}
       <button
         onClick={() => setExpanded((v) => !v)}
+        className="pi-btn pi-btn-ghost"
         title={collapsedHint ?? undefined}
         style={{
           display: "flex",
@@ -1112,11 +1077,9 @@ function ToolCallBlock({
           gap: 8,
           width: "100%",
           padding: "7px 12px",
-          background: "none",
           border: "none",
           borderBottom: expanded || result ? "1px solid var(--tool-border)" : "none",
           color: isError ? "var(--danger)" : "var(--accent)",
-          cursor: "pointer",
           fontSize: scaledChatFont(12),
           textAlign: "left",
           minWidth: 0,
@@ -1199,17 +1162,14 @@ function ToolCallBlock({
       {expanded && browserTabId && (
         <button
           type="button"
+          className="pi-btn pi-btn-link"
           onClick={() =>
             window.dispatchEvent(new CustomEvent("pi-desktop:open-browser-tab", { detail: { tabId: browserTabId } }))
           }
           style={{
             width: "100%",
             minHeight: 30,
-            border: "none",
             borderTop: "1px solid var(--tool-border)",
-            background: "transparent",
-            color: "var(--accent)",
-            cursor: "pointer",
             fontSize: scaledChatFont(11),
             textAlign: "left",
             padding: "0 12px",
@@ -1795,15 +1755,13 @@ function CustomMessageView({
           </div>
         ) : (
           <button
+            className="pi-btn pi-btn-ghost"
             onClick={() => setContentExpanded(true)}
             style={{
               display: "block",
               width: "100%",
               padding: "8px 10px",
               border: "none",
-              background: "transparent",
-              color: "var(--text-dim)",
-              cursor: "pointer",
               fontSize: scaledChatFont(12),
               textAlign: "left",
             }}
@@ -1824,13 +1782,12 @@ function CustomMessageView({
         >
           {text || detailsText ? (
             <button
+              className="pi-btn pi-btn-ghost"
               onClick={copyContent}
               style={{
                 padding: "3px 7px",
                 border: "none",
-                background: "none",
-                color: copied ? "var(--accent)" : "var(--text-dim)",
-                cursor: "pointer",
+                color: copied ? "var(--accent)" : undefined,
                 fontSize: scaledChatFont(11),
               }}
             >
@@ -1839,6 +1796,7 @@ function CustomMessageView({
           ) : null}
           {(hasDetails || isHiddenDisplay) && (
             <button
+              className="pi-btn pi-btn-ghost"
               onClick={() => {
                 if (isHiddenDisplay) setContentExpanded((v) => !v);
                 else setDetailsExpanded((v) => !v);
@@ -1847,9 +1805,6 @@ function CustomMessageView({
                 marginLeft: "auto",
                 padding: "3px 7px",
                 border: "none",
-                background: "none",
-                color: "var(--text-dim)",
-                cursor: "pointer",
                 fontSize: scaledChatFont(11),
               }}
             >

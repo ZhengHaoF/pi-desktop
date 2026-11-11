@@ -95,9 +95,9 @@ export function CapabilityRequired({
       role="alert"
       style={{
         padding: 13,
-        border: "1px solid color-mix(in srgb, #f59e0b 45%, var(--border))",
+        border: "1px solid color-mix(in srgb, var(--warning) 45%, var(--border))",
         borderRadius: 8,
-        background: "color-mix(in srgb, #f59e0b 8%, var(--bg-panel))",
+        background: "color-mix(in srgb, var(--warning) 8%, var(--bg-panel))",
         color: "var(--text)",
       }}
     >
@@ -110,7 +110,7 @@ export function CapabilityRequired({
           "No verified tool satisfying this operation was found. Pi Desktop will not download one in the background.",
         )}
       </p>
-      {error && <p style={{ margin: "0 0 9px", fontSize: 11, color: "#f87171" }}>{error}</p>}
+      {error && <p style={{ margin: "0 0 9px", fontSize: 11, color: "var(--danger)" }}>{error}</p>}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
         {installAction && (
           <PromptButton primary disabled={pending !== null} onClick={() => void installAndContinue()}>
@@ -151,19 +151,17 @@ function PromptButton({
   return (
     <button
       type="button"
+      className={primary ? "pi-btn pi-btn-primary" : "pi-btn"}
       disabled={disabled}
       onClick={onClick}
       style={{
         minHeight: 31,
         padding: "6px 10px",
-        border: `1px solid ${primary ? "var(--accent)" : "var(--border)"}`,
         borderRadius: 6,
-        background: primary ? "var(--accent)" : "var(--bg)",
-        color: primary ? "white" : "var(--text)",
+        color: primary ? undefined : "var(--text)",
         fontSize: 11,
         fontWeight: 600,
         cursor: disabled ? "wait" : "pointer",
-        opacity: disabled ? 0.6 : 1,
       }}
     >
       {children}

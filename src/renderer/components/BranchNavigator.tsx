@@ -317,6 +317,8 @@ export function BranchNavigator({
         <button
           ref={btnRef}
           onClick={handleInlineToggle}
+          aria-pressed={open}
+          className="pi-btn"
           style={{
             display: "flex",
             alignItems: "center",
@@ -327,21 +329,11 @@ export function BranchNavigator({
             border: "none",
             borderTop: open ? "2px solid var(--accent)" : "2px solid transparent",
             borderRight: "1px solid var(--border)",
-            cursor: "pointer",
-            color: open ? "var(--text)" : "var(--text-muted)",
             fontSize: 11,
             whiteSpace: "nowrap",
-            transition: "color 0.1s, background 0.1s",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = "var(--text)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = open ? "var(--text)" : "var(--text-muted)";
           }}
           title={t("branches", "Branches")}
           aria-label={t("branches", "Branches")}
-          aria-pressed={open}
         >
           {branchIcon}
           {!compact && <span>{t("branches", "Branches")}</span>}
@@ -380,16 +372,14 @@ export function BranchNavigator({
       {/* Header toggle */}
       <button
         onClick={() => setOpenInternal((v) => !v)}
+        className="pi-btn pi-btn-ghost"
         style={{
           display: "flex",
           alignItems: "center",
           gap: 6,
           width: "100%",
           padding: "5px 12px",
-          background: "none",
           border: "none",
-          cursor: "pointer",
-          color: "var(--text-muted)",
           fontSize: 11,
           textAlign: "left",
         }}

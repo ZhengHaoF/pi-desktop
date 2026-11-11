@@ -23,6 +23,7 @@ function DownloadLink({ filePath, sourceSessionId }: { filePath: string; sourceS
   return (
     <button
       type="button"
+      className="pi-btn"
       title={t("downloadFile", "Download file")}
       aria-label={t("downloadFile", "Download file")}
       disabled={busy}
@@ -40,10 +41,7 @@ function DownloadLink({ filePath, sourceSessionId }: { filePath: string; sourceS
         width: 32,
         height: 32,
         padding: 0,
-        background: "var(--bg-panel)",
-        border: "1px solid var(--border)",
         borderRadius: 4,
-        color: "var(--text-muted)",
         cursor: busy ? "wait" : "pointer",
         flexShrink: 0,
       }}
@@ -937,22 +935,23 @@ function TextFileViewer({ filePath, cwd, sourceSessionId }: Props) {
           <div style={{ display: "flex", borderRadius: 5, overflow: "hidden", border: "1px solid var(--border)" }}>
             <button
               type="button"
+              className="pi-btn"
               onClick={() => setViewMode("source")}
               style={{
                 minHeight: 32,
                 padding: "0 10px",
                 fontSize: 12,
                 border: "none",
-                cursor: "pointer",
                 background: viewMode === "source" ? "var(--bg-selected)" : "var(--bg-hover)",
-                color: viewMode === "source" ? "var(--text)" : "var(--text-muted)",
-                fontWeight: viewMode === "source" ? 600 : 400,
+                color: viewMode === "source" ? "var(--text)" : undefined,
+                fontWeight: viewMode === "source" ? 600 : undefined,
               }}
             >
               {t("source", "Source")}
             </button>
             <button
               type="button"
+              className="pi-btn"
               onClick={() => setViewMode("diff")}
               style={{
                 minHeight: 32,
@@ -960,10 +959,9 @@ function TextFileViewer({ filePath, cwd, sourceSessionId }: Props) {
                 fontSize: 12,
                 border: "none",
                 borderLeft: "1px solid var(--border)",
-                cursor: "pointer",
                 background: viewMode === "diff" ? "var(--bg-selected)" : "var(--bg-hover)",
-                color: viewMode === "diff" ? "var(--text)" : "var(--text-muted)",
-                fontWeight: viewMode === "diff" ? 600 : 400,
+                color: viewMode === "diff" ? "var(--text)" : undefined,
+                fontWeight: viewMode === "diff" ? 600 : undefined,
               }}
             >
               {t("diff", "Diff")}{" "}
@@ -978,18 +976,18 @@ function TextFileViewer({ filePath, cwd, sourceSessionId }: Props) {
         {viewMode === "source" && !previewMode && (
           <button
             type="button"
+            className="pi-btn"
             onClick={() => setWrapLines((v) => !v)}
             title={wrapLines ? t("disableWordWrap", "Disable word wrap") : t("enableWordWrap", "Enable word wrap")}
             style={{
               minHeight: 32,
               padding: "0 10px",
               fontSize: 12,
-              cursor: "pointer",
               background: wrapLines ? "var(--bg-selected)" : "var(--bg-hover)",
-              color: wrapLines ? "var(--text)" : "var(--text-muted)",
+              color: wrapLines ? "var(--text)" : undefined,
               border: "1px solid var(--border)",
               borderRadius: 5,
-              fontWeight: wrapLines ? 600 : 400,
+              fontWeight: wrapLines ? 600 : undefined,
             }}
           >
             {t("wrap", "wrap")}
@@ -1001,22 +999,23 @@ function TextFileViewer({ filePath, cwd, sourceSessionId }: Props) {
           <div style={{ display: "flex", borderRadius: 5, overflow: "hidden", border: "1px solid var(--border)" }}>
             <button
               type="button"
+              className="pi-btn"
               onClick={() => setPreviewMode(false)}
               style={{
                 minHeight: 32,
                 padding: "0 10px",
                 fontSize: 12,
                 border: "none",
-                cursor: "pointer",
                 background: !previewMode ? "var(--bg-selected)" : "var(--bg-hover)",
-                color: !previewMode ? "var(--text)" : "var(--text-muted)",
-                fontWeight: !previewMode ? 600 : 400,
+                color: !previewMode ? "var(--text)" : undefined,
+                fontWeight: !previewMode ? 600 : undefined,
               }}
             >
               {t("code", "Code")}
             </button>
             <button
               type="button"
+              className="pi-btn"
               onClick={() => setPreviewMode(true)}
               style={{
                 minHeight: 32,
@@ -1024,10 +1023,9 @@ function TextFileViewer({ filePath, cwd, sourceSessionId }: Props) {
                 fontSize: 12,
                 border: "none",
                 borderLeft: "1px solid var(--border)",
-                cursor: "pointer",
                 background: previewMode ? "var(--bg-selected)" : "var(--bg-hover)",
-                color: previewMode ? "var(--text)" : "var(--text-muted)",
-                fontWeight: previewMode ? 600 : 400,
+                color: previewMode ? "var(--text)" : undefined,
+                fontWeight: previewMode ? 600 : undefined,
               }}
             >
               {t("preview", "Preview")}
@@ -1040,22 +1038,23 @@ function TextFileViewer({ filePath, cwd, sourceSessionId }: Props) {
           <div style={{ display: "flex", borderRadius: 5, overflow: "hidden", border: "1px solid var(--border)" }}>
             <button
               type="button"
+              className="pi-btn"
               onClick={() => setPreviewMode(true)}
               style={{
                 minHeight: 32,
                 padding: "0 10px",
                 fontSize: 12,
                 border: "none",
-                cursor: "pointer",
                 background: previewMode ? "var(--bg-selected)" : "var(--bg-hover)",
-                color: previewMode ? "var(--text)" : "var(--text-muted)",
-                fontWeight: previewMode ? 600 : 400,
+                color: previewMode ? "var(--text)" : undefined,
+                fontWeight: previewMode ? 600 : undefined,
               }}
             >
               {t("preview", "Preview")}
             </button>
             <button
               type="button"
+              className="pi-btn"
               onClick={() => setPreviewMode(false)}
               style={{
                 minHeight: 32,
@@ -1063,10 +1062,9 @@ function TextFileViewer({ filePath, cwd, sourceSessionId }: Props) {
                 fontSize: 12,
                 border: "none",
                 borderLeft: "1px solid var(--border)",
-                cursor: "pointer",
                 background: !previewMode ? "var(--bg-selected)" : "var(--bg-hover)",
-                color: !previewMode ? "var(--text)" : "var(--text-muted)",
-                fontWeight: !previewMode ? 600 : 400,
+                color: !previewMode ? "var(--text)" : undefined,
+                fontWeight: !previewMode ? 600 : undefined,
               }}
             >
               {t("raw", "Raw")}

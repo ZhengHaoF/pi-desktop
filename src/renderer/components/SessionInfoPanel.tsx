@@ -118,6 +118,7 @@ export function SessionInfoPanel({
               title={tooltip || t("sessionInfo", "Session info")}
               aria-label={t("sessionInfo", "Session info")}
               aria-pressed={activeTopPanel === "session"}
+              className="pi-btn"
               style={{
                 marginLeft: "auto",
                 display: "flex",
@@ -130,17 +131,8 @@ export function SessionInfoPanel({
                 border: "none",
                 borderTop: activeTopPanel === "session" ? "2px solid var(--accent)" : "2px solid transparent",
                 fontSize: 12,
-                color: "var(--text-muted)",
                 whiteSpace: "nowrap",
-                cursor: "pointer",
                 fontVariantNumeric: "tabular-nums",
-                transition: "color 0.1s, background 0.1s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = "var(--text)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = activeTopPanel === "session" ? "var(--text)" : "var(--text-muted)";
               }}
             >
               <svg
@@ -309,6 +301,7 @@ export function SessionInfoPanel({
                         title={label}
                         aria-label={label}
                         onClick={() => handleCopySessionField(field, value)}
+                        className="pi-btn"
                         style={{
                           alignSelf: "start",
                           display: "inline-flex",
@@ -317,27 +310,9 @@ export function SessionInfoPanel({
                           width: 22,
                           height: 22,
                           marginTop: -2,
-                          color: failed ? "var(--error, #ef4444)" : copied ? "var(--accent)" : "var(--text-dim)",
-                          background: "transparent",
-                          border: "1px solid var(--border)",
                           borderRadius: 4,
-                          cursor: "pointer",
+                          color: failed ? "var(--danger)" : copied ? "var(--accent)" : undefined,
                           flex: "0 0 auto",
-                          transition: "color 0.12s, border-color 0.12s, background 0.12s",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.color = "var(--accent)";
-                          e.currentTarget.style.borderColor = "var(--accent)";
-                          e.currentTarget.style.background = "var(--bg-hover)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.color = failed
-                            ? "var(--error, #ef4444)"
-                            : copied
-                              ? "var(--accent)"
-                              : "var(--text-dim)";
-                          e.currentTarget.style.borderColor = "var(--border)";
-                          e.currentTarget.style.background = "transparent";
                         }}
                       >
                         {failed ? (
@@ -421,7 +396,7 @@ export function SessionInfoPanel({
                         ))}
                       </div>
                       {sessionCopyFeedback?.status === "error" && (
-                        <div role="alert" style={{ marginTop: 8, color: "var(--error, #ef4444)" }}>
+                        <div role="alert" style={{ marginTop: 8, color: "var(--danger)" }}>
                           {t("copyFailed", "Copy failed")}.{" "}
                           {t("checkClipboardPermission", "Check clipboard permission and retry.")}
                         </div>

@@ -16,9 +16,6 @@ const groupMenuItemStyle: CSSProperties = {
   padding: "0 9px",
   border: 0,
   borderRadius: 6,
-  background: "transparent",
-  color: "var(--text-muted)",
-  cursor: "pointer",
   fontSize: 12,
   textAlign: "left",
 };
@@ -90,7 +87,6 @@ export function ProjectSessionGroup({
   onSessionDeleted,
 }: ProjectSessionGroupProps) {
   const { t } = useI18n();
-  const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -127,8 +123,6 @@ export function ProjectSessionGroup({
       }}
     >
       <div
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
         style={{
           display: "flex",
           alignItems: "center",
@@ -153,6 +147,7 @@ export function ProjectSessionGroup({
           }
           aria-expanded={!collapsed}
           aria-controls={`project-group-list-${projectRoot}`}
+          className="pi-btn pi-btn-ghost"
           style={{
             display: "flex",
             alignItems: "center",
@@ -161,11 +156,8 @@ export function ProjectSessionGroup({
             height: 28,
             padding: 0,
             flexShrink: 0,
-            background: "none",
             border: "none",
             borderRadius: 6,
-            color: "var(--text-dim)",
-            cursor: "pointer",
           }}
         >
           <svg
@@ -199,6 +191,7 @@ export function ProjectSessionGroup({
               ? t("expandProjectGroup", "Expand project group")
               : t("collapseProjectGroup", "Collapse project group")
           }
+          className="pi-btn pi-btn-ghost"
           style={{
             flex: 1,
             minWidth: 0,
@@ -206,10 +199,7 @@ export function ProjectSessionGroup({
             alignItems: "center",
             gap: 6,
             padding: 0,
-            background: "none",
             border: "none",
-            color: "var(--text)",
-            cursor: "pointer",
             font: "inherit",
             textAlign: "left",
           }}
@@ -294,6 +284,7 @@ export function ProjectSessionGroup({
           }}
           title={t("newSessionInProject", "New session in this project")}
           aria-label={t("newSessionInProject", "New session in this project")}
+          className="pi-btn pi-btn-ghost"
           style={{
             display: "flex",
             alignItems: "center",
@@ -302,11 +293,8 @@ export function ProjectSessionGroup({
             height: 22,
             padding: 0,
             flexShrink: 0,
-            background: hovered ? "var(--bg-hover)" : "transparent",
             border: "none",
             borderRadius: 6,
-            color: hovered ? "var(--text)" : "var(--text-dim)",
-            cursor: "pointer",
           }}
         >
           <svg
@@ -345,6 +333,7 @@ export function ProjectSessionGroup({
             aria-label={t("projectActionsFor", "Project actions for {name}").replace("{name}", label)}
             aria-haspopup="menu"
             aria-expanded={menuOpen || confirmRemove}
+            className="pi-btn pi-btn-ghost"
             style={{
               display: "flex",
               alignItems: "center",
@@ -352,11 +341,10 @@ export function ProjectSessionGroup({
               width: 22,
               height: 22,
               padding: 0,
-              background: menuOpen || hovered ? "var(--bg-hover)" : "transparent",
               border: "none",
               borderRadius: 6,
-              color: menuOpen ? "var(--text)" : "var(--text-dim)",
-              cursor: "pointer",
+              // The open menu keeps its trigger highlighted.
+              ...(menuOpen ? { background: "var(--bg-hover)", color: "var(--text)" } : {}),
             }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -397,7 +385,7 @@ export function ProjectSessionGroup({
                   <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
                     <button
                       type="button"
-                      className="session-menu-item"
+                      className="pi-btn pi-btn-ghost session-menu-item"
                       onClick={(event) => {
                         event.stopPropagation();
                         setConfirmRemove(false);
@@ -415,7 +403,7 @@ export function ProjectSessionGroup({
                     </button>
                     <button
                       type="button"
-                      className="session-menu-item"
+                      className="pi-btn pi-btn-danger session-menu-item"
                       onClick={(event) => {
                         event.stopPropagation();
                         void onRemoveProject();
@@ -427,7 +415,9 @@ export function ProjectSessionGroup({
                         minHeight: 28,
                         justifyContent: "center",
                         padding: "0 10px",
+                        // Solid destructive confirm keeps its filled danger palette.
                         background: "var(--danger)",
+                        borderColor: "var(--danger)",
                         color: "#fff",
                       }}
                     >
@@ -440,7 +430,7 @@ export function ProjectSessionGroup({
                   <button
                     type="button"
                     role="menuitem"
-                    className="session-menu-item"
+                    className="pi-btn pi-btn-ghost session-menu-item"
                     onClick={(event) => {
                       event.stopPropagation();
                       closeMenu();
@@ -467,7 +457,7 @@ export function ProjectSessionGroup({
                   <button
                     type="button"
                     role="menuitem"
-                    className="session-menu-item"
+                    className="pi-btn pi-btn-ghost session-menu-item"
                     onClick={(event) => {
                       event.stopPropagation();
                       closeMenu();
@@ -493,7 +483,7 @@ export function ProjectSessionGroup({
                   <button
                     type="button"
                     role="menuitem"
-                    className="session-menu-item"
+                    className="pi-btn pi-btn-ghost session-menu-item"
                     onClick={(event) => {
                       event.stopPropagation();
                       closeMenu();
@@ -520,7 +510,7 @@ export function ProjectSessionGroup({
                   <button
                     type="button"
                     role="menuitem"
-                    className="session-menu-item"
+                    className="pi-btn pi-btn-ghost session-menu-item"
                     onClick={(event) => {
                       event.stopPropagation();
                       setMenuOpen(false);
@@ -528,7 +518,7 @@ export function ProjectSessionGroup({
                     }}
                     disabled={removing}
                     title={t("projectRemoveHint", "Delete this project's session records; code on disk is untouched")}
-                    style={{ ...groupMenuItemStyle, color: "#ef4444" }}
+                    style={{ ...groupMenuItemStyle, color: "var(--danger)" }}
                   >
                     <svg
                       width="13"

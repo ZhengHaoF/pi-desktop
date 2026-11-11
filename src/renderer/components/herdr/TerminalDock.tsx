@@ -670,7 +670,8 @@ export function TerminalDock({ pane, visible, expanded, onToggleExpanded, onPane
                 <button
                   type="button"
                   disabled={opening}
-                  style={toolbarButtonStyle("neutral", opening)}
+                  className="pi-btn"
+                  style={toolbarButtonStyle("neutral")}
                   onClick={() => void open("observe")}
                 >
                   {t("releaseControl", "Release control")}
@@ -679,7 +680,8 @@ export function TerminalDock({ pane, visible, expanded, onToggleExpanded, onPane
                 <button
                   type="button"
                   disabled={opening}
-                  style={toolbarButtonStyle("control", opening)}
+                  className="pi-btn"
+                  style={toolbarButtonStyle("control")}
                   onClick={() => void takeControl()}
                 >
                   {t("takeControl", "Take control")}
@@ -688,7 +690,8 @@ export function TerminalDock({ pane, visible, expanded, onToggleExpanded, onPane
             <button
               type="button"
               disabled={opening}
-              style={toolbarButtonStyle("neutral", opening)}
+              className="pi-btn"
+              style={toolbarButtonStyle("neutral")}
               onClick={() => {
                 if (snapshotMode) setSnapshotRefreshToken((token) => token + 1);
                 else void open("observe");
@@ -696,7 +699,7 @@ export function TerminalDock({ pane, visible, expanded, onToggleExpanded, onPane
             >
               {snapshotMode ? t("refreshTerminalSnapshot", "Refresh") : t("reconnectTerminal", "Reconnect")}
             </button>
-            <button type="button" style={toolbarButtonStyle("neutral", false)} onClick={onToggleExpanded}>
+            <button type="button" className="pi-btn" style={toolbarButtonStyle("neutral")} onClick={onToggleExpanded}>
               {expanded ? t("restoreTerminal", "Restore") : t("expandTerminal", "Expand")}
             </button>
           </div>
@@ -801,11 +804,16 @@ export function TerminalDock({ pane, visible, expanded, onToggleExpanded, onPane
                 ? t("terminalKeyboardEnabled", "Keyboard input enabled")
                 : t("terminalReadOnly", "Read-only observation")}
           </span>
-          <button type="button" style={footerButtonStyle} onClick={() => void copyRecentOutput()}>
+          <button
+            type="button"
+            className="pi-btn pi-btn-ghost"
+            style={footerButtonStyle}
+            onClick={() => void copyRecentOutput()}
+          >
             {copied ? t("copied", "Copied") : t("copyRecentOutput", "Copy output")}
           </button>
           {!snapshotMode && !following && (
-            <button type="button" style={footerButtonStyle} onClick={jumpToLatest}>
+            <button type="button" className="pi-btn pi-btn-ghost" style={footerButtonStyle} onClick={jumpToLatest}>
               {t("jumpToLatest", "Jump to latest")}
             </button>
           )}
@@ -853,19 +861,20 @@ function statusBadgeStyle(state: HerdrTerminalState): React.CSSProperties {
   };
 }
 
-function toolbarButtonStyle(tone: "neutral" | "control", disabled: boolean): React.CSSProperties {
+function toolbarButtonStyle(tone: "neutral" | "control"): React.CSSProperties {
   const control = tone === "control";
   return {
     minHeight: 29,
     padding: "0 9px",
-    border: `1px solid ${control ? "#a16207" : "#334155"}`,
     borderRadius: 6,
+    // The terminal chrome keeps a fixed dark palette regardless of the app
+    // theme, so these identity colors stay inline; the shared class owns
+    // cursor, transition, and the disabled state.
+    border: `1px solid ${control ? "#a16207" : "#334155"}`,
     background: control ? "#422006" : "#172235",
     color: control ? "#fde68a" : "#dbe7f3",
-    cursor: disabled ? "default" : "pointer",
     fontSize: 10,
     fontWeight: control ? 650 : 500,
-    opacity: disabled ? 0.58 : 1,
     whiteSpace: "nowrap",
   };
 }
@@ -876,9 +885,10 @@ const footerButtonStyle: React.CSSProperties = {
   flexShrink: 0,
   border: "none",
   borderRadius: 4,
+  // Dark footer surface: the ghost hover palette would clash, so the colors
+  // stay inline and the shared class contributes cursor/transition only.
   background: "transparent",
   color: "#a9bad0",
-  cursor: "pointer",
   fontFamily: "var(--font-sans)",
   fontSize: 9,
 };

@@ -565,34 +565,25 @@ export function SessionSidebar({
           <PiAgentTitle />
           <button
             onClick={() => loadSessions(false)}
+            className="pi-btn"
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              background: sessionRefreshDone
-                ? "color-mix(in srgb, var(--success) 18%, transparent)"
-                : "var(--bg-hover)",
-              border: `1px solid ${sessionRefreshDone ? "color-mix(in srgb, var(--success) 40%, transparent)" : "var(--border)"}`,
-              color: sessionRefreshDone ? "var(--success)" : "var(--text-muted)",
-              cursor: "pointer",
               width: 32,
               height: 32,
               borderRadius: 7,
               padding: 0,
               flexShrink: 0,
-              transition: "background 0.3s, color 0.3s, border-color 0.3s",
-            }}
-            onMouseEnter={(e) => {
-              if (sessionRefreshDone) return;
-              e.currentTarget.style.background = "var(--bg-selected)";
-              e.currentTarget.style.color = "var(--accent)";
-              e.currentTarget.style.borderColor = "var(--accent-soft-border)";
-            }}
-            onMouseLeave={(e) => {
-              if (sessionRefreshDone) return;
-              e.currentTarget.style.background = "var(--bg-hover)";
-              e.currentTarget.style.color = "var(--text-muted)";
-              e.currentTarget.style.borderColor = "var(--border)";
+              // Refresh-complete flash keeps its own success palette.
+              ...(sessionRefreshDone
+                ? {
+                    background: "color-mix(in srgb, var(--success) 18%, transparent)",
+                    border: "1px solid color-mix(in srgb, var(--success) 40%, transparent)",
+                    color: "var(--success)",
+                    transition: "background 0.3s, color 0.3s, border-color 0.3s",
+                  }
+                : {}),
             }}
             title={t("refresh", "Refresh")}
           >
@@ -645,6 +636,7 @@ export function SessionSidebar({
             <button
               onClick={handleNewSession}
               disabled={!selectedCwd}
+              className="pi-btn pi-btn-primary"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -652,30 +644,17 @@ export function SessionSidebar({
                 gap: 6,
                 width: "100%",
                 padding: "8px 10px",
-                background: selectedCwd ? "var(--text)" : "var(--bg-hover)",
-                border: "none",
-                color: selectedCwd ? "var(--bg)" : "var(--text-dim)",
-                cursor: selectedCwd ? "pointer" : "not-allowed",
                 borderRadius: 7,
                 fontSize: 12.5,
                 fontWeight: 600,
                 fontFamily: "var(--font-mono)",
                 flexShrink: 0,
-                transition: "opacity 0.12s",
-                opacity: selectedCwd ? 1 : 0.7,
               }}
               title={
                 selectedCwd
                   ? `${t("newSessionIn", "New session in selected project")}: ${selectedCwd}`
                   : t("selectProjectFirst", "Select a project first")
               }
-              onMouseEnter={(e) => {
-                if (!selectedCwd) return;
-                e.currentTarget.style.opacity = "0.9";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = selectedCwd ? "1" : "0.7";
-              }}
             >
               <span style={{ fontSize: 14, lineHeight: 1 }}>+</span>
               {t("newSession", "new session")}
@@ -775,17 +754,14 @@ export function SessionSidebar({
                 onClick={() => setSessionFilter("")}
                 title={t("clearSessionSearch", "Clear session search")}
                 aria-label={t("clearSessionSearch", "Clear session search")}
+                className="pi-btn pi-btn-ghost"
                 style={{
                   position: "absolute",
                   top: 1,
                   right: 1,
                   width: 32,
                   height: 32,
-                  border: 0,
                   borderRadius: 7,
-                  background: "transparent",
-                  color: "var(--text-dim)",
-                  cursor: "pointer",
                   fontSize: 18,
                   lineHeight: 1,
                 }}

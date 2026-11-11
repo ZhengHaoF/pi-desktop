@@ -740,6 +740,7 @@ export function AppShell({
       <div style={{ padding: "8px", flexShrink: 0 }}>
         <button
           type="button"
+          className="pi-btn pi-btn-ghost"
           onClick={() => setSettingsOpen(true)}
           title={t("settings", "Settings")}
           style={{
@@ -750,25 +751,15 @@ export function AppShell({
             alignItems: "center",
             justifyContent: "center",
             gap: 7,
-            background: "none",
             border: "none",
             borderRadius: 9,
-            color: "var(--text-muted)",
-            cursor: "pointer",
             fontSize: 12,
-            transition: "background 0.12s, color 0.12s",
           }}
           onFocus={() => {
             void preloadSettingsConfig().catch(() => undefined);
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={() => {
             void preloadSettingsConfig().catch(() => undefined);
-            e.currentTarget.style.background = "var(--bg-hover)";
-            e.currentTarget.style.color = "var(--text)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "none";
-            e.currentTarget.style.color = "var(--text-muted)";
           }}
         >
           <svg
@@ -930,6 +921,7 @@ export function AppShell({
             }}
           >
             <button
+              className="pi-btn pi-btn-ghost"
               onClick={handleSidebarToggle}
               title={sidebarOpen ? t("hideSidebar", "Hide sidebar") : t("showSidebar", "Show sidebar")}
               aria-label={sidebarOpen ? t("hideSidebar", "Hide sidebar") : t("showSidebar", "Show sidebar")}
@@ -940,19 +932,9 @@ export function AppShell({
                 width: 36,
                 height: 36,
                 padding: 0,
-                background: "none",
                 border: "none",
                 borderRight: "1px solid var(--border)",
-                color: "var(--text-muted)",
-                cursor: "pointer",
                 flexShrink: 0,
-                transition: "color 0.12s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = "var(--text)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = "var(--text-muted)";
               }}
             >
               {sidebarOpen ? (
@@ -986,6 +968,7 @@ export function AppShell({
               )}
             </button>
             <button
+              className="pi-btn pi-btn-ghost"
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 toggleTheme({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
@@ -1002,19 +985,9 @@ export function AppShell({
                 width: 36,
                 height: 36,
                 padding: 0,
-                background: "none",
                 border: "none",
                 borderRight: "1px solid var(--border)",
-                color: "var(--text-muted)",
-                cursor: "pointer",
                 flexShrink: 0,
-                transition: "color 0.12s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = "var(--text)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = "var(--text-muted)";
               }}
             >
               {isDark ? (
@@ -1230,6 +1203,7 @@ export function AppShell({
           >
             <button
               type="button"
+              className="pi-btn"
               onClick={() => dispatchFileTab({ type: "select", tabId: EXPLORER_TAB_ID })}
               aria-pressed={activeFileTabId === EXPLORER_TAB_ID}
               style={{
@@ -1242,10 +1216,9 @@ export function AppShell({
                 background: activeFileTabId === EXPLORER_TAB_ID ? "var(--bg)" : "var(--bg-panel)",
                 border: "none",
                 borderRight: "1px solid var(--border)",
-                color: activeFileTabId === EXPLORER_TAB_ID ? "var(--text)" : "var(--text-muted)",
-                cursor: "pointer",
+                color: activeFileTabId === EXPLORER_TAB_ID ? "var(--text)" : undefined,
+                fontWeight: activeFileTabId === EXPLORER_TAB_ID ? 500 : undefined,
                 fontSize: 12,
-                fontWeight: activeFileTabId === EXPLORER_TAB_ID ? 500 : 400,
               }}
             >
               <svg
@@ -1265,6 +1238,7 @@ export function AppShell({
             </button>
             <button
               type="button"
+              className="pi-btn"
               onClick={() => dispatchFileTab({ type: "select", tabId: BROWSER_TAB_ID })}
               aria-pressed={activeFileTabId === BROWSER_TAB_ID}
               style={{
@@ -1277,10 +1251,9 @@ export function AppShell({
                 background: activeFileTabId === BROWSER_TAB_ID ? "var(--bg)" : "var(--bg-panel)",
                 border: "none",
                 borderRight: "1px solid var(--border)",
-                color: activeFileTabId === BROWSER_TAB_ID ? "var(--text)" : "var(--text-muted)",
-                cursor: "pointer",
+                color: activeFileTabId === BROWSER_TAB_ID ? "var(--text)" : undefined,
+                fontWeight: activeFileTabId === BROWSER_TAB_ID ? 500 : undefined,
                 fontSize: 12,
-                fontWeight: activeFileTabId === BROWSER_TAB_ID ? 500 : 400,
               }}
             >
               <svg
@@ -1301,6 +1274,7 @@ export function AppShell({
             </button>
             <button
               type="button"
+              className="pi-btn"
               onClick={() => dispatchFileTab({ type: "select", tabId: PROCESSES_TAB_ID })}
               aria-pressed={activeFileTabId === PROCESSES_TAB_ID}
               style={{
@@ -1313,10 +1287,9 @@ export function AppShell({
                 background: activeFileTabId === PROCESSES_TAB_ID ? "var(--bg)" : "var(--bg-panel)",
                 border: "none",
                 borderRight: "1px solid var(--border)",
-                color: activeFileTabId === PROCESSES_TAB_ID ? "var(--text)" : "var(--text-muted)",
-                cursor: "pointer",
+                color: activeFileTabId === PROCESSES_TAB_ID ? "var(--text)" : undefined,
+                fontWeight: activeFileTabId === PROCESSES_TAB_ID ? 500 : undefined,
                 fontSize: 12,
-                fontWeight: activeFileTabId === PROCESSES_TAB_ID ? 500 : 400,
               }}
             >
               <svg
@@ -1343,8 +1316,8 @@ export function AppShell({
                     display: "inline-grid",
                     placeItems: "center",
                     borderRadius: 8,
-                    background: managedProcessAttention ? "#dc2626" : "var(--accent)",
-                    color: "white",
+                    background: managedProcessAttention ? "var(--danger)" : "var(--accent)",
+                    color: "var(--on-accent)",
                     fontSize: 9,
                     fontWeight: 700,
                   }}
@@ -1355,6 +1328,7 @@ export function AppShell({
             </button>
             <button
               type="button"
+              className="pi-btn"
               onClick={() => dispatchFileTab({ type: "select", tabId: HERDR_TERMINAL_TAB_ID })}
               aria-pressed={activeFileTabId === HERDR_TERMINAL_TAB_ID}
               style={{
@@ -1367,10 +1341,9 @@ export function AppShell({
                 background: activeFileTabId === HERDR_TERMINAL_TAB_ID ? "var(--bg)" : "var(--bg-panel)",
                 border: "none",
                 borderRight: "1px solid var(--border)",
-                color: activeFileTabId === HERDR_TERMINAL_TAB_ID ? "var(--text)" : "var(--text-muted)",
-                cursor: "pointer",
+                color: activeFileTabId === HERDR_TERMINAL_TAB_ID ? "var(--text)" : undefined,
+                fontWeight: activeFileTabId === HERDR_TERMINAL_TAB_ID ? 500 : undefined,
                 fontSize: 12,
-                fontWeight: activeFileTabId === HERDR_TERMINAL_TAB_ID ? 500 : 400,
               }}
             >
               <span aria-hidden="true">›_</span>
@@ -1387,6 +1360,7 @@ export function AppShell({
             {activeFileTabId === EXPLORER_TAB_ID && explorerCwd && (
               <button
                 type="button"
+                className="pi-btn pi-btn-ghost"
                 onClick={() => setExplorerRefreshKey((key) => key + 1)}
                 title={t("refreshExplorer", "Refresh explorer")}
                 aria-label={t("refreshExplorer", "Refresh explorer")}
@@ -1399,19 +1373,8 @@ export function AppShell({
                   padding: 0,
                   marginRight: 2,
                   flexShrink: 0,
-                  background: "none",
                   border: "none",
-                  color: "var(--text-dim)",
-                  cursor: "pointer",
                   borderRadius: 5,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = "var(--text)";
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = "var(--text-dim)";
-                  e.currentTarget.style.background = "none";
                 }}
               >
                 <svg
@@ -1502,6 +1465,7 @@ export function AppShell({
       </div>
       {/* File panel toggle — always visible at top-right */}
       <button
+        className="pi-btn"
         onClick={handleRightPanelToggle}
         title={rightPanelOpen ? t("hideFilePanel", "Hide file panel") : t("showFilePanel", "Show file panel")}
         aria-label={rightPanelOpen ? t("hideFilePanel", "Hide file panel") : t("showFilePanel", "Show file panel")}
@@ -1520,15 +1484,7 @@ export function AppShell({
           border: "none",
           borderLeft: "1px solid var(--border)",
           borderBottom: "1px solid var(--border)",
-          color: rightPanelOpen ? "var(--text)" : "var(--text-muted)",
-          cursor: "pointer",
-          transition: "color 0.12s",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.color = "var(--text)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.color = rightPanelOpen ? "var(--text)" : "var(--text-muted)";
+          color: rightPanelOpen ? "var(--text)" : undefined,
         }}
       >
         <svg

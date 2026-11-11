@@ -183,7 +183,9 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
             key={tab.id}
             type="button"
             title={tab.url}
+            aria-pressed={tab.id === state.activeTabId}
             onClick={() => void window.piBridge.browserActivateTab(tab.id).catch((cause) => setError(messageOf(cause)))}
+            className="pi-btn pi-btn-ghost"
             style={{
               maxWidth: 150,
               minWidth: 72,
@@ -192,12 +194,12 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
               alignItems: "center",
               gap: 5,
               padding: "0 7px",
-              background: tab.id === state.activeTabId ? "var(--bg)" : "transparent",
-              color: tab.crashed ? "#d45" : "var(--text-muted)",
+              // The active tab reads as connected to the page surface below.
+              background: tab.id === state.activeTabId ? "var(--bg)" : undefined,
               border: `1px solid ${tab.id === state.activeTabId ? "var(--border)" : "transparent"}`,
               borderRadius: 5,
-              cursor: "pointer",
               fontSize: 10,
+              ...(tab.crashed ? { color: "var(--danger)" } : {}),
             }}
           >
             {tab.loading ? (
@@ -232,6 +234,7 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
         ))}
         <button
           type="button"
+          className="pi-btn pi-btn-ghost"
           style={iconButtonStyle}
           title={t("browserNewTab", "New tab")}
           onClick={() => void createTab()}
@@ -251,6 +254,7 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
         }}
       >
         <button
+          className="pi-btn pi-btn-ghost"
           style={iconButtonStyle}
           disabled={!activeTab?.canGoBack}
           title={t("browserBack", "Back")}
@@ -259,6 +263,7 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
           ←
         </button>
         <button
+          className="pi-btn pi-btn-ghost"
           style={iconButtonStyle}
           disabled={!activeTab?.canGoForward}
           title={t("browserForward", "Forward")}
@@ -267,6 +272,7 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
           →
         </button>
         <button
+          className="pi-btn pi-btn-ghost"
           style={iconButtonStyle}
           disabled={!activeTab}
           title={activeTab?.loading ? t("browserStop", "Stop") : t("browserReload", "Reload")}
@@ -318,6 +324,7 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
           ))}
         </select>
         <button
+          className="pi-btn pi-btn-ghost"
           style={iconButtonStyle}
           disabled={!activeTab}
           title={t("browserChooseUpload", "Choose files for focused upload input")}
@@ -329,6 +336,7 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
           ↑
         </button>
         <button
+          className="pi-btn pi-btn-ghost"
           style={iconButtonStyle}
           disabled={!activeTab || !/^https?:/.test(activeTab.url)}
           title={t("browserOpenSystem", "Open in system browser")}
@@ -349,7 +357,7 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
             fontSize: 10,
           }}
         >
-          {error && <div style={{ color: "#d45" }}>{error}</div>}
+          {error && <div style={{ color: "var(--danger)" }}>{error}</div>}
           {state.permissionRequests.map((request) => (
             <PermissionPrompt key={request.id} request={request} onRespond={refresh} />
           ))}
@@ -359,7 +367,7 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
 
       {!activeTab ? (
         <div style={emptyStyle}>
-          <button style={primaryButtonStyle} onClick={() => void createTab()}>
+          <button className="pi-btn" style={primaryButtonStyle} onClick={() => void createTab()}>
             {t("browserOpenNewTab", "Open a new tab")}
           </button>
           <div style={{ marginTop: 8, color: "var(--text-dim)" }}>
@@ -370,6 +378,7 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
         <div style={emptyStyle}>
           <div>{t("browserTabCrashed", "This tab’s renderer crashed.")}</div>
           <button
+            className="pi-btn"
             style={{ ...primaryButtonStyle, marginTop: 9 }}
             onClick={() => void window.piBridge.browserReload(activeTab.id)}
           >
@@ -436,13 +445,13 @@ function PermissionPrompt({
           permission: request.permission,
         })}
       </span>
-      <button style={tinyButtonStyle} onClick={() => respond("deny")}>
+      <button className="pi-btn" style={tinyButtonStyle} onClick={() => respond("deny")}>
         {t("browserDeny", "Deny")}
       </button>
-      <button style={tinyButtonStyle} onClick={() => respond("allow-once")}>
+      <button className="pi-btn" style={tinyButtonStyle} onClick={() => respond("allow-once")}>
         {t("browserAllowOnce", "Once")}
       </button>
-      <button style={tinyButtonStyle} onClick={() => respond("allow-session")}>
+      <button className="pi-btn" style={tinyButtonStyle} onClick={() => respond("allow-session")}>
         {t("browserAllowSession", "Session")}
       </button>
     </div>
@@ -454,7 +463,7 @@ function DownloadStatus({ download }: { download: BrowserDownloadInfo }) {
   const percent = download.totalBytes > 0 ? Math.round((download.receivedBytes / download.totalBytes) * 100) : null;
   const stateLabel = downloadStateLabel(t, download.state);
   return (
-    <div style={{ color: download.state === "interrupted" ? "#d45" : "var(--text-dim)" }}>
+    <div style={{ color: download.state === "interrupted" ? "var(--danger)" : "var(--text-dim)" }}>
       {formatMessage(t("browserDownloadStatus", "Download {filename}: {state}{percent}"), {
         filename: download.filename,
         state: stateLabel,
@@ -470,8 +479,8 @@ function Badge({ children, danger }: { children: string; danger?: boolean }) {
       style={{
         padding: "1px 3px",
         borderRadius: 3,
-        color: danger ? "#d45" : "#b87924",
-        border: `1px solid ${danger ? "#d45" : "#b87924"}`,
+        color: danger ? "var(--danger)" : "#b87924",
+        border: `1px solid ${danger ? "var(--danger)" : "#b87924"}`,
         fontSize: 7,
         fontWeight: 700,
       }}
@@ -573,11 +582,7 @@ const iconButtonStyle = {
   alignItems: "center",
   justifyContent: "center",
   padding: 0,
-  border: "1px solid transparent",
   borderRadius: 5,
-  background: "transparent",
-  color: "var(--text-muted)",
-  cursor: "pointer",
   fontSize: 14,
 };
 const selectStyle = {
@@ -591,20 +596,17 @@ const selectStyle = {
 const primaryButtonStyle = {
   minHeight: 32,
   padding: "0 12px",
-  border: "1px solid var(--accent)",
   borderRadius: 6,
-  background: "var(--accent-soft)",
-  color: "var(--accent)",
-  cursor: "pointer",
   fontSize: 11,
+  // Accent-tinted call-to-action identity; hover feedback comes from the shared
+  // pi-btn class.
+  background: "var(--accent-soft)",
+  borderColor: "var(--accent)",
+  color: "var(--accent)",
 };
 const tinyButtonStyle = {
   minHeight: 22,
   padding: "0 6px",
-  border: "1px solid var(--border)",
   borderRadius: 4,
-  background: "var(--bg)",
-  color: "var(--text-muted)",
-  cursor: "pointer",
   fontSize: 9,
 };

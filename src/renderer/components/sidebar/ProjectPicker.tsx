@@ -129,6 +129,7 @@ export function ProjectPicker({
         <button
           onClick={() => setDropdownOpen((v) => !v)}
           title={t("openProjectEllipsis", "Open project…")}
+          className="pi-btn"
           style={{
             width: "100%",
             display: "flex",
@@ -136,22 +137,11 @@ export function ProjectPicker({
             justifyContent: "center",
             gap: 6,
             padding: "8px 10px",
-            background: "var(--text)",
-            border: "none",
             borderRadius: 7,
-            cursor: "pointer",
             fontSize: 12.5,
             fontWeight: 600,
             fontFamily: "var(--font-mono)",
-            color: "var(--bg)",
             flexShrink: 0,
-            transition: "opacity 0.12s",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = "0.9";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = "1";
           }}
         >
           <svg
@@ -174,19 +164,19 @@ export function ProjectPicker({
         <button
           onClick={() => setDropdownOpen((v) => !v)}
           title={selectedProject ?? selectedCwd ?? ""}
+          className="pi-btn"
           style={{
             width: "100%",
             display: "flex",
             alignItems: "center",
             padding: "6px 10px",
-            background: selectedCwd ? "var(--bg-hover)" : "var(--accent-soft)",
-            border: selectedCwd ? "1px solid var(--border)" : "1px solid var(--accent-soft-border)",
             borderRadius: 7,
-            cursor: "pointer",
             fontSize: 12,
-            color: "var(--text)",
             textAlign: "left",
-            transition: "border-color 0.15s, background 0.15s",
+            // Without a project the trigger invites picking one.
+            ...(!selectedCwd
+              ? { background: "var(--accent-soft)", border: "1px solid var(--accent-soft-border)" }
+              : {}),
           }}
         >
           {selectedCwd ? (
@@ -273,17 +263,17 @@ export function ProjectPicker({
                   setCustomPathError(null);
                   setDropdownOpen(false);
                 }}
+                aria-pressed={project === selectedProject}
+                className="pi-btn pi-btn-ghost"
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: 7,
                   width: "100%",
                   padding: "8px 10px",
-                  background: "var(--bg)",
                   border: "none",
                   borderBottom: "1px solid var(--border)",
-                  color: project === selectedProject ? "var(--text)" : "var(--text-muted)",
-                  cursor: "pointer",
+                  background: project === selectedProject ? "var(--bg-selected)" : undefined,
                   textAlign: "left",
                   fontSize: 11,
                   fontFamily: "var(--font-mono)",
@@ -327,17 +317,15 @@ export function ProjectPicker({
               e.stopPropagation();
               void handleDefaultCwd();
             }}
+            className="pi-btn pi-btn-ghost"
             style={{
               display: "flex",
               alignItems: "center",
               gap: 7,
               width: "100%",
               padding: "8px 10px",
-              background: "none",
               border: "none",
               borderTop: showProjectList && visibleProjects.length > 0 ? "1px solid var(--border)" : "none",
-              color: "var(--text-muted)",
-              cursor: "pointer",
               textAlign: "left",
               fontSize: 11,
             }}
@@ -366,16 +354,14 @@ export function ProjectPicker({
               e.stopPropagation();
               void handlePickDirectory();
             }}
+            className="pi-btn pi-btn-ghost"
             style={{
               display: "flex",
               alignItems: "center",
               gap: 7,
               width: "100%",
               padding: "8px 10px",
-              background: "none",
               border: "none",
-              color: "var(--text-muted)",
-              cursor: "pointer",
               textAlign: "left",
               fontSize: 11,
             }}
@@ -406,16 +392,14 @@ export function ProjectPicker({
               setCustomPathError(null);
               deferFocus(() => customPathInputRef.current?.focus());
             }}
+            className="pi-btn pi-btn-ghost"
             style={{
               display: "flex",
               alignItems: "center",
               gap: 7,
               width: "100%",
               padding: "8px 10px",
-              background: "none",
               border: "none",
-              color: "var(--text-muted)",
-              cursor: "pointer",
               textAlign: "left",
               fontSize: 11,
             }}
@@ -478,7 +462,7 @@ export function ProjectPicker({
               <div
                 style={{
                   marginTop: 5,
-                  color: "#dc2626",
+                  color: "var(--danger)",
                   fontSize: 11,
                   lineHeight: 1.35,
                   overflowWrap: "anywhere",
@@ -491,17 +475,13 @@ export function ProjectPicker({
               <button
                 onClick={() => void commitCustomPath()}
                 disabled={customPathValidating || !customPathValue.trim()}
+                className="pi-btn pi-btn-primary"
                 style={{
                   flex: 1,
                   padding: "4px 0",
-                  background: "var(--accent)",
-                  border: "none",
                   borderRadius: 5,
-                  color: "#fff",
                   fontSize: 11,
                   fontWeight: 600,
-                  cursor: customPathValidating || !customPathValue.trim() ? "not-allowed" : "pointer",
-                  opacity: customPathValidating || !customPathValue.trim() ? 0.65 : 1,
                 }}
               >
                 {customPathValidating ? t("checking", "Checking…") : t("open", "Open")}
@@ -512,15 +492,12 @@ export function ProjectPicker({
                   setCustomPathValue("");
                   setCustomPathError(null);
                 }}
+                className="pi-btn"
                 style={{
                   flex: 1,
                   padding: "4px 0",
-                  background: "var(--bg-hover)",
-                  border: "1px solid var(--border)",
                   borderRadius: 5,
-                  color: "var(--text-muted)",
                   fontSize: 11,
-                  cursor: "pointer",
                 }}
               >
                 {t("cancel", "Cancel")}

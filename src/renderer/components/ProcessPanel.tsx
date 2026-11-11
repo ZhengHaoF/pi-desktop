@@ -24,22 +24,17 @@ function formatDuration(startedAt: number | undefined, stoppedAt: number | undef
 }
 
 function stateColor(process: ManagedProcessPublicInfo): string {
-  if (process.state === "ready") return "#4ade80";
-  if (isManagedProcessActiveState(process.state)) return "#60a5fa";
+  if (process.state === "ready") return "var(--success)";
+  if (isManagedProcessActiveState(process.state)) return "var(--info)";
   if (process.state === "exited" && process.exit?.code === 0) return "var(--text-dim)";
-  if (process.state === "killed" || process.state === "reaped") return "#fbbf24";
-  return "#f87171";
+  if (process.state === "killed" || process.state === "reaped") return "var(--warning)";
+  return "var(--danger)";
 }
 
 const buttonStyle = {
   height: 28,
-  border: "1px solid var(--border)",
-  borderRadius: 6,
-  background: "var(--bg-panel)",
-  color: "var(--text-muted)",
   padding: "0 9px",
   fontSize: 11,
-  cursor: "pointer",
 } as const;
 
 export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
@@ -216,7 +211,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
       {error && (
         <div
           role="alert"
-          style={{ padding: "8px 10px", color: "#f87171", fontSize: 11, borderBottom: "1px solid var(--border)" }}
+          style={{ padding: "8px 10px", color: "var(--danger)", fontSize: 11, borderBottom: "1px solid var(--border)" }}
         >
           {error}
         </div>
@@ -326,7 +321,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                 {t("ownerTask", "Owner task")}: {selected.ownerSessionId.slice(-12)}
               </div>
               {selected.networkWarnings.map((warning) => (
-                <div key={warning} style={{ color: "#fbbf24", fontSize: 10 }}>
+                <div key={warning} style={{ color: "var(--warning)", fontSize: 10 }}>
                   {warning === "Process may be reachable from the local network"
                     ? t("managedProcessLanWarning", "Process may be reachable from the local network")
                     : warning}
@@ -335,7 +330,13 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
               {selected.state === "lost" && (
                 <div
                   role="alert"
-                  style={{ padding: 9, border: "1px solid #ef4444", borderRadius: 6, color: "#fca5a5", fontSize: 11 }}
+                  style={{
+                    padding: 9,
+                    border: "1px solid var(--danger-border)",
+                    borderRadius: 6,
+                    color: "var(--danger)",
+                    fontSize: 11,
+                  }}
                 >
                   <div>
                     {t(
@@ -346,6 +347,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                   <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                     <button
                       type="button"
+                      className="pi-btn"
                       disabled={busy}
                       style={buttonStyle}
                       onClick={() => void invoke(() => call("processes.stopAll", { mode: "force" }))}
@@ -354,6 +356,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                     </button>
                     <button
                       type="button"
+                      className="pi-btn"
                       disabled={busy}
                       style={buttonStyle}
                       onClick={() => void invoke(() => window.piBridge.exportDiagnostics())}
@@ -367,6 +370,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                 <button
                   key={endpoint.id}
                   type="button"
+                  className="pi-btn"
                   disabled={busy}
                   onClick={() => void openEndpoint(selected, endpoint.url)}
                   style={{ ...buttonStyle, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis" }}
@@ -379,6 +383,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                   <>
                     <button
                       type="button"
+                      className="pi-btn"
                       disabled={busy}
                       style={buttonStyle}
                       onClick={() =>
@@ -395,6 +400,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                     </button>
                     <button
                       type="button"
+                      className="pi-btn"
                       disabled={busy}
                       style={buttonStyle}
                       onClick={() =>
@@ -411,6 +417,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                     </button>
                     <button
                       type="button"
+                      className="pi-btn"
                       disabled={busy}
                       style={buttonStyle}
                       onClick={() =>
@@ -429,6 +436,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                   <>
                     <button
                       type="button"
+                      className="pi-btn"
                       disabled={busy}
                       style={buttonStyle}
                       onClick={() =>
@@ -441,6 +449,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                     </button>
                     <button
                       type="button"
+                      className="pi-btn"
                       disabled={busy}
                       style={buttonStyle}
                       onClick={() => void invoke(() => call("processes.dismiss", { processId: selected.processId }))}
@@ -451,6 +460,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                 )}
                 <button
                   type="button"
+                  className="pi-btn"
                   disabled={busy}
                   style={buttonStyle}
                   onClick={() =>
@@ -516,6 +526,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
               ))}
               <button
                 type="button"
+                className="pi-btn"
                 style={buttonStyle}
                 onClick={() =>
                   void copyText(filteredRecords.map((record) => `[${record.stream}] ${record.text}`).join("\n"))
@@ -547,9 +558,9 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                   style={{
                     color:
                       record.stream === "stderr"
-                        ? "#fca5a5"
+                        ? "var(--danger)"
                         : record.stream === "system"
-                          ? "#fbbf24"
+                          ? "var(--warning)"
                           : "var(--text-muted)",
                   }}
                 >
@@ -560,6 +571,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
               {hasMore && (
                 <button
                   type="button"
+                  className="pi-btn"
                   style={{ ...buttonStyle, marginTop: 8 }}
                   onClick={() => void readMore(selected.processId, selected.runId, cursor)}
                 >
@@ -601,11 +613,12 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                     fontSize: 11,
                   }}
                 />
-                <button type="submit" disabled={busy || !stdin} style={buttonStyle}>
+                <button type="submit" className="pi-btn" disabled={busy || !stdin} style={buttonStyle}>
                   {t("send", "Send")}
                 </button>
                 <button
                   type="button"
+                  className="pi-btn"
                   disabled={busy}
                   style={buttonStyle}
                   onClick={() =>

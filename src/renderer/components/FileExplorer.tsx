@@ -145,6 +145,7 @@ function TreeNode({
         {onAtMention && (hovered || focusedWithin) && (
           <button
             type="button"
+            className="pi-btn"
             onClick={(e) => {
               e.stopPropagation();
               onAtMention(getRelativeFilePath(node.fullPath, cwd), node.isDir);
@@ -161,11 +162,8 @@ function TreeNode({
               gap: 4,
               padding: "0 8px",
               height: 30,
-              background: "var(--bg-panel)",
-              border: "1px solid var(--border)",
               borderRadius: 4,
               color: "var(--accent)",
-              cursor: "pointer",
               fontSize: 12,
               fontWeight: 600,
               whiteSpace: "nowrap",
@@ -190,6 +188,7 @@ function TreeNode({
         {(hovered || focusedWithin) && !node.isDir && (
           <button
             type="button"
+            className="pi-btn"
             disabled={downloading}
             onClick={(e) => {
               e.stopPropagation();
@@ -212,10 +211,7 @@ function TreeNode({
               padding: "0 5px",
               width: 30,
               height: 30,
-              background: "var(--bg-panel)",
-              border: "1px solid var(--border)",
               borderRadius: 4,
-              color: "var(--text-muted)",
               cursor: downloading ? "wait" : "pointer",
               fontSize: 12,
               fontWeight: 600,
@@ -302,7 +298,7 @@ export function FileExplorer({ cwd, onOpenFile, refreshKey, onAtMention }: Props
   }
 
   if (error) {
-    return <div style={{ padding: "8px 12px", fontSize: 11, color: "#f87171" }}>{error}</div>;
+    return <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--danger)" }}>{error}</div>;
   }
 
   return (

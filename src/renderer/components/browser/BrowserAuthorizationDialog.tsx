@@ -160,13 +160,18 @@ export function BrowserAuthorizationDialog({
           )}
         </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-          <button type="button" onClick={onManage} style={buttonStyle}>
+          <button type="button" onClick={onManage} className="pi-btn" style={buttonStyle}>
             {t("browserAuthorizationManage", "Manage permanent permission…")}
           </button>
-          <button ref={denyRef} type="button" onClick={() => onRespond("deny")} style={buttonStyle}>
+          <button ref={denyRef} type="button" onClick={() => onRespond("deny")} className="pi-btn" style={buttonStyle}>
             {t("browserDeny", "Deny")}
           </button>
-          <button type="button" onClick={() => onRespond("allow-session")} style={primaryButtonStyle}>
+          <button
+            type="button"
+            onClick={() => onRespond("allow-session")}
+            className="pi-btn pi-btn-primary"
+            style={primaryButtonStyle}
+          >
             {t("browserAllowCurrentAgentSession", "Allow current Agent session")}
           </button>
         </div>
@@ -178,16 +183,9 @@ export function BrowserAuthorizationDialog({
 const buttonStyle: CSSProperties = {
   minHeight: 34,
   padding: "0 12px",
-  border: "1px solid var(--border)",
   borderRadius: 6,
-  background: "var(--bg)",
-  color: "var(--text)",
-  cursor: "pointer",
 };
 
 const primaryButtonStyle: CSSProperties = {
   ...buttonStyle,
-  borderColor: "var(--accent)",
-  background: "var(--accent)",
-  color: "white",
 };

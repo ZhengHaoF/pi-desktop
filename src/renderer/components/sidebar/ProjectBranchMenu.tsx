@@ -63,19 +63,22 @@ export function ProjectBranchMenu({
         aria-label={title}
         aria-haspopup={interactive ? "menu" : undefined}
         aria-expanded={interactive ? open : undefined}
+        className="pi-btn pi-btn-ghost"
         style={{
           display: "flex",
           alignItems: "center",
           gap: 3,
           maxWidth: "100%",
           padding: "1px 5px",
-          background: "var(--accent-chip-bg)",
           border: "none",
           borderRadius: 4,
-          color: "var(--accent-chip-fg)",
           fontFamily: "var(--font-mono)",
           fontSize: 10,
           lineHeight: 1.5,
+          // Branch chip keeps its accent-tinted identity; a non-interactive
+          // chip reads as plain text.
+          background: "var(--accent-chip-bg)",
+          color: "var(--accent-chip-fg)",
           cursor: interactive ? "pointer" : "default",
         }}
       >

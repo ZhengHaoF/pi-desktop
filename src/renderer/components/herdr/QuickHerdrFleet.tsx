@@ -193,6 +193,7 @@ export function QuickHerdrFleet({
           aria-controls={open ? dialogId : undefined}
           title={`${t("agentFleet", "Agent Fleet")} · ${runtimeDetail}`}
           onClick={() => setOpen((value) => !value)}
+          className="pi-btn"
           style={{
             minWidth: 0,
             maxWidth: isMobile ? 104 : 240,
@@ -200,13 +201,12 @@ export function QuickHerdrFleet({
             display: "flex",
             alignItems: "center",
             gap: 6,
-            border: "1px solid var(--border)",
             borderRadius: 999,
-            background: ready ? "color-mix(in srgb, var(--accent) 7%, var(--bg-panel))" : "var(--bg)",
-            color: "var(--text-muted)",
+            // Ready-state fleet identity tint; the shared class owns the rest
+            // state and hover.
+            background: ready ? "color-mix(in srgb, var(--accent) 7%, var(--bg-panel))" : undefined,
             fontSize: 11,
             whiteSpace: "nowrap",
-            cursor: "pointer",
             overflow: "hidden",
           }}
         >
@@ -282,6 +282,7 @@ export function QuickHerdrFleet({
                   aria-label={t("refresh", "Refresh")}
                   title={t("refresh", "Refresh")}
                   onClick={() => void (ready ? refresh() : refreshRuntime())}
+                  className="pi-btn"
                   style={iconButtonStyle}
                 >
                   ↻
@@ -322,6 +323,7 @@ export function QuickHerdrFleet({
                   <button
                     type="button"
                     disabled={retrying}
+                    className="pi-btn"
                     style={{ ...buttonStyle, marginTop: 10 }}
                     onClick={() => void retryConnection()}
                   >
@@ -367,6 +369,7 @@ export function QuickHerdrFleet({
                                 key={pane.id}
                                 type="button"
                                 disabled={!interactive}
+                                aria-pressed={pane.focused}
                                 onClick={() => {
                                   onOpenTerminal(pane);
                                   closePopover();
@@ -376,6 +379,7 @@ export function QuickHerdrFleet({
                                     ? t("herdrSnapshotStale", "Snapshot stale")
                                     : t("openTerminal", "Open terminal")
                                 }
+                                className="pi-btn pi-btn-ghost"
                                 style={{
                                   width: "100%",
                                   minHeight: 42,
@@ -386,10 +390,9 @@ export function QuickHerdrFleet({
                                   alignItems: "center",
                                   gap: 8,
                                   textAlign: "left",
-                                  border: `1px solid ${pane.focused ? "color-mix(in srgb, var(--accent) 45%, var(--border))" : "transparent"}`,
                                   borderRadius: 8,
-                                  background: pane.focused ? "var(--accent-soft)" : "transparent",
                                   color: "var(--text)",
+                                  // Stale snapshots read as inert, not disabled.
                                   cursor: fleet.stale ? "default" : "pointer",
                                   opacity: fleet.stale ? 0.65 : 1,
                                 }}
@@ -447,11 +450,7 @@ function statusColor(state?: HerdrAgentState): string {
 const buttonStyle: React.CSSProperties = {
   minHeight: 32,
   padding: "0 12px",
-  border: "1px solid var(--border)",
   borderRadius: 8,
-  background: "var(--bg-panel)",
-  color: "var(--text)",
-  cursor: "pointer",
   fontSize: 11,
 };
 const iconButtonStyle: React.CSSProperties = { ...buttonStyle, width: 28, minHeight: 28, padding: 0, fontSize: 15 };
@@ -474,10 +473,10 @@ const hintStyle: React.CSSProperties = {
 };
 const errorStyle: React.CSSProperties = {
   marginBottom: 9,
-  border: "1px solid rgba(239,68,68,.28)",
+  border: "1px solid var(--danger-border)",
   borderRadius: 8,
   padding: 9,
-  color: "#ef4444",
+  color: "var(--danger)",
   fontSize: 10,
   overflowWrap: "anywhere",
 };

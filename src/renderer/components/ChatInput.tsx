@@ -330,6 +330,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
         : t("commandCount", "{count} commands").replace("{count}", String(filteredSlashCommands.length));
   const hasInputText = Boolean(value.trim());
   const canQueueStreamingMessage = hasInputText || attachedFiles.length > 0 || attachedImages.length > 0;
+  const hasComposerContent = hasInputText || attachedImages.length > 0 || attachedFiles.length > 0;
 
   const updateAtQuery = useCallback(
     (text: string, cursor: number | null) => {
@@ -680,6 +681,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
               </span>
               {onRecallQueue && (
                 <button
+                  className="pi-btn"
                   onClick={onRecallQueue}
                   title={t(
                     "recallQueueDescription",
@@ -692,20 +694,8 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                     padding: "4px 12px",
                     fontSize: scaledChatFont(12),
                     color: "var(--text)",
-                    background: "transparent",
-                    border: "1px solid var(--border)",
                     borderRadius: 7,
-                    cursor: "pointer",
-                    transition: "background 0.12s, border-color 0.12s",
                     whiteSpace: "nowrap",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "var(--bg-hover)";
-                    e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 45%, var(--border))";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.borderColor = "var(--border)";
                   }}
                 >
                   <svg
@@ -739,11 +729,11 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
             style={{
               marginBottom: 8,
               padding: "5px 10px",
-              background: "rgba(234,179,8,0.08)",
-              border: "1px solid rgba(234,179,8,0.25)",
+              background: "var(--warning-soft)",
+              border: "1px solid var(--warning-border)",
               borderRadius: 6,
               fontSize: scaledChatFont(12),
-              color: "rgba(180,130,0,0.9)",
+              color: "var(--warning)",
               display: "flex",
               alignItems: "center",
               gap: 6,
@@ -787,13 +777,12 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
             <span>{imageAttachNotice}</span>
             <button
               type="button"
+              className="pi-btn pi-btn-ghost"
               onClick={() => setImageAttachNotice(null)}
               aria-label="Dismiss image attachment error"
               style={{
                 border: "none",
-                background: "transparent",
                 color: "inherit",
-                cursor: "pointer",
                 padding: 2,
                 lineHeight: 1,
               }}
@@ -823,13 +812,12 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
             <span>{submissionNotice}</span>
             <button
               type="button"
+              className="pi-btn pi-btn-ghost"
               onClick={() => setSubmissionNotice(null)}
               aria-label={t("dismissSubmissionError", "Dismiss submission error")}
               style={{
                 border: "none",
-                background: "transparent",
                 color: "inherit",
-                cursor: "pointer",
                 padding: 2,
                 lineHeight: 1,
               }}
@@ -843,11 +831,11 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
             style={{
               marginBottom: 8,
               padding: "5px 10px",
-              background: "rgba(16,185,129,0.08)",
-              border: "1px solid rgba(16,185,129,0.24)",
+              background: "var(--success-soft)",
+              border: "1px solid var(--success-border)",
               borderRadius: 6,
               fontSize: scaledChatFont(12),
-              color: "rgba(5,150,105,0.95)",
+              color: "var(--success)",
               display: "flex",
               alignItems: "center",
               gap: 6,
@@ -887,6 +875,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                   }}
                 />
                 <button
+                  className="pi-btn"
                   onClick={() => removeImage(i)}
                   style={{
                     position: "absolute",
@@ -895,14 +884,10 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                     width: 16,
                     height: 16,
                     borderRadius: "50%",
-                    background: "var(--bg-panel)",
-                    border: "1px solid var(--border)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    cursor: "pointer",
                     padding: 0,
-                    color: "var(--text-muted)",
                   }}
                 >
                   <svg
@@ -994,6 +979,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                     </span>
                   )}
                   <button
+                    className="pi-btn pi-btn-ghost"
                     onClick={(event) => {
                       event.stopPropagation();
                       removeFile(i);
@@ -1003,14 +989,11 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                       width: 16,
                       height: 16,
                       borderRadius: "50%",
-                      background: "transparent",
                       border: "none",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      cursor: "pointer",
                       padding: 0,
-                      color: "var(--text-muted)",
                       flexShrink: 0,
                     }}
                   >
@@ -1309,7 +1292,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                 gap: 8,
                 alignItems: "center",
                 background: "var(--assistant-bg)",
-                border: `1px solid ${isStreaming && (onSteer || onFollowUp) ? "rgba(234,179,8,0.4)" : "var(--border)"}`,
+                border: `1px solid ${isStreaming && (onSteer || onFollowUp) ? "var(--warning-border)" : "var(--border)"}`,
                 borderRadius: 14,
                 padding: "10px 10px 10px 12px",
                 boxShadow: "0 8px 24px color-mix(in srgb, #000 8%, transparent)",
@@ -1368,6 +1351,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
               <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, alignSelf: "flex-end" }}>
                 {onSteer && (
                   <button
+                    className="pi-btn"
                     onClick={() => sendQueued("steer")}
                     disabled={!canQueueStreamingMessage}
                     title={
@@ -1380,15 +1364,13 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                       alignItems: "center",
                       gap: 5,
                       padding: "7px 12px",
-                      background: canQueueStreamingMessage ? "rgba(234,179,8,0.12)" : "none",
-                      border: "1px solid rgba(234,179,8,0.35)",
+                      background: canQueueStreamingMessage ? "var(--warning-soft)" : "none",
+                      border: "1px solid var(--warning-border)",
                       borderRadius: 8,
-                      color: canQueueStreamingMessage ? "rgba(180,130,0,1)" : "var(--text-dim)",
-                      cursor: canQueueStreamingMessage ? "pointer" : "not-allowed",
+                      color: canQueueStreamingMessage ? "var(--warning)" : "var(--text-dim)",
                       fontSize: scaledChatFont(13),
                       fontWeight: 600,
                       letterSpacing: "-0.01em",
-                      transition: "background 0.12s",
                     }}
                   >
                     <svg
@@ -1409,6 +1391,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                 )}
                 {onFollowUp && (
                   <button
+                    className="pi-btn"
                     onClick={() => sendQueued("followup")}
                     disabled={!canQueueStreamingMessage}
                     title={
@@ -1421,15 +1404,13 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                       alignItems: "center",
                       gap: 5,
                       padding: "7px 12px",
-                      background: canQueueStreamingMessage ? "rgba(129,140,248,0.12)" : "none",
-                      border: "1px solid rgba(129,140,248,0.35)",
+                      background: canQueueStreamingMessage ? "var(--info-soft)" : "none",
+                      border: "1px solid var(--info-border)",
                       borderRadius: 8,
-                      color: canQueueStreamingMessage ? "rgba(99,102,241,1)" : "var(--text-dim)",
-                      cursor: canQueueStreamingMessage ? "pointer" : "not-allowed",
+                      color: canQueueStreamingMessage ? "var(--info)" : "var(--text-dim)",
                       fontSize: scaledChatFont(13),
                       fontWeight: 600,
                       letterSpacing: "-0.01em",
-                      transition: "background 0.12s",
                     }}
                   >
                     <svg
@@ -1452,6 +1433,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
               </div>
             ) : (
               <button
+                className={hasComposerContent ? "pi-btn pi-btn-primary" : "pi-btn"}
                 onClick={handleSend}
                 disabled={!value.trim() && !attachedImages.length && !attachedFiles.length}
                 style={{
@@ -1461,24 +1443,17 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                   alignItems: "center",
                   gap: 6,
                   padding: "10px 18px",
-                  background:
-                    value.trim() || attachedImages.length || attachedFiles.length ? "var(--accent)" : "var(--bg-hover)",
+                  background: hasComposerContent ? undefined : "var(--bg-hover)",
                   border: "none",
                   borderRadius: 9,
-                  color:
-                    value.trim() || attachedImages.length || attachedFiles.length
-                      ? "var(--on-accent)"
-                      : "var(--text-dim)",
-                  cursor: value.trim() || attachedImages.length || attachedFiles.length ? "pointer" : "not-allowed",
+                  color: hasComposerContent ? undefined : "var(--text-dim)",
                   fontSize: scaledChatFont(12.5),
                   fontWeight: 700,
                   fontFamily: "var(--font-mono)",
                   letterSpacing: "-0.01em",
-                  boxShadow:
-                    value.trim() || attachedImages.length || attachedFiles.length
-                      ? "0 1px 3px color-mix(in srgb, var(--accent) 30%, transparent)"
-                      : "none",
-                  transition: "background 0.15s, box-shadow 0.15s",
+                  boxShadow: hasComposerContent
+                    ? "0 1px 3px color-mix(in srgb, var(--accent) 30%, transparent)"
+                    : "none",
                 }}
               >
                 {t("send", "Send")}

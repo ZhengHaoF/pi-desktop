@@ -51,6 +51,7 @@ export function ImageLightbox({ src, alt, onClose }: { src: string; alt?: string
       />
       <button
         type="button"
+        className="pi-btn pi-btn-ghost"
         onClick={onClose}
         title={t("close", "Close")}
         aria-label={t("close", "Close")}
@@ -66,7 +67,6 @@ export function ImageLightbox({ src, alt, onClose }: { src: string; alt?: string
           color: "#fff",
           fontSize: 20,
           lineHeight: "32px",
-          cursor: "pointer",
         }}
       >
         ×
