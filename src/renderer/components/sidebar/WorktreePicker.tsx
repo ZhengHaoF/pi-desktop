@@ -5,6 +5,7 @@ import { abbreviateHomePath } from "@/lib/display-path";
 import { worktreePathsEqual } from "@shared/worktree-path";
 import { AnimatedDropdown, PathLabel } from "./WorkspaceDropdown";
 import { WorktreeDropdownPanel } from "./WorktreeDropdownPanel";
+import { Button } from "@/components/ui/Button";
 
 interface Props {
   selectedCwd: string | null;
@@ -105,14 +106,13 @@ export function WorktreePicker({
             worktreeState.worktrees.find((w) => w.isMain);
           return (
             <div ref={wtDropdownRef} style={{ position: "relative", marginTop: 6 }}>
-              <button
+              <Button
                 onClick={() => setWtDropdownOpen((v) => !v)}
                 title={
                   currentWt
                     ? t("switchWorktreePath", "Switch worktree: {path}").replace("{path}", currentWt.path)
                     : t("switchWorktree", "Switch worktree")
                 }
-                className="pi-btn"
                 style={{
                   width: "100%",
                   height: 29,
@@ -173,7 +173,7 @@ export function WorktreePicker({
                 >
                   <polyline points="2 3.5 5 6.5 8 3.5" />
                 </svg>
-              </button>
+              </Button>
 
               <AnimatedDropdown
                 open={wtDropdownOpen}

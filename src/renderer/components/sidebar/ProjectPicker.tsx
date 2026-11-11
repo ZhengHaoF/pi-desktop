@@ -5,6 +5,7 @@ import type { SessionInfo } from "@/lib/types";
 import { getRecentProjects } from "@/hooks/useSidebarWorkspace";
 import { abbreviateHomePath } from "@/lib/display-path";
 import { PathLabel, AnimatedDropdown, useDeferredFocus } from "./WorkspaceDropdown";
+import { Button } from "@/components/ui/Button";
 
 interface Props {
   selectedCwd: string | null;
@@ -126,10 +127,9 @@ export function ProjectPicker({
   return (
     <div ref={dropdownRef} style={{ position: "relative" }}>
       {compact ? (
-        <button
+        <Button
           onClick={() => setDropdownOpen((v) => !v)}
           title={t("openProjectEllipsis", "Open project…")}
-          className="pi-btn"
           style={{
             width: "100%",
             display: "flex",
@@ -159,12 +159,11 @@ export function ProjectPicker({
             <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
           </svg>
           {t("openProjectEllipsis", "Open project…")}
-        </button>
+        </Button>
       ) : (
-        <button
+        <Button
           onClick={() => setDropdownOpen((v) => !v)}
           title={selectedProject ?? selectedCwd ?? ""}
-          className="pi-btn"
           style={{
             width: "100%",
             display: "flex",
@@ -204,7 +203,7 @@ export function ProjectPicker({
               {restoringInitialSession ? "" : t("selectProjectEllipsis", "Select project…")}
             </span>
           )}
-        </button>
+        </Button>
       )}
 
       <AnimatedDropdown
@@ -253,7 +252,7 @@ export function ProjectPicker({
         {showProjectList && (
           <div style={{ maxHeight: "min(50vh, 380px)", overflowY: "auto" }}>
             {visibleProjects.map((project) => (
-              <button
+              <Button
                 key={project}
                 onClick={() => {
                   setSelectedCwd(project);
@@ -263,8 +262,8 @@ export function ProjectPicker({
                   setCustomPathError(null);
                   setDropdownOpen(false);
                 }}
-                aria-pressed={project === selectedProject}
-                className="pi-btn pi-btn-ghost"
+                pressed={project === selectedProject}
+                variant="ghost"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -300,7 +299,7 @@ export function ProjectPicker({
                 )}
                 {project !== selectedProject && <span style={{ width: 10, flexShrink: 0 }} />}
                 <PathLabel text={abbreviateHomePath(project, homeDir)} style={{ flex: 1 }} />
-              </button>
+              </Button>
             ))}
             {visibleProjects.length === 0 && projectFilter.trim() && (
               <div style={{ padding: "8px 10px", fontSize: 11, color: "var(--text-dim)" }}>
@@ -312,12 +311,12 @@ export function ProjectPicker({
 
         {/* Default cwd shortcut */}
         {!customPathOpen && (
-          <button
+          <Button
             onClick={(e) => {
               e.stopPropagation();
               void handleDefaultCwd();
             }}
-            className="pi-btn pi-btn-ghost"
+            variant="ghost"
             style={{
               display: "flex",
               alignItems: "center",
@@ -344,17 +343,17 @@ export function ProjectPicker({
               <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
             </svg>
             <span>{t("useDefaultDirectory", "Use default directory")}</span>
-          </button>
+          </Button>
         )}
 
         {/* Native directory picker (desktop) */}
         {!customPathOpen && typeof window !== "undefined" && !!window.piBridge && (
-          <button
+          <Button
             onClick={(e) => {
               e.stopPropagation();
               void handlePickDirectory();
             }}
-            className="pi-btn pi-btn-ghost"
+            variant="ghost"
             style={{
               display: "flex",
               alignItems: "center",
@@ -380,19 +379,19 @@ export function ProjectPicker({
               <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
             </svg>
             <span>{t("browseFolder", "Browse folder…")}</span>
-          </button>
+          </Button>
         )}
 
         {/* Custom path entry */}
         {!customPathOpen ? (
-          <button
+          <Button
             onClick={(e) => {
               e.stopPropagation();
               setCustomPathOpen(true);
               setCustomPathError(null);
               deferFocus(() => customPathInputRef.current?.focus());
             }}
-            className="pi-btn pi-btn-ghost"
+            variant="ghost"
             style={{
               display: "flex",
               alignItems: "center",
@@ -418,7 +417,7 @@ export function ProjectPicker({
               <line x1="1" y1="5" x2="9" y2="5" />
             </svg>
             <span>{t("customPath", "Custom path…")}</span>
-          </button>
+          </Button>
         ) : (
           <div
             style={{
@@ -472,10 +471,10 @@ export function ProjectPicker({
               </div>
             )}
             <div style={{ display: "flex", gap: 5, marginTop: 5 }}>
-              <button
+              <Button
                 onClick={() => void commitCustomPath()}
                 disabled={customPathValidating || !customPathValue.trim()}
-                className="pi-btn pi-btn-primary"
+                variant="primary"
                 style={{
                   flex: 1,
                   padding: "4px 0",
@@ -485,14 +484,13 @@ export function ProjectPicker({
                 }}
               >
                 {customPathValidating ? t("checking", "Checking…") : t("open", "Open")}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => {
                   setCustomPathOpen(false);
                   setCustomPathValue("");
                   setCustomPathError(null);
                 }}
-                className="pi-btn"
                 style={{
                   flex: 1,
                   padding: "4px 0",
@@ -501,7 +499,7 @@ export function ProjectPicker({
                 }}
               >
                 {t("cancel", "Cancel")}
-              </button>
+              </Button>
             </div>
           </div>
         )}

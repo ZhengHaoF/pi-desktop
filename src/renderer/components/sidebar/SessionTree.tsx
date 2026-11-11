@@ -4,6 +4,7 @@ import type { SessionInfo } from "@/lib/types";
 import { useI18n } from "@/i18n";
 import { getSessionDisplayTitle } from "@/lib/session-list";
 import { formatNumber, formatRelativeDateTime } from "@/lib/locale-format";
+import { Button } from "@/components/ui/Button";
 
 export interface SessionTreeNode {
   session: SessionInfo;
@@ -381,9 +382,9 @@ function SessionItem({
             )}
           </div>
           <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
-            <button
+            <Button
               onClick={handleDeleteConfirm}
-              className="pi-btn pi-btn-danger"
+              variant="danger"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -417,10 +418,9 @@ function SessionItem({
                 <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
               </svg>
               {t("delete", "Delete")}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleDeleteCancel}
-              className="pi-btn"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -434,7 +434,7 @@ function SessionItem({
               }}
             >
               {t("cancel", "Cancel")}
-            </button>
+            </Button>
           </div>
         </>
       ) : renaming ? (
@@ -464,7 +464,7 @@ function SessionItem({
       ) : (
         /* ── Normal view ── */
         <>
-          <button
+          <Button
             type="button"
             onClick={() => {
               closeActionsMenu();
@@ -478,7 +478,7 @@ function SessionItem({
                   ? `${title} · ${t("newSessionActivity", "New activity")}`
                   : title
             }
-            className="pi-btn pi-btn-ghost"
+            variant="ghost"
             style={{
               alignSelf: "stretch",
               flex: 1,
@@ -616,11 +616,11 @@ function SessionItem({
                 )}
               </div>
             </div>
-          </button>
+          </Button>
 
           {/* Collapse toggle — always visible when has children */}
           {hasChildren && (
-            <button
+            <Button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
@@ -629,7 +629,7 @@ function SessionItem({
               title={collapsed ? t("expandForks", "Expand forks") : t("collapseForks", "Collapse forks")}
               aria-label={collapsed ? t("expandForks", "Expand forks") : t("collapseForks", "Collapse forks")}
               aria-expanded={!collapsed}
-              className="pi-btn pi-btn-ghost"
+              variant="ghost"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -659,7 +659,7 @@ function SessionItem({
               >
                 <polyline points="2 3.5 5 6.5 8 3.5" />
               </svg>
-            </button>
+            </Button>
           )}
 
           <div
@@ -675,10 +675,10 @@ function SessionItem({
             }}
             style={{ position: "relative", flexShrink: 0 }}
           >
-            <button
+            <Button
               type="button"
               ref={actionsSummaryRef}
-              className="session-actions-summary pi-btn pi-btn-ghost"
+              className="session-actions-summary"
               title={t("sessionActions", "Session actions")}
               aria-label={t("sessionActionsFor", "Session actions for {title}").replace("{title}", title)}
               aria-haspopup="menu"
@@ -706,7 +706,7 @@ function SessionItem({
                 <circle cx="12" cy="12" r="1.7" />
                 <circle cx="19" cy="12" r="1.7" />
               </svg>
-            </button>
+            </Button>
             {actionsOpen && (
               <div
                 role="menu"
@@ -724,10 +724,11 @@ function SessionItem({
                   boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
                 }}
               >
-                <button
+                <Button
                   type="button"
                   role="menuitem"
-                  className="pi-btn pi-btn-ghost session-menu-item"
+                  variant="ghost"
+                  className="session-menu-item"
                   onClick={startRename}
                   style={sessionMenuItemStyle}
                 >
@@ -745,11 +746,12 @@ function SessionItem({
                     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
                   </svg>
                   {t("rename", "Rename")}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   role="menuitem"
-                  className="pi-btn pi-btn-ghost session-menu-item"
+                  variant="danger"
+                  className="session-menu-item"
                   onClick={handleDeleteClick}
                   style={{ ...sessionMenuItemStyle, color: "var(--danger)" }}
                 >
@@ -770,7 +772,7 @@ function SessionItem({
                     <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                   </svg>
                   {t("delete", "Delete")}
-                </button>
+                </Button>
               </div>
             )}
           </div>

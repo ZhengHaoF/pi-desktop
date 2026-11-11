@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { APP_VERSION, PI_VERSION } from "@/lib/app-version";
+import { Button } from "@/components/ui/Button";
 
 const SCRAMBLE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
 
@@ -94,9 +95,9 @@ export function PiAgentTitle() {
   );
 
   return (
-    <button
+    <Button
       onClick={handleClick}
-      className="pi-btn pi-btn-ghost"
+      variant="ghost"
       style={{
         border: "none",
         padding: 0,
@@ -131,6 +132,6 @@ export function PiAgentTitle() {
       <span style={{ fontWeight: 700, fontSize: 14, letterSpacing: "-0.2px", fontFamily: "var(--font-mono)" }}>
         {display}
       </span>
-    </button>
+    </Button>
   );
 }

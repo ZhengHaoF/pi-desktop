@@ -6,6 +6,7 @@ import { copyText } from "@/lib/clipboard";
 import type { ProjectWorktreeInfo } from "@/hooks/useSidebarWorkspace";
 import { ProjectBranchMenu } from "./ProjectBranchMenu";
 import { RunningSessionIndicator, SessionTreeItem, UnreadSessionIndicator, type SessionTreeNode } from "./SessionTree";
+import { Button } from "@/components/ui/Button";
 
 const groupMenuItemStyle: CSSProperties = {
   width: "100%",
@@ -132,7 +133,7 @@ export function ProjectSessionGroup({
           borderRadius: 8,
         }}
       >
-        <button
+        <Button
           type="button"
           onClick={() => onToggleCollapse()}
           title={
@@ -147,7 +148,7 @@ export function ProjectSessionGroup({
           }
           aria-expanded={!collapsed}
           aria-controls={`project-group-list-${projectRoot}`}
-          className="pi-btn pi-btn-ghost"
+          variant="ghost"
           style={{
             display: "flex",
             alignItems: "center",
@@ -177,9 +178,9 @@ export function ProjectSessionGroup({
           >
             <polyline points="2 3.5 5 6.5 8 3.5" />
           </svg>
-        </button>
+        </Button>
 
-        <button
+        <Button
           type="button"
           id={`project-group-label-${projectRoot}`}
           onClick={() => {
@@ -191,7 +192,7 @@ export function ProjectSessionGroup({
               ? t("expandProjectGroup", "Expand project group")
               : t("collapseProjectGroup", "Collapse project group")
           }
-          className="pi-btn pi-btn-ghost"
+          variant="ghost"
           style={{
             flex: 1,
             minWidth: 0,
@@ -233,7 +234,7 @@ export function ProjectSessionGroup({
           >
             {label}
           </span>
-        </button>
+        </Button>
 
         <ProjectBranchMenu
           branch={branch}
@@ -275,7 +276,7 @@ export function ProjectSessionGroup({
           <span style={{ fontSize: 10 }}>{sessionCount}</span>
         </span>
 
-        <button
+        <Button
           type="button"
           onClick={(event) => {
             event.stopPropagation();
@@ -284,7 +285,7 @@ export function ProjectSessionGroup({
           }}
           title={t("newSessionInProject", "New session in this project")}
           aria-label={t("newSessionInProject", "New session in this project")}
-          className="pi-btn pi-btn-ghost"
+          variant="ghost"
           style={{
             display: "flex",
             alignItems: "center",
@@ -310,7 +311,7 @@ export function ProjectSessionGroup({
             <line x1="5" y1="1" x2="5" y2="9" />
             <line x1="1" y1="5" x2="9" y2="5" />
           </svg>
-        </button>
+        </Button>
 
         <div
           ref={menuRef}
@@ -321,7 +322,7 @@ export function ProjectSessionGroup({
           }}
           style={{ position: "relative", flexShrink: 0 }}
         >
-          <button
+          <Button
             type="button"
             ref={menuButtonRef}
             onClick={(event) => {
@@ -333,7 +334,7 @@ export function ProjectSessionGroup({
             aria-label={t("projectActionsFor", "Project actions for {name}").replace("{name}", label)}
             aria-haspopup="menu"
             aria-expanded={menuOpen || confirmRemove}
-            className="pi-btn pi-btn-ghost"
+            variant="ghost"
             style={{
               display: "flex",
               alignItems: "center",
@@ -352,7 +353,7 @@ export function ProjectSessionGroup({
               <circle cx="12" cy="12" r="1.7" />
               <circle cx="19" cy="12" r="1.7" />
             </svg>
-          </button>
+          </Button>
           {(menuOpen || confirmRemove) && (
             <div
               role={confirmRemove ? "alertdialog" : "menu"}
@@ -383,9 +384,10 @@ export function ProjectSessionGroup({
                       : t("projectRemoveConfirmEmpty", "Remove “{name}” from the list?").replace("{name}", label)}
                   </span>
                   <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
-                    <button
+                    <Button
                       type="button"
-                      className="pi-btn pi-btn-ghost session-menu-item"
+                      variant="ghost"
+                      className="session-menu-item"
                       onClick={(event) => {
                         event.stopPropagation();
                         setConfirmRemove(false);
@@ -400,10 +402,11 @@ export function ProjectSessionGroup({
                       }}
                     >
                       {t("cancel", "Cancel")}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
-                      className="pi-btn pi-btn-danger session-menu-item"
+                      variant="danger"
+                      className="session-menu-item"
                       onClick={(event) => {
                         event.stopPropagation();
                         void onRemoveProject();
@@ -422,15 +425,16 @@ export function ProjectSessionGroup({
                       }}
                     >
                       {removing ? t("projectRemoving", "Removing…") : t("projectRemove", "Remove project")}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
                 <>
-                  <button
+                  <Button
                     type="button"
                     role="menuitem"
-                    className="pi-btn pi-btn-ghost session-menu-item"
+                    variant="ghost"
+                    className="session-menu-item"
                     onClick={(event) => {
                       event.stopPropagation();
                       closeMenu();
@@ -453,11 +457,12 @@ export function ProjectSessionGroup({
                       <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
                     </svg>
                     {t("openProject", "Open project")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     role="menuitem"
-                    className="pi-btn pi-btn-ghost session-menu-item"
+                    variant="ghost"
+                    className="session-menu-item"
                     onClick={(event) => {
                       event.stopPropagation();
                       closeMenu();
@@ -479,11 +484,12 @@ export function ProjectSessionGroup({
                       <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                     </svg>
                     {t("projectRevealInFolder", "Show in File Explorer")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     role="menuitem"
-                    className="pi-btn pi-btn-ghost session-menu-item"
+                    variant="ghost"
+                    className="session-menu-item"
                     onClick={(event) => {
                       event.stopPropagation();
                       closeMenu();
@@ -506,11 +512,12 @@ export function ProjectSessionGroup({
                       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                     </svg>
                     {t("projectCopyPath", "Copy project path")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     role="menuitem"
-                    className="pi-btn pi-btn-ghost session-menu-item"
+                    variant="ghost"
+                    className="session-menu-item"
                     onClick={(event) => {
                       event.stopPropagation();
                       setMenuOpen(false);
@@ -535,7 +542,7 @@ export function ProjectSessionGroup({
                       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                     </svg>
                     {t("projectRemove", "Remove project")}
-                  </button>
+                  </Button>
                 </>
               )}
             </div>

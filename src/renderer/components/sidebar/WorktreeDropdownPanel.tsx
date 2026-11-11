@@ -3,6 +3,7 @@ import { useI18n } from "@/i18n";
 import { abbreviateHomePath } from "@/lib/display-path";
 import type { WorktreeEntry } from "@/hooks/useSidebarWorkspace";
 import { PathLabel, useDeferredFocus } from "./WorkspaceDropdown";
+import { Button } from "@/components/ui/Button";
 
 export interface WorktreeDropdownPanelProps {
   worktrees: WorktreeEntry[];
@@ -118,10 +119,10 @@ export function WorktreeDropdownPanel({
                 >
                   {t("worktreeForceRemoveConfirm", "Uncommitted changes. Force remove checkout?")}
                 </span>
-                <button
+                <Button
                   onClick={() => void handleRemoveWorktree(wt.path, true)}
                   disabled={busy}
-                  className="pi-btn pi-btn-danger"
+                  variant="danger"
                   style={{
                     padding: "3px 9px",
                     borderRadius: 5,
@@ -135,10 +136,9 @@ export function WorktreeDropdownPanel({
                   }}
                 >
                   {t("force", "Force")}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => setConfirmRemove(null)}
-                  className="pi-btn"
                   style={{
                     padding: "3px 9px",
                     borderRadius: 5,
@@ -147,7 +147,7 @@ export function WorktreeDropdownPanel({
                   }}
                 >
                   {t("cancel", "Cancel")}
-                </button>
+                </Button>
               </div>
             );
           }
@@ -157,13 +157,13 @@ export function WorktreeDropdownPanel({
               className="wt-row"
               style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--border)" }}
             >
-              <button
+              <Button
                 onClick={() => {
                   onSelectWorktree(wt.path);
                 }}
                 title={wt.path}
-                aria-pressed={isCurrent}
-                className="pi-btn pi-btn-ghost"
+                pressed={isCurrent}
+                variant="ghost"
                 style={{
                   flex: 1,
                   minWidth: 0,
@@ -201,16 +201,16 @@ export function WorktreeDropdownPanel({
                     {t("mainBranch", "main")}
                   </span>
                 )}
-              </button>
+              </Button>
               {!wt.isMain && (
-                <button
+                <Button
                   onClick={() => void handleRemoveWorktree(wt.path, false)}
                   disabled={busy}
                   title={t("removeWorktreeHint", "Remove worktree checkout {path}; the branch is kept").replace(
                     "{path}",
                     wt.path,
                   )}
-                  className="pi-btn pi-btn-danger"
+                  variant="danger"
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -239,7 +239,7 @@ export function WorktreeDropdownPanel({
                     <path d="M10 11v6M14 11v6" />
                     <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                   </svg>
-                </button>
+                </Button>
               )}
             </div>
           );
@@ -247,7 +247,7 @@ export function WorktreeDropdownPanel({
       </div>
 
       {!newOpen ? (
-        <button
+        <Button
           onClick={(e) => {
             e.stopPropagation();
             setNewOpen(true);
@@ -255,7 +255,7 @@ export function WorktreeDropdownPanel({
             deferFocus(() => newInputRef.current?.focus());
           }}
           title={t("createWorktreeHint", "Create a worktree checkout for a branch")}
-          className="pi-btn pi-btn-ghost"
+          variant="ghost"
           style={{
             display: "flex",
             alignItems: "center",
@@ -281,7 +281,7 @@ export function WorktreeDropdownPanel({
             <line x1="1" y1="5" x2="9" y2="5" />
           </svg>
           <span>{t("newWorktree", "New worktree…")}</span>
-        </button>
+        </Button>
       ) : (
         <div style={{ padding: "6px 8px" }}>
           <input
@@ -317,10 +317,10 @@ export function WorktreeDropdownPanel({
             }}
           />
           <div style={{ display: "flex", gap: 5, marginTop: 5 }}>
-            <button
+            <Button
               onClick={() => void handleCreateWorktree()}
               disabled={busy || !newBranch.trim()}
-              className="pi-btn pi-btn-primary"
+              variant="primary"
               style={{
                 flex: 1,
                 padding: "4px 0",
@@ -330,14 +330,13 @@ export function WorktreeDropdownPanel({
               }}
             >
               {busy ? t("creating", "Creating…") : t("create", "Create")}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => {
                 setNewOpen(false);
                 setNewBranch("");
                 setError(null);
               }}
-              className="pi-btn"
               style={{
                 flex: 1,
                 padding: "4px 0",
@@ -346,7 +345,7 @@ export function WorktreeDropdownPanel({
               }}
             >
               {t("cancel", "Cancel")}
-            </button>
+            </Button>
           </div>
         </div>
       )}

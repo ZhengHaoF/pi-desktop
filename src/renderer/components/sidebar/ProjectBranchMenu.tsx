@@ -3,6 +3,7 @@ import { useI18n } from "@/i18n";
 import type { ProjectWorktreeInfo } from "@/hooks/useSidebarWorkspace";
 import { AnimatedDropdown } from "./WorkspaceDropdown";
 import { WorktreeDropdownPanel } from "./WorktreeDropdownPanel";
+import { Button } from "@/components/ui/Button";
 
 export interface ProjectBranchMenuProps {
   /** Branch to display: the active worktree's branch, else the main branch. */
@@ -52,7 +53,7 @@ export function ProjectBranchMenu({
 
   return (
     <div ref={containerRef} style={{ position: "relative", flexShrink: 0, maxWidth: 96 }}>
-      <button
+      <Button
         type="button"
         disabled={!interactive}
         onClick={(event) => {
@@ -63,7 +64,7 @@ export function ProjectBranchMenu({
         aria-label={title}
         aria-haspopup={interactive ? "menu" : undefined}
         aria-expanded={interactive ? open : undefined}
-        className="pi-btn pi-btn-ghost"
+        variant="ghost"
         style={{
           display: "flex",
           alignItems: "center",
@@ -99,7 +100,7 @@ export function ProjectBranchMenu({
             <polyline points="2 3.5 5 6.5 8 3.5" />
           </svg>
         )}
-      </button>
+      </Button>
       {interactive && open && worktreeInfo && (
         <AnimatedDropdown
           open={open}

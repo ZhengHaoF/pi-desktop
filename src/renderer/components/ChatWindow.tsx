@@ -39,6 +39,7 @@ import { useI18n } from "@/i18n";
 import type { ThinkingExpansionStore } from "@/lib/thinking-expansion-store";
 import { skillInvocationCommandText } from "@shared/skill-invocation";
 import { localizedExtensionConfirmCopy } from "@/lib/extension-ui-copy";
+import { Button } from "@/components/ui/Button";
 
 interface Props {
   session: SessionInfo | null;
@@ -583,9 +584,8 @@ export function ChatWindow({
                       ref={olderHistorySentinelRef}
                       style={{ display: "flex", justifyContent: "center", padding: 8 }}
                     >
-                      <button
+                      <Button
                         type="button"
-                        className="pi-btn"
                         disabled={loadingOlder}
                         onClick={() => void loadOlder()}
                         style={{
@@ -595,7 +595,7 @@ export function ChatWindow({
                         }}
                       >
                         {loadingOlder ? "Loading earlier messages…" : "Load earlier messages"}
-                      </button>
+                      </Button>
                     </div>
                   )}
                   <ExtensionStatusBar statuses={extensionStatuses} />
@@ -1154,9 +1154,8 @@ function ExtensionDialog({
           {request.method === "select" && (
             <div style={{ display: "grid", gap: 8 }}>
               {request.options.map((option) => (
-                <button
+                <Button
                   key={option}
-                  className="pi-btn"
                   onClick={() => onRespond(request, { value: option })}
                   style={{
                     width: "100%",
@@ -1168,7 +1167,7 @@ function ExtensionDialog({
                   }}
                 >
                   {option}
-                </button>
+                </Button>
               ))}
             </div>
           )}
@@ -1231,8 +1230,7 @@ function ExtensionDialog({
             background: "var(--bg-panel)",
           }}
         >
-          <button
-            className="pi-btn"
+          <Button
             onClick={() => onRespond(request, { cancelled: true })}
             style={{
               padding: "6px 10px",
@@ -1240,10 +1238,10 @@ function ExtensionDialog({
             }}
           >
             {t("cancel", "Cancel")}
-          </button>
+          </Button>
           {request.method === "confirm" ? (
-            <button
-              className="pi-btn pi-btn-primary"
+            <Button
+              variant="primary"
               onClick={submitValue}
               style={{
                 padding: "6px 10px",
@@ -1251,10 +1249,10 @@ function ExtensionDialog({
               }}
             >
               {confirmCopy?.confirmLabel ?? t("confirm", "Confirm")}
-            </button>
+            </Button>
           ) : request.method !== "select" ? (
-            <button
-              className="pi-btn pi-btn-primary"
+            <Button
+              variant="primary"
               onClick={submitValue}
               style={{
                 padding: "6px 10px",
@@ -1262,7 +1260,7 @@ function ExtensionDialog({
               }}
             >
               {t("submit", "Submit")}
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
@@ -1378,8 +1376,7 @@ function ExtensionCustomPanel({
           }}
         >
           <div style={{ color: "var(--text)", fontSize: scaledChatFont(13), fontWeight: 650 }}>Extension panel</div>
-          <button
-            className="pi-btn"
+          <Button
             onClick={() => onInput(request, "\x03")}
             style={{
               padding: "5px 9px",
@@ -1388,7 +1385,7 @@ function ExtensionCustomPanel({
             }}
           >
             Close
-          </button>
+          </Button>
         </div>
         <pre
           style={{
