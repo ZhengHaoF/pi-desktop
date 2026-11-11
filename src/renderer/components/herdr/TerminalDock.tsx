@@ -11,6 +11,7 @@ import { herdrErrorLabel } from "./herdr-ui-copy";
 import { useHerdrFleet } from "@/hooks/useHerdrFleet";
 import { useHerdrRuntime } from "@/hooks/useHerdrRuntime";
 import type { HerdrPane, HerdrTerminalState, HerdrTerminalStatus } from "@contract/herdr";
+import { Button } from "@/components/ui/Button";
 
 const TERMINAL_RESIZE_DEBOUNCE_MS = 180;
 const COPY_BUFFER_LINES = 240;
@@ -667,30 +668,27 @@ export function TerminalDock({ pane, visible, expanded, onToggleExpanded, onPane
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             {!snapshotMode &&
               (controlling ? (
-                <button
+                <Button
                   type="button"
                   disabled={opening}
-                  className="pi-btn"
                   style={toolbarButtonStyle("neutral")}
                   onClick={() => void open("observe")}
                 >
                   {t("releaseControl", "Release control")}
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button
                   type="button"
                   disabled={opening}
-                  className="pi-btn"
                   style={toolbarButtonStyle("control")}
                   onClick={() => void takeControl()}
                 >
                   {t("takeControl", "Take control")}
-                </button>
+                </Button>
               ))}
-            <button
+            <Button
               type="button"
               disabled={opening}
-              className="pi-btn"
               style={toolbarButtonStyle("neutral")}
               onClick={() => {
                 if (snapshotMode) setSnapshotRefreshToken((token) => token + 1);
@@ -698,10 +696,10 @@ export function TerminalDock({ pane, visible, expanded, onToggleExpanded, onPane
               }}
             >
               {snapshotMode ? t("refreshTerminalSnapshot", "Refresh") : t("reconnectTerminal", "Reconnect")}
-            </button>
-            <button type="button" className="pi-btn" style={toolbarButtonStyle("neutral")} onClick={onToggleExpanded}>
+            </Button>
+            <Button type="button" style={toolbarButtonStyle("neutral")} onClick={onToggleExpanded}>
               {expanded ? t("restoreTerminal", "Restore") : t("expandTerminal", "Expand")}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -804,18 +802,13 @@ export function TerminalDock({ pane, visible, expanded, onToggleExpanded, onPane
                 ? t("terminalKeyboardEnabled", "Keyboard input enabled")
                 : t("terminalReadOnly", "Read-only observation")}
           </span>
-          <button
-            type="button"
-            className="pi-btn pi-btn-ghost"
-            style={footerButtonStyle}
-            onClick={() => void copyRecentOutput()}
-          >
+          <Button type="button" variant="ghost" style={footerButtonStyle} onClick={() => void copyRecentOutput()}>
             {copied ? t("copied", "Copied") : t("copyRecentOutput", "Copy output")}
-          </button>
+          </Button>
           {!snapshotMode && !following && (
-            <button type="button" className="pi-btn pi-btn-ghost" style={footerButtonStyle} onClick={jumpToLatest}>
+            <Button type="button" variant="ghost" style={footerButtonStyle} onClick={jumpToLatest}>
               {t("jumpToLatest", "Jump to latest")}
-            </button>
+            </Button>
           )}
         </div>
       )}

@@ -12,6 +12,7 @@ import type { HerdrAgentState, HerdrPane } from "@contract/herdr";
 import { countHerdrAgents, herdrPaneMatchesFilter } from "./fleet-selectors";
 import { getFleetPresentation, getFleetTriggerSpacing } from "./fleet-presentation";
 import { herdrErrorLabel, herdrRuntimeStatusLabel, publicHerdrErrorLabel } from "./herdr-ui-copy";
+import { Button } from "@/components/ui/Button";
 
 const FILTER_STATES: Array<HerdrAgentState | "all"> = ["all", "working", "blocked", "idle", "done", "unknown"];
 
@@ -184,7 +185,7 @@ export function QuickHerdrFleet({
           flexShrink: 1,
         }}
       >
-        <button
+        <Button
           ref={triggerRef}
           type="button"
           data-testid="herdr-fleet-indicator"
@@ -193,7 +194,6 @@ export function QuickHerdrFleet({
           aria-controls={open ? dialogId : undefined}
           title={`${t("agentFleet", "Agent Fleet")} · ${runtimeDetail}`}
           onClick={() => setOpen((value) => !value)}
-          className="pi-btn"
           style={{
             minWidth: 0,
             maxWidth: isMobile ? 104 : 240,
@@ -225,7 +225,7 @@ export function QuickHerdrFleet({
           <span aria-hidden="true" style={{ fontSize: 9, opacity: 0.7 }}>
             ▾
           </span>
-        </button>
+        </Button>
       </div>
 
       {open &&
@@ -276,17 +276,16 @@ export function QuickHerdrFleet({
                     {runtimeDetail}
                   </div>
                 </div>
-                <button
+                <Button
                   type="button"
                   disabled={loading || runtimeLoading}
                   aria-label={t("refresh", "Refresh")}
                   title={t("refresh", "Refresh")}
                   onClick={() => void (ready ? refresh() : refreshRuntime())}
-                  className="pi-btn"
                   style={iconButtonStyle}
                 >
                   ↻
-                </button>
+                </Button>
               </div>
               {hasFleet && (
                 <select
@@ -320,15 +319,14 @@ export function QuickHerdrFleet({
                         )
                       : t("herdrConnectHint", "Start the selected Herdr Session, then connect again.")}
                   </div>
-                  <button
+                  <Button
                     type="button"
                     disabled={retrying}
-                    className="pi-btn"
                     style={{ ...buttonStyle, marginTop: 10 }}
                     onClick={() => void retryConnection()}
                   >
                     {retrying ? t("connecting", "Connecting…") : t("retryConnection", "Retry connection")}
-                  </button>
+                  </Button>
                 </div>
               )}
               {showEmpty && <div style={hintStyle}>{t("noHerdrPanes", "This Herdr Session has no panes yet.")}</div>}
@@ -365,11 +363,11 @@ export function QuickHerdrFleet({
                           {panes.map((pane) => {
                             const state = pane.agent?.state ?? "unknown";
                             return (
-                              <button
+                              <Button
                                 key={pane.id}
                                 type="button"
                                 disabled={!interactive}
-                                aria-pressed={pane.focused}
+                                pressed={pane.focused}
                                 onClick={() => {
                                   onOpenTerminal(pane);
                                   closePopover();
@@ -379,7 +377,7 @@ export function QuickHerdrFleet({
                                     ? t("herdrSnapshotStale", "Snapshot stale")
                                     : t("openTerminal", "Open terminal")
                                 }
-                                className="pi-btn pi-btn-ghost"
+                                variant="ghost"
                                 style={{
                                   width: "100%",
                                   minHeight: 42,
@@ -423,7 +421,7 @@ export function QuickHerdrFleet({
                                 <span style={{ color: "var(--text-muted)", fontSize: 9 }}>
                                   {pane.agent ? stateLabel(state) : t("shellPane", "Shell pane")}
                                 </span>
-                              </button>
+                              </Button>
                             );
                           })}
                         </div>

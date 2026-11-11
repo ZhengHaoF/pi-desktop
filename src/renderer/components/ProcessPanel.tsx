@@ -4,6 +4,7 @@ import { isManagedProcessActiveState } from "@contract/processes";
 import { call, subscribe } from "@/lib/api-client";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/i18n";
+import { Button } from "@/components/ui/Button";
 
 type Props = {
   onActiveCountChange?: (count: number) => void;
@@ -345,45 +346,41 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                     )}
                   </div>
                   <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                    <button
+                    <Button
                       type="button"
-                      className="pi-btn"
                       disabled={busy}
                       style={buttonStyle}
                       onClick={() => void invoke(() => call("processes.stopAll", { mode: "force" }))}
                     >
                       {t("stopAll", "Stop All")}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
-                      className="pi-btn"
                       disabled={busy}
                       style={buttonStyle}
                       onClick={() => void invoke(() => window.piBridge.exportDiagnostics())}
                     >
                       {t("exportDiagnostics", "Export Diagnostics")}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
               {selected.endpoints.map((endpoint) => (
-                <button
+                <Button
                   key={endpoint.id}
                   type="button"
-                  className="pi-btn"
                   disabled={busy}
                   onClick={() => void openEndpoint(selected, endpoint.url)}
                   style={{ ...buttonStyle, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis" }}
                 >
                   {t("openInBrowser", "Open in Browser")}: {endpoint.url}
-                </button>
+                </Button>
               ))}
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {isManagedProcessActiveState(selected.state) ? (
                   <>
-                    <button
+                    <Button
                       type="button"
-                      className="pi-btn"
                       disabled={busy}
                       style={buttonStyle}
                       onClick={() =>
@@ -397,10 +394,9 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                       }
                     >
                       {t("stop", "Stop")}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
-                      className="pi-btn"
                       disabled={busy}
                       style={buttonStyle}
                       onClick={() =>
@@ -414,10 +410,9 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                       }
                     >
                       {t("forceStop", "Force Stop")}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
-                      className="pi-btn"
                       disabled={busy}
                       style={buttonStyle}
                       onClick={() =>
@@ -430,13 +425,12 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                       }
                     >
                       {t("restart", "Restart")}
-                    </button>
+                    </Button>
                   </>
                 ) : selected.state === "lost" ? null : (
                   <>
-                    <button
+                    <Button
                       type="button"
-                      className="pi-btn"
                       disabled={busy}
                       style={buttonStyle}
                       onClick={() =>
@@ -446,21 +440,19 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                       }
                     >
                       {t("restart", "Restart")}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
-                      className="pi-btn"
                       disabled={busy}
                       style={buttonStyle}
                       onClick={() => void invoke(() => call("processes.dismiss", { processId: selected.processId }))}
                     >
                       {t("dismiss", "Dismiss")}
-                    </button>
+                    </Button>
                   </>
                 )}
-                <button
+                <Button
                   type="button"
-                  className="pi-btn"
                   disabled={busy}
                   style={buttonStyle}
                   onClick={() =>
@@ -474,7 +466,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                   }
                 >
                   {t("exportLogs", "Export Logs")}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -524,16 +516,15 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                   {stream}
                 </label>
               ))}
-              <button
+              <Button
                 type="button"
-                className="pi-btn"
                 style={buttonStyle}
                 onClick={() =>
                   void copyText(filteredRecords.map((record) => `[${record.stream}] ${record.text}`).join("\n"))
                 }
               >
                 {t("copyVisible", "Copy Visible")}
-              </button>
+              </Button>
             </div>
 
             <div
@@ -569,14 +560,13 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                 </div>
               ))}
               {hasMore && (
-                <button
+                <Button
                   type="button"
-                  className="pi-btn"
                   style={{ ...buttonStyle, marginTop: 8 }}
                   onClick={() => void readMore(selected.processId, selected.runId, cursor)}
                 >
                   {t("loadMoreLogs", "Load more logs")}
-                </button>
+                </Button>
               )}
             </div>
 
@@ -613,12 +603,11 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                     fontSize: 11,
                   }}
                 />
-                <button type="submit" className="pi-btn" disabled={busy || !stdin} style={buttonStyle}>
+                <Button type="submit" disabled={busy || !stdin} style={buttonStyle}>
                   {t("send", "Send")}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  className="pi-btn"
                   disabled={busy}
                   style={buttonStyle}
                   onClick={() =>
@@ -635,7 +624,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                   }
                 >
                   {t("closeStdin", "Close stdin")}
-                </button>
+                </Button>
               </form>
             )}
           </div>

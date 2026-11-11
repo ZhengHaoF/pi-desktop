@@ -10,6 +10,7 @@ import {
   type HerdrSettings as HerdrSettingsValue,
 } from "@contract/herdr";
 import { herdrErrorLabel, herdrRuntimeStatusLabel, publicHerdrErrorLabel } from "./herdr-ui-copy";
+import { Button } from "@/components/ui/Button";
 
 export function HerdrSettings() {
   const { t } = useI18n();
@@ -271,24 +272,17 @@ export function HerdrSettings() {
               </small>
             </div>
             <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-              <button
+              <Button
                 type="button"
                 disabled={diagnosticsLoading}
                 onClick={() => void refreshDiagnostics()}
-                className="pi-btn"
                 style={buttonLayout}
               >
                 {diagnosticsLoading ? t("loading", "Loading…") : t("refresh", "Refresh")}
-              </button>
-              <button
-                type="button"
-                disabled={!diagnostics}
-                onClick={() => void copyDiagnostics()}
-                className="pi-btn"
-                style={buttonLayout}
-              >
+              </Button>
+              <Button type="button" disabled={!diagnostics} onClick={() => void copyDiagnostics()} style={buttonLayout}>
                 {diagnosticsCopied ? t("copied", "Copied") : t("copyDiagnostics", "Copy diagnostics")}
-              </button>
+              </Button>
             </div>
           </div>
           {diagnostics && (
@@ -367,53 +361,49 @@ export function HerdrSettings() {
         </section>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
+          <Button
             type="button"
             disabled={loading || saving}
             onClick={() => void save()}
-            className="pi-btn pi-btn-primary"
+            variant="primary"
             style={buttonLayout}
           >
             {saving ? t("saving", "Saving…") : t("saveAndApply", "Save and apply")}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             disabled={loading || saving || dirty}
             onClick={() => void action("probe")}
-            className="pi-btn"
             style={buttonLayout}
           >
             {t("probe", "Probe")}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             disabled={loading || saving || dirty || !settings.enabled}
             onClick={() => void action("connect")}
-            className="pi-btn"
             style={buttonLayout}
           >
             {t("connect", "Connect")}
-          </button>
+          </Button>
           {settings.mode === "managed" && diagnostics?.agentClis.some((cli) => cli.restartRequired) && (
-            <button
+            <Button
               type="button"
               disabled={loading || saving || dirty || !settings.enabled}
               onClick={() => void action("restart")}
-              className="pi-btn"
               style={buttonLayout}
             >
               {t("restartManagedHerdr", "Restart managed Herdr")}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
             disabled={loading || saving || !canDisconnect}
             onClick={() => void action("disconnect")}
-            className="pi-btn"
             style={buttonLayout}
           >
             {t("disconnect", "Disconnect")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

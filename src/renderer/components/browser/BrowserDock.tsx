@@ -8,6 +8,7 @@ import type {
   BrowserPermissionRequest,
   BrowserRendererState,
 } from "../../../contract/browser";
+import { Button } from "@/components/ui/Button";
 
 export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; ownerSessionId: string | null }) {
   const { t } = useI18n();
@@ -179,13 +180,13 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
         }}
       >
         {visibleTabs.map((tab) => (
-          <button
+          <Button
             key={tab.id}
             type="button"
             title={tab.url}
-            aria-pressed={tab.id === state.activeTabId}
+            pressed={tab.id === state.activeTabId}
             onClick={() => void window.piBridge.browserActivateTab(tab.id).catch((cause) => setError(messageOf(cause)))}
-            className="pi-btn pi-btn-ghost"
+            variant="ghost"
             style={{
               maxWidth: 150,
               minWidth: 72,
@@ -230,17 +231,17 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
             >
               ×
             </span>
-          </button>
+          </Button>
         ))}
-        <button
+        <Button
           type="button"
-          className="pi-btn pi-btn-ghost"
+          variant="ghost"
           style={iconButtonStyle}
           title={t("browserNewTab", "New tab")}
           onClick={() => void createTab()}
         >
           ＋
-        </button>
+        </Button>
       </div>
 
       <div
@@ -253,26 +254,26 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
           background: "var(--bg-panel)",
         }}
       >
-        <button
-          className="pi-btn pi-btn-ghost"
+        <Button
+          variant="ghost"
           style={iconButtonStyle}
           disabled={!activeTab?.canGoBack}
           title={t("browserBack", "Back")}
           onClick={() => activeTab && void window.piBridge.browserGoBack(activeTab.id)}
         >
           ←
-        </button>
-        <button
-          className="pi-btn pi-btn-ghost"
+        </Button>
+        <Button
+          variant="ghost"
           style={iconButtonStyle}
           disabled={!activeTab?.canGoForward}
           title={t("browserForward", "Forward")}
           onClick={() => activeTab && void window.piBridge.browserGoForward(activeTab.id)}
         >
           →
-        </button>
-        <button
-          className="pi-btn pi-btn-ghost"
+        </Button>
+        <Button
+          variant="ghost"
           style={iconButtonStyle}
           disabled={!activeTab}
           title={activeTab?.loading ? t("browserStop", "Stop") : t("browserReload", "Reload")}
@@ -284,7 +285,7 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
           }
         >
           {activeTab?.loading ? "×" : "↻"}
-        </button>
+        </Button>
         <form
           style={{ flex: 1, minWidth: 0 }}
           onSubmit={(event) => {
@@ -323,8 +324,8 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
             </option>
           ))}
         </select>
-        <button
-          className="pi-btn pi-btn-ghost"
+        <Button
+          variant="ghost"
           style={iconButtonStyle}
           disabled={!activeTab}
           title={t("browserChooseUpload", "Choose files for focused upload input")}
@@ -334,16 +335,16 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
           }
         >
           ↑
-        </button>
-        <button
-          className="pi-btn pi-btn-ghost"
+        </Button>
+        <Button
+          variant="ghost"
           style={iconButtonStyle}
           disabled={!activeTab || !/^https?:/.test(activeTab.url)}
           title={t("browserOpenSystem", "Open in system browser")}
           onClick={() => activeTab && void window.piBridge.openExternal(activeTab.url)}
         >
           ↗
-        </button>
+        </Button>
       </div>
 
       {(error || state.permissionRequests.length > 0 || activeDownload(state.downloads)) && (
@@ -367,9 +368,9 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
 
       {!activeTab ? (
         <div style={emptyStyle}>
-          <button className="pi-btn" style={primaryButtonStyle} onClick={() => void createTab()}>
+          <Button style={primaryButtonStyle} onClick={() => void createTab()}>
             {t("browserOpenNewTab", "Open a new tab")}
-          </button>
+          </Button>
           <div style={{ marginTop: 8, color: "var(--text-dim)" }}>
             {t("browserRemotePageSecurity", "Remote pages receive no Pi Desktop preload or Node access.")}
           </div>
@@ -377,13 +378,12 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
       ) : activeTab.crashed ? (
         <div style={emptyStyle}>
           <div>{t("browserTabCrashed", "This tab’s renderer crashed.")}</div>
-          <button
-            className="pi-btn"
+          <Button
             style={{ ...primaryButtonStyle, marginTop: 9 }}
             onClick={() => void window.piBridge.browserReload(activeTab.id)}
           >
             {t("browserReload", "Reload")}
-          </button>
+          </Button>
         </div>
       ) : (
         <div
@@ -445,15 +445,15 @@ function PermissionPrompt({
           permission: request.permission,
         })}
       </span>
-      <button className="pi-btn" style={tinyButtonStyle} onClick={() => respond("deny")}>
+      <Button style={tinyButtonStyle} onClick={() => respond("deny")}>
         {t("browserDeny", "Deny")}
-      </button>
-      <button className="pi-btn" style={tinyButtonStyle} onClick={() => respond("allow-once")}>
+      </Button>
+      <Button style={tinyButtonStyle} onClick={() => respond("allow-once")}>
         {t("browserAllowOnce", "Once")}
-      </button>
-      <button className="pi-btn" style={tinyButtonStyle} onClick={() => respond("allow-session")}>
+      </Button>
+      <Button style={tinyButtonStyle} onClick={() => respond("allow-session")}>
         {t("browserAllowSession", "Session")}
-      </button>
+      </Button>
     </div>
   );
 }
