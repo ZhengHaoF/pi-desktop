@@ -6,6 +6,7 @@ import { ReplyImage } from "./ReplyImage";
 import { EnlargableImage } from "./ImageLightbox";
 import { DeferredContentActions } from "./DeferredContentActions";
 import { AssistantOutcome } from "./AssistantOutcome";
+import { Button } from "./ui/Button";
 import { scaledChatFont } from "@/lib/chat-appearance";
 import { getToolResultDisplayText } from "@/lib/tool-result-display";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
@@ -287,9 +288,9 @@ function UserMessageView({
             transition: "opacity 0.12s",
           }}
         >
-          <button
+          <Button
             type="button"
-            className="pi-btn pi-btn-ghost"
+            variant="ghost"
             onClick={copyContent}
             disabled={!copyableContent}
             title={copyableContent ? "Copy message" : "Nothing to copy"}
@@ -336,7 +337,7 @@ function UserMessageView({
               </svg>
             )}
             {copied ? "Copied" : "Copy"}
-          </button>
+          </Button>
         </div>
         {(canFork || canNavigate) && (
           <div
@@ -350,9 +351,9 @@ function UserMessageView({
             }}
           >
             {canNavigate && (
-              <button
+              <Button
                 type="button"
-                className="pi-btn pi-btn-ghost"
+                variant="ghost"
                 onClick={() => {
                   onNavigate!(prevAssistantEntryId!);
                   onEditContent?.(editableContent);
@@ -385,12 +386,12 @@ function UserMessageView({
                   <path d="M4 4v7a4 4 0 0 0 4 4h12" />
                 </svg>
                 Edit from here
-              </button>
+              </Button>
             )}
             {canFork && (
-              <button
+              <Button
                 type="button"
-                className="pi-btn pi-btn-ghost"
+                variant="ghost"
                 onClick={() => {
                   onFork!(entryId!);
                 }}
@@ -426,7 +427,7 @@ function UserMessageView({
                   <path d="M18 9a9 9 0 0 1-9 9" />
                 </svg>
                 {forking ? "Creating…" : "New session"}
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -783,9 +784,10 @@ function AssistantMessageView({
           <div style={{ fontSize: scaledChatFont(12), color: "var(--text-dim)" }}>{formatUsage(message.usage)}</div>
         )}
         {textContent && !isStreaming && (
-          <button
+          <Button
             type="button"
-            className="message-hover-action pi-btn pi-btn-ghost"
+            className="message-hover-action"
+            variant="ghost"
             onClick={copyContent}
             title="Copy message"
             style={{
@@ -834,7 +836,7 @@ function AssistantMessageView({
               </svg>
             )}
             {copied ? "Copied" : "Copy"}
-          </button>
+          </Button>
         )}
         {time && !isStreaming && (
           <span style={{ fontSize: scaledChatFont(12), color: "var(--text-dim)", marginLeft: "auto" }}>{time}</span>
@@ -964,9 +966,9 @@ function ThinkingBlock({
         background: "var(--thinking-bg)",
       }}
     >
-      <button
+      <Button
         onClick={toggleExpanded}
-        className="pi-btn pi-btn-ghost"
+        variant="ghost"
         style={{
           display: "flex",
           alignItems: "center",
@@ -998,7 +1000,7 @@ function ThinkingBlock({
             {t("collapsed", "collapsed")}
           </span>
         )}
-      </button>
+      </Button>
       {expanded && (
         <div
           style={{
@@ -1067,9 +1069,9 @@ function ToolCallBlock({
       }}
     >
       {/* ── Tool call header ── */}
-      <button
+      <Button
         onClick={() => setExpanded((v) => !v)}
-        className="pi-btn pi-btn-ghost"
+        variant="ghost"
         title={collapsedHint ?? undefined}
         style={{
           display: "flex",
@@ -1112,7 +1114,7 @@ function ToolCallBlock({
             {duration}s
           </span>
         )}
-      </button>
+      </Button>
 
       {/* ── Expanded: input args ── */}
       {expanded && !isEditTool && (
@@ -1160,9 +1162,9 @@ function ToolCallBlock({
       {expanded && result && <ToolResultImages content={result.content} />}
       {expanded && result && <DeferredContentActions content={result.content} onLoad={onLoadDeferredContent} />}
       {expanded && browserTabId && (
-        <button
+        <Button
           type="button"
-          className="pi-btn pi-btn-link"
+          variant="link"
           onClick={() =>
             window.dispatchEvent(new CustomEvent("pi-desktop:open-browser-tab", { detail: { tabId: browserTabId } }))
           }
@@ -1176,7 +1178,7 @@ function ToolCallBlock({
           }}
         >
           Open in Browser →
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -1754,8 +1756,8 @@ function CustomMessageView({
             <DeferredContentActions content={message.content} onLoad={onLoadDeferredContent} />
           </div>
         ) : (
-          <button
-            className="pi-btn pi-btn-ghost"
+          <Button
+            variant="ghost"
             onClick={() => setContentExpanded(true)}
             style={{
               display: "block",
@@ -1767,7 +1769,7 @@ function CustomMessageView({
             }}
           >
             {text ? previewText(text) : "Show extension message"}
-          </button>
+          </Button>
         )}
 
         <div
@@ -1781,8 +1783,8 @@ function CustomMessageView({
           }}
         >
           {text || detailsText ? (
-            <button
-              className="pi-btn pi-btn-ghost"
+            <Button
+              variant="ghost"
               onClick={copyContent}
               style={{
                 padding: "3px 7px",
@@ -1792,11 +1794,11 @@ function CustomMessageView({
               }}
             >
               {copied ? "Copied" : "Copy"}
-            </button>
+            </Button>
           ) : null}
           {(hasDetails || isHiddenDisplay) && (
-            <button
-              className="pi-btn pi-btn-ghost"
+            <Button
+              variant="ghost"
               onClick={() => {
                 if (isHiddenDisplay) setContentExpanded((v) => !v);
                 else setDetailsExpanded((v) => !v);
@@ -1815,7 +1817,7 @@ function CustomMessageView({
                 : detailsExpanded
                   ? "Hide details"
                   : "Show details"}
-            </button>
+            </Button>
           )}
         </div>
 

@@ -10,6 +10,7 @@ import { FolderIcon, getFileIcon } from "./FileIcons";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useI18n } from "@/i18n";
 import { localFilePathKey, splitLocalFileReferenceMarkdown } from "@/lib/file-url";
+import { Button } from "@/components/ui/Button";
 
 export type { AttachedImage } from "@/hooks/useComposerDraft";
 
@@ -680,8 +681,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                 {(queuedMessages?.steering.length ?? 0) + (queuedMessages?.followUp.length ?? 0)}
               </span>
               {onRecallQueue && (
-                <button
-                  className="pi-btn"
+                <Button
                   onClick={onRecallQueue}
                   title={t(
                     "recallQueueDescription",
@@ -712,7 +712,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                     <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
                   </svg>
                   {t("recallToInput", "Recall to input")}
-                </button>
+                </Button>
               )}
             </div>
             {queuedMessages?.steering.map((text, i) => (
@@ -775,9 +775,9 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
             }}
           >
             <span>{imageAttachNotice}</span>
-            <button
+            <Button
               type="button"
-              className="pi-btn pi-btn-ghost"
+              variant="ghost"
               onClick={() => setImageAttachNotice(null)}
               aria-label="Dismiss image attachment error"
               style={{
@@ -788,7 +788,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
               }}
             >
               ×
-            </button>
+            </Button>
           </div>
         )}
         {submissionNotice && (
@@ -810,9 +810,9 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
             }}
           >
             <span>{submissionNotice}</span>
-            <button
+            <Button
               type="button"
-              className="pi-btn pi-btn-ghost"
+              variant="ghost"
               onClick={() => setSubmissionNotice(null)}
               aria-label={t("dismissSubmissionError", "Dismiss submission error")}
               style={{
@@ -823,7 +823,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
               }}
             >
               ×
-            </button>
+            </Button>
           </div>
         )}
         {compactResultText && (
@@ -874,8 +874,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                     display: "block",
                   }}
                 />
-                <button
-                  className="pi-btn"
+                <Button
                   onClick={() => removeImage(i)}
                   style={{
                     position: "absolute",
@@ -902,7 +901,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                     <line x1="1" y1="1" x2="7" y2="7" />
                     <line x1="7" y1="1" x2="1" y2="7" />
                   </svg>
-                </button>
+                </Button>
               </div>
             ))}
           </div>
@@ -978,8 +977,8 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                       {t("outsideProject", "Outside project")}
                     </span>
                   )}
-                  <button
-                    className="pi-btn pi-btn-ghost"
+                  <Button
+                    variant="ghost"
                     onClick={(event) => {
                       event.stopPropagation();
                       removeFile(i);
@@ -1009,7 +1008,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                       <line x1="1" y1="1" x2="7" y2="7" />
                       <line x1="7" y1="1" x2="1" y2="7" />
                     </svg>
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -1350,8 +1349,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
             {isStreaming ? (
               <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, alignSelf: "flex-end" }}>
                 {onSteer && (
-                  <button
-                    className="pi-btn"
+                  <Button
                     onClick={() => sendQueued("steer")}
                     disabled={!canQueueStreamingMessage}
                     title={
@@ -1387,11 +1385,10 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                       <line x1="1" y1="5" x2="9" y2="5" />
                     </svg>
                     {t("steer", "Steer")}
-                  </button>
+                  </Button>
                 )}
                 {onFollowUp && (
-                  <button
-                    className="pi-btn"
+                  <Button
                     onClick={() => sendQueued("followup")}
                     disabled={!canQueueStreamingMessage}
                     title={
@@ -1428,12 +1425,12 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                       <line x1="2" y1="9" x2="8" y2="9" />
                     </svg>
                     {t("followUp", "Follow-up")}
-                  </button>
+                  </Button>
                 )}
               </div>
             ) : (
-              <button
-                className={hasComposerContent ? "pi-btn pi-btn-primary" : "pi-btn"}
+              <Button
+                variant={hasComposerContent ? "primary" : "default"}
                 onClick={handleSend}
                 disabled={!value.trim() && !attachedImages.length && !attachedFiles.length}
                 style={{
@@ -1457,7 +1454,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                 }}
               >
                 {t("send", "Send")}
-              </button>
+              </Button>
             )}
           </div>
         </div>

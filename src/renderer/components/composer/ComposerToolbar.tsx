@@ -5,6 +5,7 @@ import { useI18n } from "@/i18n";
 import { scaledChatFont } from "@/lib/chat-appearance";
 import type { ToolPreset, SelectableToolPreset } from "@shared/tool-presets";
 import { thinkingMenuLevels, type ThinkingLevelOption } from "@shared/thinking-levels";
+import { Button } from "@/components/ui/Button";
 
 interface ModelOption {
   provider: string;
@@ -283,8 +284,7 @@ function ComposerToolbarView({
           gap: isMobile ? 2 : 6,
         }}
       >
-        <button
-          className="pi-btn"
+        <Button
           onClick={onAttach}
           title={t(
             "attachLocalFilesDescription",
@@ -318,13 +318,12 @@ function ComposerToolbarView({
             <circle cx="8.5" cy="8.5" r="1.5" />
             <polyline points="21 15 16 10 5 21" />
           </svg>
-        </button>
+        </Button>
         {/* Model selector — visible always, disabled during streaming */}
         {(onModelsRefresh || (modelOptions.length > 0 && currentName && onModelChange)) && (
           <div ref={dropdownRef} style={{ position: "relative", flex: isMobile ? "1 1 auto" : undefined, minWidth: 0 }}>
-            <button
+            <Button
               ref={modelButtonRef}
-              className="pi-btn"
               onClick={() => {
                 updateModelDropdownRect();
                 setModelDropdownOpen((v) => !v);
@@ -369,7 +368,7 @@ function ComposerToolbarView({
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
                 {currentName ?? t("models", "Models")}
               </span>
-            </button>
+            </Button>
             {modelDropdownOpen &&
               modelDropdownRect &&
               typeof document !== "undefined" &&
@@ -409,9 +408,8 @@ function ComposerToolbarView({
                             minWidth: 240,
                           }}
                         >
-                          <button
+                          <Button
                             type="button"
-                            className="pi-btn"
                             disabled={modelRefreshing}
                             onClick={() => void onModelsRefresh?.()}
                             style={{
@@ -427,7 +425,7 @@ function ComposerToolbarView({
                             {modelRefreshing
                               ? t("refreshingModels", "Refreshing model directory…")
                               : t("refreshModels", "Refresh model directory")}
-                          </button>
+                          </Button>
                           {modelCatalog?.source === "offline" && (
                             <div style={{ marginTop: 6, color: "var(--text-dim)", fontSize: scaledChatFont(11) }}>
                               {t("modelsOfflineCache", "Offline: using the cached model directory.")}
@@ -469,9 +467,9 @@ function ComposerToolbarView({
                           {group.options.map((opt) => {
                             const isActive = opt.modelId === model?.modelId && opt.provider === model?.provider;
                             return (
-                              <button
+                              <Button
                                 key={`${opt.provider}:${opt.modelId}`}
-                                className="pi-btn pi-btn-ghost"
+                                variant="ghost"
                                 onClick={() => {
                                   setModelDropdownOpen(false);
                                   if (!isActive || isAutoModelSelection) onModelChange?.(opt.provider, opt.modelId);
@@ -510,7 +508,7 @@ function ComposerToolbarView({
                                   <span style={{ width: 10, flexShrink: 0 }} />
                                 )}
                                 {opt.name}
-                              </button>
+                              </Button>
                             );
                           })}
                         </div>
@@ -542,9 +540,9 @@ function ComposerToolbarView({
         }}
       >
         {isStreaming && (
-          <button
+          <Button
             type="button"
-            className="pi-btn pi-btn-danger"
+            variant="danger"
             onClick={() => {
               closeControlDropdowns();
               onAbort();
@@ -571,15 +569,14 @@ function ComposerToolbarView({
               <rect x="1.5" y="1.5" width="7" height="7" rx="1.5" fill="currentColor" />
             </svg>
             {!isMobile && t("stop", "Stop")}
-          </button>
+          </Button>
         )}
         <div style={{ display: "contents" }}>
           {onThinkingLevelChange && (
             <div ref={thinkingDropdownRef} style={{ position: "relative" }}>
-              <button
+              <Button
                 ref={thinkingButtonRef}
                 type="button"
-                className="pi-btn"
                 aria-haspopup="menu"
                 aria-expanded={thinkingDropdownOpen}
                 onClick={() => {
@@ -619,7 +616,7 @@ function ComposerToolbarView({
                   <line x1="8" y1="21" x2="11" y2="21" />
                 </svg>
                 {!isMobile && <span style={{ whiteSpace: "nowrap" }}>{thinkingDisplayLabel}</span>}
-              </button>
+              </Button>
               {thinkingDropdownOpen && (
                 <div
                   role="menu"
@@ -646,12 +643,12 @@ function ComposerToolbarView({
                         ? t("thinkingMappedDescription", "Provider value: {value}").replace("{value}", mappedVal)
                         : thinkingDescriptions[lvl];
                     return (
-                      <button
+                      <Button
                         key={lvl}
                         type="button"
                         role="menuitemradio"
                         aria-checked={isActive}
-                        className="pi-btn pi-btn-ghost"
+                        variant="ghost"
                         onClick={() => {
                           if (!isActive) onThinkingLevelChange(lvl);
                           setThinkingDropdownOpen(false);
@@ -694,7 +691,7 @@ function ComposerToolbarView({
                         <span style={{ fontSize: scaledChatFont(11), color: "var(--text-dim)", marginLeft: 8 }}>
                           {desc}
                         </span>
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -703,10 +700,9 @@ function ComposerToolbarView({
           )}
           {onToolPresetChange && (
             <div ref={toolDropdownRef} style={{ position: "relative" }}>
-              <button
+              <Button
                 ref={toolButtonRef}
                 type="button"
-                className="pi-btn"
                 aria-haspopup="menu"
                 aria-expanded={toolDropdownOpen}
                 onClick={() => {
@@ -745,7 +741,7 @@ function ComposerToolbarView({
                   <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
                 </svg>
                 {!isMobile && <span style={{ whiteSpace: "nowrap" }}>{toolPresetLabel}</span>}
-              </button>
+              </Button>
               {toolDropdownOpen && (
                 <div
                   role="menu"
@@ -776,12 +772,12 @@ function ComposerToolbarView({
                               "All tools, code orchestration, image generation, classification and search",
                             );
                     return (
-                      <button
+                      <Button
                         key={lvl}
                         type="button"
                         role="menuitemradio"
                         aria-checked={isActive}
-                        className="pi-btn pi-btn-ghost"
+                        variant="ghost"
                         onClick={() => {
                           onToolPresetChange(preset);
                           setToolDropdownOpen(false);
@@ -824,7 +820,7 @@ function ComposerToolbarView({
                         <span style={{ fontSize: scaledChatFont(11), color: "var(--text-dim)", marginLeft: 8 }}>
                           {desc}
                         </span>
-                      </button>
+                      </Button>
                     );
                   })}
                   {toolSelectionError && (
@@ -859,9 +855,8 @@ function ComposerToolbarView({
                   {compactError}
                 </div>
               )}
-              <button
+              <Button
                 type="button"
-                className="pi-btn"
                 onClick={() => {
                   closeControlDropdowns();
                   if (isCompacting) onAbortCompaction?.();
@@ -912,15 +907,14 @@ function ComposerToolbarView({
                     {!isMobile && <span style={{ whiteSpace: "nowrap" }}>{t("compactAction", "Compact")}</span>}
                   </>
                 )}
-              </button>
+              </Button>
             </div>
           )}
 
           {onSoundToggle !== undefined && (
-            <button
+            <Button
               type="button"
-              className="pi-btn"
-              aria-pressed={soundEnabled === true}
+              pressed={soundEnabled === true}
               onClick={() => {
                 closeControlDropdowns();
                 onSoundToggle();
@@ -977,7 +971,7 @@ function ComposerToolbarView({
                   <line x1="17" y1="9" x2="23" y2="15" />
                 </svg>
               )}
-            </button>
+            </Button>
           )}
         </div>
       </div>
