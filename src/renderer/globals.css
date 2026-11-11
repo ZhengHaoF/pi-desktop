@@ -602,6 +602,29 @@ body {
   outline-offset: 2px;
 }
 
+/* Shared input color states. Inline styles cannot express :hover or
+   :disabled, so components keep only layout (size/padding/font) inline and
+   take colors from these classes. Input and Textarea share the block. */
+.pi-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+}
+.pi-input::placeholder {
+  color: var(--text-dim);
+}
+.pi-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.pi-input-invalid,
+.pi-input-invalid:hover:not(:disabled) {
+  border-color: var(--danger-border);
+}
+
 /* Shared button color states. Inline styles cannot express :hover, so
    components keep only layout (padding/size/radius) inline and take colors
    from these classes. */

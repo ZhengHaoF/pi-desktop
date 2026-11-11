@@ -33,7 +33,9 @@ test("Field associates its label with every shared input type", () => {
   assertFieldAssociation(TextInput, { value: "name", onChange() {} }, "input");
   assertFieldAssociation(SecretTextInput, { value: "secret", onChange() {} }, "input");
   assertFieldAssociation(NumInput, { value: "42", onChange() {} }, "input");
-  assertFieldAssociation(Select, { value: "one", onChange() {}, options: ["one"] }, "select");
+  // Select renders a themed listbox whose trigger is a button; label-for
+  // association applies to button elements.
+  assertFieldAssociation(Select, { value: "one", onChange() {}, options: ["one"] }, "button");
 });
 
 test("compact shared controls expose at least a 32px pointer target", () => {

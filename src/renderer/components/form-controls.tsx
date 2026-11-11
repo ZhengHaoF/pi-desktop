@@ -1,18 +1,13 @@
 /**
  * Shared form controls for settings-style panels (fields, inputs, selects).
  * Extracted from ModelsConfig so detail panes can stay focused on domain logic.
+ * The input primitives delegate to components/ui; this module owns the Field
+ * label-association context and the Select option-mapping API.
  */
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useId,
-  useState,
-  type CSSProperties,
-  type KeyboardEventHandler,
-  type ReactNode,
-} from "react";
-import { Button } from "@/components/ui/Button";
+import { createContext, useContext, useId, type ReactNode } from "react";
+import { Input } from "@/components/ui/Input";
+import { SecretTextInput as UiSecretTextInput } from "@/components/ui/SecretTextInput";
+import { Select as UiSelect } from "@/components/ui/Select";
 
 const FieldControlIdContext = createContext<string | undefined>(undefined);
 
@@ -35,19 +30,6 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-export const inputStyle = {
-  minHeight: 36,
-  padding: "7px 10px",
-  background: "var(--bg-panel)",
-  border: "1px solid var(--border)",
-  borderRadius: 5,
-  color: "var(--text)",
-  fontSize: 13,
-  outline: "none",
-  width: "100%",
-  boxSizing: "border-box" as const,
-};
-
 export function TextInput({
   value,
   onChange,
@@ -62,12 +44,12 @@ export function TextInput({
   const controlId = useFieldControlId();
 
   return (
-    <input
+    <Input
       id={controlId}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      style={{ ...inputStyle, fontFamily: mono ? "var(--font-mono)" : "inherit" }}
+      mono={mono}
     />
   );
 }
@@ -78,92 +60,33 @@ export function SecretTextInput({
   placeholder,
   mono,
   onKeyDown,
-  autoComplete = "off",
-  spellCheck = false,
+  autoComplete,
+  spellCheck,
   style,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   mono?: boolean;
-  onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
+  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
   autoComplete?: string;
   spellCheck?: boolean;
-  style?: CSSProperties;
+  style?: React.CSSProperties;
 }) {
-  const [visible, setVisible] = useState(false);
   const controlId = useFieldControlId();
 
-  useEffect(() => {
-    if (!value) setVisible(false);
-  }, [value]);
-
   return (
-    <div style={{ position: "relative", width: "100%", ...style }}>
-      <input
-        id={controlId}
-        type={visible ? "text" : "password"}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={onKeyDown}
-        placeholder={placeholder}
-        style={{ ...inputStyle, paddingRight: 40, fontFamily: mono ? "var(--font-mono)" : "inherit" }}
-        autoComplete={autoComplete}
-        spellCheck={spellCheck}
-      />
-      <Button
-        type="button"
-        variant="ghost"
-        onClick={() => setVisible((v) => !v)}
-        aria-label={visible ? "Hide API key" : "Show API key"}
-        title={visible ? "Hide API key" : "Show API key"}
-        style={{
-          position: "absolute",
-          right: 2,
-          top: "50%",
-          transform: "translateY(-50%)",
-          width: 32,
-          height: 32,
-          padding: 0,
-          border: "none",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {visible ? (
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C7 20 2.73 16.89 1 12a18.45 18.45 0 0 1 5.06-6.94" />
-            <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c5 0 9.27 3.11 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-            <path d="M14.12 14.12A3 3 0 0 1 9.88 9.88" />
-            <path d="M1 1l22 22" />
-          </svg>
-        ) : (
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12Z" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
-        )}
-      </Button>
-    </div>
+    <UiSecretTextInput
+      id={controlId}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      mono={mono}
+      onKeyDown={onKeyDown}
+      autoComplete={autoComplete}
+      spellCheck={spellCheck}
+      style={style}
+    />
   );
 }
 
@@ -179,13 +102,12 @@ export function NumInput({
   const controlId = useFieldControlId();
 
   return (
-    <input
+    <Input
       id={controlId}
       type="number"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      style={inputStyle}
     />
   );
 }
@@ -211,25 +133,22 @@ export function Select({
 }) {
   const controlId = useFieldControlId();
 
+  const mapped = options.map((o) => {
+    const value = typeof o === "string" ? o : o.value;
+    const label = typeof o === "string" ? o : o.label;
+    return { value, label: labels?.[value] ?? label };
+  });
+  const selectOptions = required ? mapped : [{ value: "", label: emptyLabel ?? "— inherit / none —" }, ...mapped];
+
   return (
-    <select
+    <UiSelect
       id={controlId}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={onChange}
+      options={selectOptions}
+      placeholder={emptyLabel ?? "— inherit / none —"}
       disabled={disabled}
-      style={{ ...inputStyle, color: value ? "var(--text)" : "var(--text-dim)" }}
-    >
-      {!required && <option value="">{emptyLabel ?? "— inherit / none —"}</option>}
-      {options.map((o) => {
-        const value = typeof o === "string" ? o : o.value;
-        const label = typeof o === "string" ? o : o.label;
-        return (
-          <option key={value} value={value}>
-            {labels?.[value] ?? label}
-          </option>
-        );
-      })}
-    </select>
+    />
   );
 }
 
