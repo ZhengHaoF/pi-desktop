@@ -16,12 +16,6 @@ const inputStyle = {
   fontSize: 13,
 } as const;
 
-const buttonLayout = {
-  minHeight: 36,
-  padding: "7px 14px",
-  fontSize: 13,
-} as const;
-
 const hintStyle = { margin: "8px 0 0", fontSize: 12, lineHeight: 1.55, color: "var(--text-dim)" } as const;
 
 /** Per-provider hint lines; each provider declares what it supports and how its key resolves. */
@@ -232,7 +226,8 @@ export function WebSearchSettings() {
             />
             <Button
               type="button"
-              style={{ ...buttonLayout, opacity: keyDirty && !busy ? 1 : 0.6 }}
+              size="lg"
+              style={{ opacity: keyDirty && !busy ? 1 : 0.6 }}
               disabled={!keyDirty || busy}
               onClick={() => void saveKey()}
             >
@@ -240,7 +235,8 @@ export function WebSearchSettings() {
             </Button>
             <Button
               type="button"
-              style={{ ...buttonLayout, opacity: testing ? 0.65 : 1 }}
+              size="lg"
+              style={{ opacity: testing ? 0.65 : 1 }}
               disabled={busy || testing || !providerId}
               onClick={() => void test()}
             >

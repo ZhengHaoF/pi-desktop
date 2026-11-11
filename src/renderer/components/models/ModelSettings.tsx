@@ -13,11 +13,6 @@ import { JsonObjectField } from "./JsonObjectField";
 import { THINKING_LEVELS } from "@shared/thinking-levels";
 import { Button } from "@/components/ui/Button";
 
-const buttonLayout = {
-  padding: "7px 12px",
-  borderRadius: 5,
-};
-
 const mutedHintStyle = { color: "var(--text-muted)", fontSize: 12, lineHeight: 1.6, margin: 0 } as const;
 
 /** Load / edit / save state for a revision-checked settings file. */
@@ -95,10 +90,10 @@ function SettingsActions({
       )}
       {saved && <p role="status">{t("saved", "Saved")}</p>}
       <div style={{ display: "flex", gap: 8 }}>
-        <Button style={buttonLayout} disabled={busy || !canSave} onClick={onSave}>
+        <Button disabled={busy || !canSave} onClick={onSave}>
           {t("save", "Save")}
         </Button>
-        <Button style={buttonLayout} disabled={busy} onClick={onReload}>
+        <Button disabled={busy} onClick={onReload}>
           {t("reload", "Reload")}
         </Button>
       </div>

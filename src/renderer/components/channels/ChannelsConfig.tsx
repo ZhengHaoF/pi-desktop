@@ -38,12 +38,6 @@ export const FEISHU_PERMISSION_IMPORT_JSON = JSON.stringify(
   2,
 );
 
-const buttonLayout: React.CSSProperties = {
-  minHeight: 36,
-  fontSize: 13,
-  padding: "0 12px",
-};
-
 const inputStyle: React.CSSProperties = {
   width: "100%",
   border: "1px solid var(--border)",
@@ -354,7 +348,7 @@ export function ChannelsConfig({ onSnapshotChange }: { onSnapshotChange?: (snaps
             <Button
               type="button"
               disabled={busy}
-              style={buttonLayout}
+              size="lg"
               onClick={() => {
                 setFeishuError("");
                 setFeishuDialogOpen(true);
@@ -365,7 +359,7 @@ export function ChannelsConfig({ onSnapshotChange }: { onSnapshotChange?: (snaps
             <Button
               type="button"
               disabled={busy}
-              style={buttonLayout}
+              size="lg"
               onClick={() => {
                 setTelegramError("");
                 setTelegramDialogOpen(true);
@@ -373,7 +367,7 @@ export function ChannelsConfig({ onSnapshotChange }: { onSnapshotChange?: (snaps
             >
               {t("connectTelegram", "Connect Telegram")}
             </Button>
-            <Button type="button" disabled={busy} style={buttonLayout} onClick={beginLogin}>
+            <Button type="button" disabled={busy} size="lg" onClick={beginLogin}>
               {t("connectWeixin", "Connect WeChat")}
             </Button>
           </div>
@@ -868,7 +862,7 @@ export function AccountCard({
             />
             <Button
               type="button"
-              style={buttonLayout}
+              size="lg"
               onClick={() =>
                 void window.piBridge.selectDirectory().then((cwd) => cwd && setDraft({ ...draft, defaultCwd: cwd }))
               }
@@ -899,7 +893,7 @@ export function AccountCard({
             <Button
               type="button"
               disabled={busy || updatingToken || !telegramToken.trim()}
-              style={buttonLayout}
+              size="lg"
               onClick={() => void handleTokenUpdate()}
             >
               {updatingToken ? t("saving", "Saving…") : t("updateTelegramToken", "Update token")}
@@ -949,7 +943,7 @@ export function AccountCard({
           <Button
             type="button"
             disabled={busy || updatingToken || !draft.appId?.trim() || !feishuAppSecret.trim()}
-            style={buttonLayout}
+            size="lg"
             onClick={() => void handleFeishuCredentialUpdate()}
           >
             {updatingToken ? t("saving", "Saving…") : t("updateFeishuCredential", "Update credentials")}
@@ -977,7 +971,7 @@ export function AccountCard({
           type="button"
           disabled={busy}
           variant="primary"
-          style={buttonLayout}
+          size="lg"
           onClick={() => {
             const elevated =
               draft.dmPolicy === "open" ||
@@ -1003,26 +997,27 @@ export function AccountCard({
           {t("save", "Save")}
         </Button>
         {status?.state === "running" ? (
-          <Button type="button" disabled={busy} style={buttonLayout} onClick={onStop}>
+          <Button type="button" disabled={busy} size="lg" onClick={onStop}>
             {t("stop", "Stop")}
           </Button>
         ) : (
-          <Button type="button" disabled={busy || !draft.enabled} style={buttonLayout} onClick={onStart}>
+          <Button type="button" disabled={busy || !draft.enabled} size="lg" onClick={onStart}>
             {t("start", "Start")}
           </Button>
         )}
-        <Button type="button" disabled={busy} style={buttonLayout} onClick={onRestart}>
+        <Button type="button" disabled={busy} size="lg" onClick={onRestart}>
           {t("restart", "Restart")}
         </Button>
         <Button
           type="button"
           disabled={busy || probing}
-          style={{ ...buttonLayout, opacity: probing ? 0.65 : 1 }}
+          size="lg"
+          style={{ opacity: probing ? 0.65 : 1 }}
           onClick={() => void handleProbe()}
         >
           {probing ? t("testingConnection", "Testing…") : t("testConnection", "Test connection")}
         </Button>
-        <Button type="button" disabled={busy} variant="danger" style={buttonLayout} onClick={onDelete}>
+        <Button type="button" disabled={busy} variant="danger" size="lg" onClick={onDelete}>
           {t("delete", "Delete")}
         </Button>
       </div>
@@ -1070,7 +1065,7 @@ export function AccountCard({
         <Button
           type="button"
           disabled={busy || !testPeer.trim() || !testMessage.trim()}
-          style={buttonLayout}
+          size="lg"
           onClick={() => onTestSend(testPeer.trim(), testMessage.trim())}
         >
           {t("testSend", "Test send")}
@@ -1125,14 +1120,14 @@ function PairingSection({
               <Button
                 disabled={busy}
                 variant="primary"
-                style={buttonLayout}
+                size="lg"
                 onClick={() => void run(() => call("channels.pairingApprove", { pairingId: pairing.id }))}
               >
                 {t("approve", "Approve")}
               </Button>
               <Button
                 disabled={busy}
-                style={buttonLayout}
+                size="lg"
                 onClick={() => void run(() => call("channels.pairingReject", { pairingId: pairing.id }))}
               >
                 {t("reject", "Reject")}
@@ -1212,7 +1207,7 @@ function BindingRow({
       <div style={{ display: "flex", gap: 5 }}>
         <Button
           disabled={busy}
-          style={buttonLayout}
+          size="lg"
           onClick={() =>
             void run(() =>
               call("channels.bindingUpsert", {
@@ -1226,7 +1221,7 @@ function BindingRow({
         <Button
           disabled={busy}
           variant="danger"
-          style={buttonLayout}
+          size="lg"
           onClick={() => void run(() => call("channels.bindingDelete", { bindingId: binding.id }))}
           title={t("deleteBinding", "Delete binding")}
           aria-label={t("deleteBinding", "Delete binding")}
@@ -1323,11 +1318,7 @@ function ActivitySection({ snapshot }: { snapshot: ChannelsSnapshot }) {
             ))
           )}
           {snapshot.activities.length > 12 && (
-            <Button
-              type="button"
-              style={{ ...buttonLayout, marginTop: 9 }}
-              onClick={() => setShowAll((value) => !value)}
-            >
+            <Button type="button" size="lg" style={{ marginTop: 9 }} onClick={() => setShowAll((value) => !value)}>
               {showAll
                 ? t("showLatestTwelve", "Show latest 12")
                 : `${t("showAllActivity", "Show all")} (${snapshot.activities.length})`}
@@ -1400,14 +1391,14 @@ export function TelegramTokenDialog({
           </div>
         )}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 7, marginTop: 16 }}>
-          <Button type="button" disabled={busy} style={buttonLayout} onClick={onClose}>
+          <Button type="button" disabled={busy} size="lg" onClick={onClose}>
             {t("cancel", "Cancel")}
           </Button>
           <Button
             type="button"
             disabled={busy || !token.trim()}
             variant="primary"
-            style={buttonLayout}
+            size="lg"
             onClick={() => onConnect(token.trim())}
           >
             {busy ? t("testingConnection", "Testing…") : t("saveAndConnect", "Save and connect")}
@@ -1485,7 +1476,7 @@ export function FeishuCredentialDialog({
             aria-selected={mode === "scan"}
             data-testid="feishu-scan-tab"
             variant={mode === "scan" ? "primary" : "default"}
-            style={buttonLayout}
+            size="lg"
             onClick={() => setMode("scan")}
           >
             {t("feishuScanCreate", "Scan to create (recommended)")}
@@ -1496,7 +1487,7 @@ export function FeishuCredentialDialog({
             aria-selected={mode === "manual"}
             data-testid="feishu-manual-tab"
             variant={mode === "manual" ? "primary" : "default"}
-            style={buttonLayout}
+            size="lg"
             onClick={() => setMode("manual")}
           >
             {t("feishuExistingApp", "Existing app")}
@@ -1545,7 +1536,7 @@ export function FeishuCredentialDialog({
             </div>
             <FeishuDialogError error={error} />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 7, marginTop: 16 }}>
-              <Button type="button" disabled={busy} style={buttonLayout} onClick={onClose}>
+              <Button type="button" disabled={busy} size="lg" onClick={onClose}>
                 {t("cancel", "Cancel")}
               </Button>
               <Button
@@ -1553,7 +1544,7 @@ export function FeishuCredentialDialog({
                 data-testid="start-feishu-scan"
                 disabled={busy}
                 variant="primary"
-                style={buttonLayout}
+                size="lg"
                 onClick={() => onStartScan(domain)}
               >
                 {busy ? t("creatingQrCode", "Creating QR code…") : t("createQrCode", "Create QR code")}
@@ -1710,18 +1701,14 @@ function FeishuManualForm({
             type="button"
             data-testid="copy-feishu-permission-json"
             variant="primary"
-            style={buttonLayout}
+            size="lg"
             onClick={() => void copyPermissionJson()}
           >
             {permissionCopyState === "copied"
               ? t("feishuPermissionJsonCopied", "Permission JSON copied")
               : t("copyFeishuPermissionJson", "Copy permission JSON")}
           </Button>
-          <Button
-            type="button"
-            style={buttonLayout}
-            onClick={() => void window.piBridge.openExternal(`${docsBase}/app`)}
-          >
+          <Button type="button" size="lg" onClick={() => void window.piBridge.openExternal(`${docsBase}/app`)}>
             {t("openDeveloperConsole", "Open developer console")}
           </Button>
         </div>
@@ -1729,14 +1716,14 @@ function FeishuManualForm({
 
       <FeishuDialogError error={error} />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 7, marginTop: 16 }}>
-        <Button type="button" disabled={busy} style={buttonLayout} onClick={onClose}>
+        <Button type="button" disabled={busy} size="lg" onClick={onClose}>
           {t("cancel", "Cancel")}
         </Button>
         <Button
           type="button"
           disabled={busy || !appId.trim() || !appSecret.trim()}
           variant="primary"
-          style={buttonLayout}
+          size="lg"
           onClick={() => onConnect(appId.trim(), appSecret.trim(), domain)}
         >
           {busy ? t("testingConnection", "Testing…") : t("saveAndConnect", "Save and connect")}
@@ -1849,7 +1836,7 @@ export function LoginDialog({
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
               placeholder={t("verificationNumber", "Verification number")}
             />
-            <Button type="button" variant="primary" style={buttonLayout} onClick={onSubmitCode}>
+            <Button type="button" variant="primary" size="lg" onClick={onSubmitCode}>
               {t("submit", "Submit")}
             </Button>
           </div>
@@ -1863,11 +1850,11 @@ export function LoginDialog({
         )}
         <div style={{ display: "flex", justifyContent: "center", gap: 7, marginTop: 16 }}>
           {retryable && onRetry && (
-            <Button type="button" variant="primary" style={buttonLayout} onClick={onRetry}>
+            <Button type="button" variant="primary" size="lg" onClick={onRetry}>
               {t("regenerateQrCode", "Generate a new QR code")}
             </Button>
           )}
-          <Button type="button" style={buttonLayout} onClick={onClose}>
+          <Button type="button" size="lg" onClick={onClose}>
             {terminal ? t("close", "Close") : t("cancel", "Cancel")}
           </Button>
         </div>

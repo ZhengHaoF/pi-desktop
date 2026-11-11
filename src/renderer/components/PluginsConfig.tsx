@@ -165,11 +165,6 @@ function ScopeTag({ scope }: { scope: PluginScope }) {
   );
 }
 
-const buttonLayout: React.CSSProperties = {
-  padding: "6px 12px",
-  fontSize: 12,
-};
-
 function Toggle({
   enabled,
   loading,
@@ -323,13 +318,7 @@ function AddPluginPanel({
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <SegmentedScope value={scope} onChange={onScopeChange} />
-        <Button
-          type="button"
-          onClick={onInstall}
-          disabled={busy || !source.trim()}
-          variant="primary"
-          style={buttonLayout}
-        >
+        <Button type="button" onClick={onInstall} disabled={busy || !source.trim()} variant="primary">
           {busy ? t("installing", "Installing…") : t("install", "Install")}
         </Button>
       </div>
@@ -454,13 +443,13 @@ function PackageDetail({
         </div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <Button onClick={() => onAction("update", pkg)} disabled={busy || reloadBusy} style={buttonLayout}>
+          <Button onClick={() => onAction("update", pkg)} disabled={busy || reloadBusy}>
             {busyKey === `update:${key}` ? t("pluginUpdating", "Updating…") : t("pluginUpdate", "Update")}
           </Button>
           <Button
             onClick={onReloadSession}
             disabled={!sessionId || reloadBusy || busy}
-            style={buttonLayout}
+
             title={
               sessionId
                 ? t("pluginReloadCurrentSession", "Reload current session")
@@ -469,12 +458,7 @@ function PackageDetail({
           >
             {reloadBusy ? t("pluginReloading", "Reloading…") : t("pluginReloadSession", "Reload session")}
           </Button>
-          <Button
-            onClick={() => onAction("remove", pkg)}
-            disabled={busy || reloadBusy}
-            variant="danger"
-            style={buttonLayout}
-          >
+          <Button onClick={() => onAction("remove", pkg)} disabled={busy || reloadBusy} variant="danger">
             {busyKey === `remove:${key}` ? t("pluginRemoving", "Removing…") : t("pluginRemove", "Remove")}
           </Button>
         </div>
@@ -1046,14 +1030,10 @@ export function PluginsConfig({
               </span>
             )}
           </div>
-          <Button onClick={() => void loadPlugins()} disabled={loading || busyKey !== null} style={buttonLayout}>
+          <Button onClick={() => void loadPlugins()} disabled={loading || busyKey !== null}>
             {t("refresh", "Refresh")}
           </Button>
-          {!embedded && (
-            <Button onClick={onClose} style={buttonLayout}>
-              {t("close", "Close")}
-            </Button>
-          )}
+          {!embedded && <Button onClick={onClose}>{t("close", "Close")}</Button>}
         </div>
       </div>
     </div>

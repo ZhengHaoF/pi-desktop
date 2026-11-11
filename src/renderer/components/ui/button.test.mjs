@@ -48,6 +48,8 @@ test("sizes expose the shared layout defaults", () => {
   assert.match(renderButton({ size: "sm" }), /min-height:26px/);
   assert.match(renderButton({ size: "icon" }), /width:32px;height:32px/);
   assert.match(renderButton({ size: "icon" }), /padding:0;/);
+  assert.match(renderButton({ size: "lg" }), /min-height:36px/);
+  assert.match(renderButton({ size: "lg" }), /font-size:13px/);
 });
 
 test("block stretches the button and caller style wins over defaults", () => {

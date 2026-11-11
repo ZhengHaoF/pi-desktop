@@ -70,12 +70,17 @@ export default tseslint.config(
     ignores: ["src/renderer/components/ui/Button.tsx"],
     rules: {
       // Button colors live in the shared .pi-btn classes; compose them through
-      // <Button> instead of re-typing the class names at call sites.
+      // <Button> instead of re-typing the class names at call sites. Raw
+      // <button> elements are reserved to the Button component itself.
       "no-restricted-syntax": [
         "error",
         {
           selector: 'JSXAttribute[name.name="className"][value.value=/pi-btn/] , Literal[value=/\\bpi-btn/]',
           message: "Use <Button> from components/ui/Button instead of pi-btn class literals.",
+        },
+        {
+          selector: 'JSXOpeningElement[name.name="button"]',
+          message: "Use <Button> from components/ui/Button instead of raw <button> elements.",
         },
       ],
     },

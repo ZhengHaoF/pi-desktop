@@ -7,7 +7,7 @@
 import type { ButtonHTMLAttributes, CSSProperties, Ref } from "react";
 
 export type ButtonVariant = "default" | "primary" | "danger" | "ghost" | "link" | "dashed";
-export type ButtonSize = "md" | "sm" | "icon";
+export type ButtonSize = "sm" | "md" | "lg" | "icon";
 
 const variantClass: Record<ButtonVariant, string> = {
   default: "pi-btn",
@@ -35,6 +35,14 @@ const smStyle: CSSProperties = {
   fontSize: 11,
 };
 
+/** Settings-form density: 36px-tall rows beside 13px inputs. */
+const lgStyle: CSSProperties = {
+  ...mdStyle,
+  minHeight: 36,
+  padding: "7px 14px",
+  fontSize: 13,
+};
+
 const iconStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -46,8 +54,9 @@ const iconStyle: CSSProperties = {
 };
 
 const sizeStyle: Record<ButtonSize, CSSProperties> = {
-  md: mdStyle,
   sm: smStyle,
+  md: mdStyle,
+  lg: lgStyle,
   icon: iconStyle,
 };
 
