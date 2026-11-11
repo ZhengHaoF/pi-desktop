@@ -193,6 +193,8 @@ export class RelayHub {
     // the host it is addressing; a first-time device presents the one-time
     // token from that PC's QR code. Bindings are per (device, host).
     let issuedDeviceSecret: string | undefined;
+    /** Device peers: the host this connection addresses (drives online flags). */
+    let deviceTargetHostId = "";
     if (role === "device") {
       const auth = payload.auth as { pairingToken?: unknown; deviceSecret?: unknown } | undefined;
       const deviceSecret = typeof auth?.deviceSecret === "string" ? auth.deviceSecret : "";
@@ -201,6 +203,7 @@ export class RelayHub {
       // A hello may omit hostId; relay then routes to the first online host
       // (see ackHostId), so validate the credential against that same host.
       const targetHostId = declaredHostId || this.registry.onlineHosts()[0]?.id || "";
+      deviceTargetHostId = targetHostId;
       let paired = false;
       // A fresh scan token wins over a stale credential. Re-pairing only
       // replaces the binding for the scanned host, other PCs stay paired.
@@ -234,6 +237,7 @@ export class RelayHub {
       appVersion: typeof payload.appVersion === "string" ? payload.appVersion : undefined,
       protocolVersion: 1,
       connectedAt: Date.now(),
+      ...(role === "device" && deviceTargetHostId ? { addressedHostId: deviceTargetHostId } : {}),
       send: (data) => {
         if (ws.readyState === WebSocket.OPEN) ws.send(data);
       },
@@ -418,6 +422,14 @@ export class RelayHub {
         from.close(4002, "only hosts may list paired devices");
         return;
       }
+      // Per-device online flag: the device must have a live connection AND be
+      // addressing this host (multi-PC — a phone talking to another PC shows
+      // offline here).
+      const devices = this.pairing.listDevices(from.id).map((binding) => {
+        const peer = this.registry.get(binding.deviceId);
+        const online = peer?.role === "device" && peer.addressedHostId === from.id;
+        return { ...binding, online };
+      });
       from.send(
         JSON.stringify({
           v: 1,
@@ -425,7 +437,7 @@ export class RelayHub {
           ts: Date.now(),
           nonce: randomUUID(),
           role: "relay",
-          payload: { kind: "pair.devices.result", devices: this.pairing.listDevices(from.id) },
+          payload: { kind: "pair.devices.result", devices },
         }),
       );
       return;
@@ -443,6 +455,11 @@ export class RelayHub {
     }
     const targetId =
       from.role === "device" ? (envelope.hostId as string | undefined) : (envelope.deviceId as string | undefined);
+    // Keep the device's addressed host fresh so pair.devices reports accurate
+    // online flags (a device re-handshakes to switch hosts; this is a safety net).
+    if (from.role === "device" && typeof targetId === "string" && targetId !== from.addressedHostId) {
+      from.addressedHostId = targetId;
+    }
     const decision = this.registry.route(from, targetId);
     if (!decision.ok || !decision.target) {
       // A momentarily-absent peer (device reconnect window, stale deviceId)

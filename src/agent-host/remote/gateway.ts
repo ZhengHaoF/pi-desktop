@@ -148,11 +148,6 @@ export class RemoteGateway {
     return this.state;
   }
 
-  /** Devices seen on this relay session (for status display). */
-  getDeviceCount(): number {
-    return this.knownDevices.size;
-  }
-
   /** Outbound-only connection. Never binds a port. */
   async start(): Promise<void> {
     if (this.state !== "stopped") return;

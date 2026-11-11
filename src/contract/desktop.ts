@@ -168,8 +168,6 @@ export interface RemoteControlStatus {
   /** disabled: switch off; connecting/ready/stopped: gateway link states. */
   state: "disabled" | "connecting" | "ready" | "stopped";
   relayUrl: string;
-  /** Devices currently seen by the gateway on this relay session. */
-  deviceCount: number;
   lastError?: string;
 }
 

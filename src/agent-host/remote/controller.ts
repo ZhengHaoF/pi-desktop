@@ -117,13 +117,13 @@ export class RemoteControlController {
     return result.revoked === true;
   }
 
-  /** Paired devices bound to this host (secrets excluded). */
-  async listDevices(): Promise<Array<{ deviceId: string; label?: string; pairedAt: number }>> {
+  /** Paired devices bound to this host (secrets excluded; online flag per device). */
+  async listDevices(): Promise<Array<{ deviceId: string; label?: string; pairedAt: number; online: boolean }>> {
     const gateway = this.gateway;
     if (!gateway) throw new Error("remote control is disabled");
     const result = await gateway.sendControl("pair.devices");
     return Array.isArray(result.devices)
-      ? (result.devices as Array<{ deviceId: string; label?: string; pairedAt: number }>)
+      ? (result.devices as Array<{ deviceId: string; label?: string; pairedAt: number; online: boolean }>)
       : [];
   }
 
@@ -211,7 +211,6 @@ export class RemoteControlController {
     const status: RemoteControlStatus = {
       state,
       relayUrl: this.config?.relayUrl ?? "",
-      deviceCount: this.gateway?.getDeviceCount() ?? 0,
       ...(lastError ? { lastError } : {}),
     };
     // Only push on change to keep the parentPort quiet.
@@ -220,7 +219,6 @@ export class RemoteControlController {
       prev &&
       prev.state === status.state &&
       prev.relayUrl === status.relayUrl &&
-      prev.deviceCount === status.deviceCount &&
       prev.lastError === status.lastError
     ) {
       return;

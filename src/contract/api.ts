@@ -592,7 +592,7 @@ export interface Api {
   "remote.pair.revoke": { params: { deviceId: string }; result: { revoked: boolean } };
   "remote.pair.devices": {
     params: void;
-    result: { devices: Array<{ deviceId: string; label?: string; pairedAt: number }> };
+    result: { devices: Array<{ deviceId: string; label?: string; pairedAt: number; online: boolean }> };
   };
 }
 

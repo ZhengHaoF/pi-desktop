@@ -764,6 +764,52 @@ async function reconnectWithSecret(
   return outcome;
 }
 
+interface ListedDevice {
+  deviceId: string;
+  label?: string;
+  pairedAt: number;
+  online?: boolean;
+}
+
+async function listPairedDevices(host: WebSocket, traceId: string): Promise<ListedDevice[]> {
+  host.send(
+    JSON.stringify({
+      v: 1,
+      traceId,
+      ts: Date.now(),
+      nonce: traceId,
+      role: "host",
+      control: "pair.devices",
+      payload: { kind: "pair.devices" },
+    }),
+  );
+  const listed = JSON.parse(await nextMessage(host)) as {
+    payload: { kind: string; devices: ListedDevice[] };
+  };
+  assert.equal(listed.payload.kind, "pair.devices.result");
+  return listed.payload.devices;
+}
+
+/** Device close is asynchronous on the relay side; wait for the registry to settle. */
+async function waitForOnlineFlag(
+  host: WebSocket,
+  deviceId: string,
+  expected: boolean,
+  timeoutMs = 3000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const devices = await listPairedDevices(host, `poll-${Date.now()}`);
+    const entry = devices.find((device) => device.deviceId === deviceId);
+    if (entry && entry.online === expected) return;
+    if (Date.now() > deadline) {
+      assert.equal(entry?.online, expected, `device ${deviceId} online flag did not settle to ${expected}`);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
+
 test("relay: one device pairs with two hosts; credentials are host-scoped", { timeout: 20000 }, async () => {
   const relay = await startRelay(testConfig({ pairingRequired: true }));
   try {
@@ -888,6 +934,90 @@ test("relay: pair.unbind lets a device drop only its own host binding", { timeou
       "ok",
       "unbinding one host must leave the other usable",
     );
+    hostB.close();
+  } finally {
+    await relay.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// pair.devices online flags: the count a PC shows must match its own rows.
+// ---------------------------------------------------------------------------
+
+test("relay: pair.devices marks a live device online and offline after disconnect", { timeout: 20000 }, async () => {
+  const relay = await startRelay(testConfig({ pairingRequired: true }));
+  try {
+    const { ws: host } = await helloHostWithId(relay.url, "host-online-1");
+    const secret = await pairDeviceWithToken(
+      relay.url,
+      "dev-online",
+      "host-online-1",
+      await requestPairToken(host, "pc-online-1"),
+    );
+
+    // Pairing binds the device while its connection closes right after; the
+    // flag must be false until it reconnects under the stored credential.
+    await waitForOnlineFlag(host, "dev-online", false);
+    const listed = await listPairedDevices(host, "pd-online-1");
+    assert.deepEqual(
+      listed.map((device) => device.deviceId),
+      ["dev-online"],
+    );
+    assert.equal(listed[0].online, false);
+
+    // Live connection addressing this host → online.
+    const device = await connect(relay.url, "device");
+    device.send(
+      pairingHello("device", { deviceId: "dev-online", hostId: "host-online-1", auth: { deviceSecret: secret } }),
+    );
+    const ack = JSON.parse(await nextMessage(device)) as { payload: { kind: string } };
+    assert.equal(ack.payload.kind, "hello_ack");
+    await waitForOnlineFlag(host, "dev-online", true);
+
+    // Disconnect → the same row flips back to offline (no ghost entries).
+    const closed = nextClose(device);
+    device.close();
+    await closed;
+    await waitForOnlineFlag(host, "dev-online", false);
+    assert.equal((await listPairedDevices(host, "pd-online-2")).length, 1);
+    host.close();
+  } finally {
+    await relay.close();
+  }
+});
+
+test("relay: pair.devices reports offline when the device addresses another PC", { timeout: 20000 }, async () => {
+  const relay = await startRelay(testConfig({ pairingRequired: true }));
+  try {
+    const { ws: hostA } = await helloHostWithId(relay.url, "host-switch-a");
+    const { ws: hostB } = await helloHostWithId(relay.url, "host-switch-b");
+    await pairDeviceWithToken(relay.url, "dev-switch", "host-switch-a", await requestPairToken(hostA, "pc-switch-a"));
+    const secretB = await pairDeviceWithToken(
+      relay.url,
+      "dev-switch",
+      "host-switch-b",
+      await requestPairToken(hostB, "pc-switch-b"),
+    );
+
+    // The phone is online, but it is talking to PC B.
+    const device = await connect(relay.url, "device");
+    device.send(
+      pairingHello("device", { deviceId: "dev-switch", hostId: "host-switch-b", auth: { deviceSecret: secretB } }),
+    );
+    const ack = JSON.parse(await nextMessage(device)) as { payload: { kind: string } };
+    assert.equal(ack.payload.kind, "hello_ack");
+
+    await waitForOnlineFlag(hostB, "dev-switch", true);
+    // PC A still lists the binding (paired once) but must not claim it online.
+    await waitForOnlineFlag(hostA, "dev-switch", false);
+    const listedA = await listPairedDevices(hostA, "pd-switch-a");
+    assert.deepEqual(
+      listedA.map((entry) => [entry.deviceId, entry.online]),
+      [["dev-switch", false]],
+    );
+
+    device.close();
+    hostA.close();
     hostB.close();
   } finally {
     await relay.close();

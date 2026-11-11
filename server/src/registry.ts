@@ -13,6 +13,8 @@ export interface PeerMeta {
   appVersion?: string;
   protocolVersion: number;
   connectedAt: number;
+  /** Device peers only: the host this device addressed at hello (updated on routed frames). */
+  addressedHostId?: string;
   send: (data: string) => void;
   close: (code: number, reason: string) => void;
 }

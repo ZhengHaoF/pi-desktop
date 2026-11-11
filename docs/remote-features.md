@@ -83,7 +83,7 @@ cd mobile && flutter run -d 192.168.31.118:38043 # 真机无线调试
 - [ ] **真机端到端**（MuMu/真机 + 桌面 app）：扫码配对 → 加密会话聊天，与 Step 1 扫码待办合并验证
 
 ### 配对凭证（Step 1）✅ 新增
-- [x] **Relay**：`pairingRequired` 配置（默认 true，诊断需 `RELAY_ALLOW_PLAINTEXT_PUBLIC=diagnostic`）；`PairingService` 设备绑定表（`pairDevice`/`verifyDevice`/`revokeDevice`/`listDevices`，secret 哈希存储、timingSafeEqual 校验）；control 帧 `pair.create` / `pair.revoke` / `pair.devices`（仅 host 可发，cipher gate 之前处理，payload 只含元数据）
+- [x] **Relay**：`pairingRequired` 配置（默认 true，诊断需 `RELAY_ALLOW_PLAINTEXT_PUBLIC=diagnostic`）；`PairingService` 设备绑定表（`pairDevice`/`verifyDevice`/`revokeDevice`/`listDevices`，secret 哈希存储、timingSafeEqual 校验）；control 帧 `pair.create` / `pair.revoke` / `pair.devices`（仅 host 可发，cipher gate 之前处理，payload 只含元数据）。`pair.devices` 每条绑定附带 `online` 标记（设备在线 **且** 正寻址本机才为 true；多 PC 下手机连另一台电脑时本机显示离线），设置卡片的状态栏数字与设备列表同源，不会再出现「已连接 2 台但列表为空」
 - [x] **hello 配对闸门**：device hello 的 `auth` 支持 `pairingToken`（一次性扫码令牌 → 自动批准绑定 + 签发 `deviceSecret`）与 `deviceSecret`（重连凭证）；新 token 优先于旧凭证（支持重新配对）；`pairingRequired` 下无有效凭证 close 4003 并审计
 - [x] **桌面**：gateway `sendControl`（traceId 关联 relay 的 `*.result` 帧，5s 超时）；RPC `remote.pair.create/revoke/devices`（契约注册于 registerHandlers）；设置卡片新增「设备配对」区——添加设备（生成含 `{v,relayUrl,hostId,token}` 的配对二维码）、已配对设备列表 + 撤销（撤销即踢掉在线连接）
 - [x] **手机**：`parseRelayQr` 支持 JSON 配对载荷（兼容纯 URL）；deviceId 持久化（`remote.deviceId`）；配对成功自动保存 relay 签发的 `deviceSecret`；重连 hello 携带凭证，免重复扫码

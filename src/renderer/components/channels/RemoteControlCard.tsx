@@ -98,7 +98,9 @@ export function RemoteControlCard() {
   const [pairing, setPairing] = useState<{ token: string; expiresAt: number } | null>(null);
   const [pairingBusy, setPairingBusy] = useState(false);
   const [pairingError, setPairingError] = useState("");
-  const [devices, setDevices] = useState<Array<{ deviceId: string; label?: string; pairedAt: number }>>([]);
+  const [devices, setDevices] = useState<
+    Array<{ deviceId: string; label?: string; pairedAt: number; online: boolean }>
+  >([]);
   const [reconnecting, setReconnecting] = useState(false);
 
   const loadLanAddresses = useCallback(async () => {
@@ -124,13 +126,6 @@ export function RemoteControlCard() {
       if (!disposed) setRelayStatus(status);
     });
     void loadLanAddresses();
-    void call("remote.pair.devices")
-      .then((result) => {
-        if (!disposed) setDevices(result.devices ?? []);
-      })
-      .catch(() => {
-        /* remote control may be disabled; list stays empty */
-      });
     const unsubRemote = window.piBridge.onRemoteStatus((status) => {
       if (disposed) return;
       setRemoteStatus(status);
@@ -193,14 +188,26 @@ export function RemoteControlCard() {
     });
   }, [reconnecting, draft.enabled]);
 
-  const loadDevices = useCallback(async () => {
+  const loadDevices = useCallback(async (opts?: { quiet?: boolean }) => {
     try {
       const result = await call("remote.pair.devices");
       setDevices(result.devices ?? []);
     } catch (err) {
-      setPairingError(err instanceof Error ? err.message : String(err));
+      // Poll-triggered refreshes stay silent (transient drops); user-facing
+      // loads surface the error so "empty list" is never mistaken for a bug.
+      if (!opts?.quiet) setPairingError(err instanceof Error ? err.message : String(err));
     }
   }, []);
+
+  // Paired/online counts live on the relay: reload when the gateway link is
+  // ready and poll lightly so the online flags stay fresh.
+  const remoteReady = remoteStatus?.state === "ready";
+  useEffect(() => {
+    if (!draft.enabled || !remoteReady) return;
+    void loadDevices();
+    const timer = window.setInterval(() => void loadDevices({ quiet: true }), 10_000);
+    return () => window.clearInterval(timer);
+  }, [draft.enabled, remoteReady, loadDevices]);
 
   const createPairingQr = useCallback(async () => {
     setPairingBusy(true);
@@ -232,6 +239,9 @@ export function RemoteControlCard() {
   const preferred = lanAddresses.find((entry) => entry.preferred) ?? lanAddresses[0] ?? null;
   const active = lanAddresses.find((entry) => entry.url === selectedUrl) ?? preferred;
   const isLan = draft.mode === "lan";
+  // Same source as the list below (relay pair.devices) — the count can never
+  // disagree with the paired-device rows again.
+  const onlineCount = devices.filter((device) => device.online).length;
 
   // 手机扫码载荷：relay 地址 + 目标 hostId + 一次性配对 token。
   const pairingQrValue = useMemo(() => {
@@ -287,7 +297,8 @@ export function RemoteControlCard() {
           <span style={{ width: 9, height: 9, borderRadius: 999, background: statusColor(indicator), flex: "none" }} />
           <span style={{ fontSize: 12, color: "var(--text)", fontWeight: 600 }}>{relayStateLabel}</span>
           <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
-            {t("remoteConnectedDevices", "Connected devices")}: {remoteStatus?.deviceCount ?? 0}
+            {t("remotePairedDevices", "Paired devices")}: {devices.length}
+            {devices.length > 0 ? ` · ${t("remoteOnlineDevices", "online")}: ${onlineCount}` : null}
           </span>
           {draft.enabled && (
             <button
@@ -569,6 +580,16 @@ export function RemoteControlCard() {
             <div style={{ display: "grid", gap: 4 }}>
               {devices.map((device) => (
                 <div key={device.deviceId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                  <span
+                    title={device.online ? t("remoteDeviceOnline", "online") : t("remoteDeviceOffline", "offline")}
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: 999,
+                      flex: "none",
+                      background: device.online ? "#07c160" : "var(--text-dim)",
+                    }}
+                  />
                   <span style={{ flex: 1, color: "var(--text)" }}>
                     {device.label?.trim() ? device.label : device.deviceId}
                     <span style={{ color: "var(--text-dim)", marginLeft: 8, fontSize: 11 }}>

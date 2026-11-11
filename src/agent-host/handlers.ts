@@ -54,7 +54,7 @@ import { clearHerdrBridge, initializeHerdrBridge } from "./herdr/runtime";
 export interface RemotePairingPort {
   createPairingToken(): Promise<{ token: string; expiresAt: number }>;
   revokeDevice(deviceId: string): Promise<boolean>;
-  listDevices(): Promise<Array<{ deviceId: string; label?: string; pairedAt: number }>>;
+  listDevices(): Promise<Array<{ deviceId: string; label?: string; pairedAt: number; online: boolean }>>;
 }
 
 export function registerHandlers(
