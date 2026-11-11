@@ -22,6 +22,7 @@ import { SessionProfiler } from "./SessionProfiler";
 import { EnlargableImage } from "./ImageLightbox";
 import { useI18n } from "@/i18n";
 import { scaledChatFont } from "@/lib/chat-appearance";
+import { Button } from "@/components/ui/Button";
 
 interface MarkdownBodyProps {
   children: string;
@@ -342,7 +343,7 @@ function MermaidBlock({ code, isStreaming }: { code: string; isStreaming?: boole
   }, [code, currentKey, isDark, isStreaming, showPreview]);
 
   const previewButton = (
-    <button
+    <Button
       onClick={() => setShowPreview((v) => !v)}
       disabled={isStreaming}
       title={
@@ -355,7 +356,7 @@ function MermaidBlock({ code, isStreaming }: { code: string; isStreaming?: boole
       className={["markdown-code-action", showPreview ? "is-active" : ""].filter(Boolean).join(" ")}
     >
       {showPreview ? "Source" : "Preview"}
-    </button>
+    </Button>
   );
 
   if (!showPreview || isStreaming) {
@@ -402,9 +403,9 @@ const CodeBlock = memo(function CodeBlock({
         <span className="markdown-code-lang">{lang || "text"}</span>
         <div className="markdown-code-actions">
           {headerAction}
-          <button onClick={() => void copy(code)} className="markdown-code-action">
+          <Button onClick={() => void copy(code)} className="markdown-code-action">
             {copied ? "copied" : "copy"}
-          </button>
+          </Button>
         </div>
       </div>
       {!isStreaming && shouldHighlightCode(code) ? (

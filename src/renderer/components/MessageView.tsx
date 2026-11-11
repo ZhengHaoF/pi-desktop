@@ -467,7 +467,7 @@ function SkillInvocationView({
         color: "var(--text)",
       }}
     >
-      <button
+      <Button
         type="button"
         className="skill-invocation-toggle"
         aria-expanded={expanded}
@@ -517,7 +517,7 @@ function SkillInvocationView({
         >
           {invocation.name}
         </span>
-      </button>
+      </Button>
 
       {expanded && (
         <div
@@ -1563,7 +1563,7 @@ function CompactionMessageView({ message }: { message: CustomMessage }) {
           background: "var(--bg)",
         }}
       >
-        <button
+        <Button
           type="button"
           className="compaction-summary-toggle"
           aria-expanded={expanded}
@@ -1606,7 +1606,7 @@ function CompactionMessageView({ message }: { message: CustomMessage }) {
           {time && (
             <span style={{ marginLeft: "auto", color: "var(--text-dim)", fontSize: scaledChatFont(10) }}>{time}</span>
           )}
-        </button>
+        </Button>
 
         {expanded && (
           <div style={{ padding: "11px 13px 12px" }}>

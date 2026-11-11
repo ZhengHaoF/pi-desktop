@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "@/i18n";
+import { Button } from "@/components/ui/Button";
 import type { ModelsConfigSelection, ProviderEntry } from "@/lib/models-config-state";
 
 export function CustomProviderTree({
@@ -52,8 +53,7 @@ export function CustomProviderTree({
         return (
           <div key={name} className="custom-model-tree-group">
             <div className="custom-model-tree-provider" data-selected={selected}>
-              <button
-                type="button"
+              <Button
                 className="custom-model-tree-toggle"
                 aria-expanded={open}
                 aria-label={(open
@@ -75,9 +75,8 @@ export function CustomProviderTree({
                 >
                   <path d="m9 5 7 7-7 7" />
                 </svg>
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
                 className="custom-model-tree-name"
                 title={name}
                 aria-current={selected ? "page" : undefined}
@@ -85,7 +84,7 @@ export function CustomProviderTree({
               >
                 <span>{name}</span>
                 <small>{provider.models?.length ?? 0}</small>
-              </button>
+              </Button>
             </div>
             {open && (
               <div className="custom-model-tree-models">
@@ -96,8 +95,7 @@ export function CustomProviderTree({
                   const label = model.name || model.id.slice(slash + 1) || t("modelNewModel", "new model");
                   const prefix = model.name ? model.id : slash >= 0 ? model.id.slice(0, slash) : "";
                   return (
-                    <button
-                      type="button"
+                    <Button
                       key={index}
                       className="custom-model-tree-model"
                       data-selected={active}
@@ -108,12 +106,12 @@ export function CustomProviderTree({
                     >
                       <span>{label}</span>
                       {prefix && <small>{prefix}</small>}
-                    </button>
+                    </Button>
                   );
                 })}
-                <button type="button" className="custom-model-tree-add" onClick={() => onAddModel(name)}>
+                <Button className="custom-model-tree-add" onClick={() => onAddModel(name)}>
                   {t("modelAddModelAction", "Add model")}
-                </button>
+                </Button>
               </div>
             )}
           </div>
