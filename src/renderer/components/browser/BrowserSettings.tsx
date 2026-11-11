@@ -10,6 +10,7 @@ import type {
   BrowserRendererState,
   BrowserSettingsPatch,
 } from "../../../contract/browser";
+import { Button } from "@/components/ui/Button";
 
 export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
   const { language, t } = useI18n();
@@ -314,9 +315,8 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                     )}
                   </span>
                   {state.runtimeSessionGrants[sessionId] && (
-                    <button
+                    <Button
                       type="button"
-                      className="pi-btn"
                       style={buttonLayout}
                       onClick={() =>
                         void window.piBridge
@@ -326,7 +326,7 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                       }
                     >
                       {t("browserRevokeTemporaryPermission", "Revoke permission")}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </Field>
@@ -494,8 +494,7 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
               <Field label={t("browserApprovedDirectory", "Approved directory")}>
                 <div style={{ display: "flex", gap: 8 }}>
                   <input style={{ ...inputStyle, flex: 1 }} readOnly value={settings.downloads.directory ?? ""} />
-                  <button
-                    className="pi-btn"
+                  <Button
                     style={buttonLayout}
                     onClick={() =>
                       void window.piBridge.selectDirectory().then((directory) => {
@@ -504,7 +503,7 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                     }
                   >
                     {t("browserChoose", "Choose…")}
-                  </button>
+                  </Button>
                 </div>
               </Field>
             )}
@@ -567,8 +566,7 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                   </Field>
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  <button
-                    className="pi-btn"
+                  <Button
                     style={buttonLayout}
                     disabled={!proxyUsername || !proxyPassword}
                     onClick={() =>
@@ -583,10 +581,9 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                     }
                   >
                     {t("browserStoreCredentials", "Store credentials securely")}
-                  </button>
+                  </Button>
                   {settings.proxy.credentialSecretRef && (
-                    <button
-                      className="pi-btn"
+                    <Button
                       style={buttonLayout}
                       onClick={() =>
                         void window.piBridge
@@ -596,7 +593,7 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                       }
                     >
                       {t("browserRemoveCredentials", "Remove stored credentials")}
-                    </button>
+                    </Button>
                   )}
                   <span style={{ color: "var(--text-dim)", fontSize: 11 }}>
                     {settings.proxy.credentialSecretRef
@@ -683,8 +680,7 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
               )}
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                className="pi-btn"
+              <Button
                 style={buttonLayout}
                 onClick={() =>
                   void Promise.all(
@@ -695,19 +691,15 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                 }
               >
                 {t("browserClearAllData", "Clear all browser data")}
-              </button>
-              <button className="pi-btn" style={buttonLayout} onClick={() => void window.piBridge.exportDiagnostics()}>
+              </Button>
+              <Button style={buttonLayout} onClick={() => void window.piBridge.exportDiagnostics()}>
                 {t("browserExportDiagnostics", "Export redacted diagnostics")}
-              </button>
-              <button
-                className="pi-btn"
-                style={buttonLayout}
-                onClick={() => void window.piBridge.browserCloseAllTabs().then(refresh)}
-              >
+              </Button>
+              <Button style={buttonLayout} onClick={() => void window.piBridge.browserCloseAllTabs().then(refresh)}>
                 {t("browserCloseAllTabs", "Close all tabs")}
-              </button>
-              <button
-                className="pi-btn pi-btn-danger"
+              </Button>
+              <Button
+                variant="danger"
                 style={buttonLayout}
                 onClick={() => {
                   if (
@@ -723,7 +715,7 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                 }}
               >
                 {t("browserReset", "Reset Browser")}
-              </button>
+              </Button>
             </div>
           </Section>
         </div>
@@ -888,8 +880,7 @@ function HeaderRulesSection({
               </div>
               <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{rule.urlPattern}</div>
             </div>
-            <button
-              className="pi-btn"
+            <Button
               style={smallButtonLayout}
               disabled={disabled || !directionEnabled}
               onClick={() =>
@@ -900,7 +891,7 @@ function HeaderRulesSection({
               }
             >
               {t("browserDelete", "Delete")}
-            </button>
+            </Button>
           </div>
         ))}
       </div>
@@ -946,8 +937,7 @@ function HeaderRulesSection({
           />
         </>
       )}
-      <button
-        className="pi-btn"
+      <Button
         style={buttonLayout}
         disabled={
           disabled ||
@@ -960,7 +950,7 @@ function HeaderRulesSection({
         onClick={() => void add()}
       >
         {t("browserAddHeaderRule", "Add header rule")}
-      </button>
+      </Button>
     </Section>
   );
 }
@@ -1020,8 +1010,7 @@ function SnippetSection({
                   })}
                 </div>
               </div>
-              <button
-                className="pi-btn"
+              <Button
                 style={smallButtonLayout}
                 onClick={() =>
                   void window.piBridge
@@ -1031,9 +1020,8 @@ function SnippetSection({
                 }
               >
                 {snippet.enabled ? t("browserDisable", "Disable") : t("browserEnable", "Enable")}
-              </button>
-              <button
-                className="pi-btn"
+              </Button>
+              <Button
                 style={smallButtonLayout}
                 onClick={() =>
                   void window.piBridge
@@ -1043,13 +1031,12 @@ function SnippetSection({
                 }
               >
                 {t("browserDelete", "Delete")}
-              </button>
+              </Button>
             </div>
           ))}
         </div>
       )}
-      <button
-        className="pi-btn"
+      <Button
         style={buttonLayout}
         disabled={snippets.length === 0}
         onClick={() =>
@@ -1060,7 +1047,7 @@ function SnippetSection({
         }
       >
         {t("browserClearJavascriptExperience", "Clear JavaScript experiences")}
-      </button>
+      </Button>
     </Section>
   );
 }
@@ -1140,16 +1127,15 @@ function ProfileSection({
                   {proxyModeLabel(t, profile.proxyMode)}
                 </div>
               </div>
-              <button className="pi-btn" style={smallButtonLayout} onClick={() => void clear(profile.id, "all")}>
+              <Button style={smallButtonLayout} onClick={() => void clear(profile.id, "all")}>
                 {t("browserClearData", "Clear data")}
-              </button>
+              </Button>
               {profile.id !== "temporary" && (
                 <>
-                  <button className="pi-btn" style={smallButtonLayout} onClick={() => void rename(profile)}>
+                  <Button style={smallButtonLayout} onClick={() => void rename(profile)}>
                     {t("browserRename", "Rename")}
-                  </button>
-                  <button
-                    className="pi-btn"
+                  </Button>
+                  <Button
                     style={smallButtonLayout}
                     onClick={() => {
                       if (
@@ -1167,30 +1153,21 @@ function ProfileSection({
                     }}
                   >
                     {t("browserDelete", "Delete")}
-                  </button>
+                  </Button>
                 </>
               )}
             </div>
           ))}
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            className="pi-btn"
-            style={buttonLayout}
-            onClick={() => void create(saveLoginState ? "persistent" : "ephemeral")}
-          >
+          <Button style={buttonLayout} onClick={() => void create(saveLoginState ? "persistent" : "ephemeral")}>
             {formatMessage(t("browserNewProfile", "New Profile ({mode})"), {
               mode: saveLoginState ? profileModeLabel(t, "persistent") : t("browserModeEphemeral", "temporary"),
             })}
-          </button>
-          <button
-            className="pi-btn"
-            style={buttonLayout}
-            disabled={!advancedModeEnabled}
-            onClick={() => void create("unsafe")}
-          >
+          </Button>
+          <Button style={buttonLayout} disabled={!advancedModeEnabled} onClick={() => void create("unsafe")}>
             {t("browserNewAdvancedProfile", "New advanced Profile")}
-          </button>
+          </Button>
         </div>
       </Section>
       {prompt && <TextPromptDialog prompt={prompt} cancelLabel={t("cancel", "Cancel")} onRespond={respondToPrompt} />}
@@ -1316,17 +1293,17 @@ function TextPromptDialog({
           onChange={(event) => setValue(event.target.value)}
         />
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <button type="button" className="pi-btn" style={buttonLayout} onClick={() => onRespond(null)}>
+          <Button type="button" style={buttonLayout} onClick={() => onRespond(null)}>
             {cancelLabel}
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
-            className="pi-btn pi-btn-primary"
+            variant="primary"
             style={{ ...buttonLayout, color: "var(--accent-contrast)" }}
             disabled={!canSubmit}
           >
             {prompt.confirmLabel}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

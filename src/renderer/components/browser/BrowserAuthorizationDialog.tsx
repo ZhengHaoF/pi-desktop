@@ -1,6 +1,7 @@
 import { useEffect, useRef, type CSSProperties } from "react";
 import { useI18n } from "@/i18n";
 import type { BrowserAgentAuthorizationDecision, BrowserAgentAuthorizationRequest } from "../../../contract/browser";
+import { Button } from "@/components/ui/Button";
 
 export function BrowserAuthorizationDialog({
   request,
@@ -160,20 +161,15 @@ export function BrowserAuthorizationDialog({
           )}
         </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-          <button type="button" onClick={onManage} className="pi-btn" style={buttonStyle}>
+          <Button type="button" onClick={onManage} style={buttonStyle}>
             {t("browserAuthorizationManage", "Manage permanent permission…")}
-          </button>
-          <button ref={denyRef} type="button" onClick={() => onRespond("deny")} className="pi-btn" style={buttonStyle}>
+          </Button>
+          <Button ref={denyRef} type="button" onClick={() => onRespond("deny")} style={buttonStyle}>
             {t("browserDeny", "Deny")}
-          </button>
-          <button
-            type="button"
-            onClick={() => onRespond("allow-session")}
-            className="pi-btn pi-btn-primary"
-            style={primaryButtonStyle}
-          >
+          </Button>
+          <Button type="button" onClick={() => onRespond("allow-session")} variant="primary" style={primaryButtonStyle}>
             {t("browserAllowCurrentAgentSession", "Allow current Agent session")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
