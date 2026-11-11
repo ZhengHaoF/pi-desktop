@@ -8,6 +8,7 @@ import { useI18n } from "@/i18n";
 import { type ModelEntry, type ProviderEntry } from "@/lib/models-config-state";
 import { call } from "@/lib/api-client";
 import type { ModelInfoFillResult } from "@contract/types";
+import { Button } from "@/components/ui/Button";
 
 /** Public database behind the "fill model info" action. */
 const MODELS_DEV_URL = "https://models.dev";
@@ -64,18 +65,18 @@ export function ProviderDetail({
         </div>
         <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
           {onAddModel && (
-            <button type="button" onClick={onAddModel} className="custom-model-secondary-action">
+            <Button type="button" onClick={onAddModel} className="custom-model-secondary-action">
               {t("modelAddModelAction", "Add model")}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
             onClick={onDelete}
-            className="pi-btn pi-btn-danger"
+            variant="danger"
             style={{ minHeight: 32, padding: "0 10px", borderRadius: 5, fontSize: 12 }}
           >
             {t("delete", "Delete")}
-          </button>
+          </Button>
         </div>
       </div>
       <div
@@ -83,12 +84,12 @@ export function ProviderDetail({
         role="group"
         aria-label={t("modelProviderSections", "Provider settings sections")}
       >
-        <button type="button" aria-pressed={section === "connection"} onClick={() => setSection("connection")}>
+        <Button type="button" aria-pressed={section === "connection"} onClick={() => setSection("connection")}>
           {t("modelConnectionSection", "Connection & discovery")}
-        </button>
-        <button type="button" aria-pressed={section === "advanced"} onClick={() => setSection("advanced")}>
+        </Button>
+        <Button type="button" aria-pressed={section === "advanced"} onClick={() => setSection("advanced")}>
           {t("modelAdvancedSection", "Advanced")}
-        </button>
+        </Button>
       </div>
       <div hidden={section !== "connection"}>
         <div className="custom-model-fields">
@@ -559,26 +560,26 @@ export function ModelDetail({
           {result.stale ? ` ${t("modelFillInfoStaleCache", "(offline cache)")}` : ""}
         </span>
         {source?.kind === "models-dev" && (
-          <button
+          <Button
             type="button"
             onClick={() => void window.piBridge?.openExternal(MODELS_DEV_URL)}
             title={t("modelFillInfoOpenSource", "Open models.dev")}
             aria-label={t("modelFillInfoOpenSource", "Open models.dev")}
-            className="pi-btn pi-btn-link"
+            variant="link"
             style={{ padding: 0, fontSize: 11, textDecoration: "underline" }}
           >
             ↗
-          </button>
+          </Button>
         )}
         {filledCount > 0 && fillSnapshot.current && (
-          <button
+          <Button
             type="button"
             onClick={handleUndoFill}
-            className="pi-btn pi-btn-ghost"
+            variant="ghost"
             style={{ padding: "0 2px", fontSize: 11, textDecoration: "underline", borderRadius: 3 }}
           >
             {t("modelFillInfoUndo", "Undo")}
-          </button>
+          </Button>
         )}
       </div>
     );
@@ -625,12 +626,11 @@ export function ModelDetail({
               {testSummary}
             </span>
           )}
-          <button
+          <Button
             type="button"
             onClick={handleTest}
             disabled={!model.id.trim() || testState.phase === "testing"}
             title={t("modelTestConnection", "Test model connection")}
-            className="pi-btn"
             style={{
               height: 32,
               padding: "0 10px",
@@ -665,7 +665,7 @@ export function ModelDetail({
               : testState.phase === "success"
                 ? "OK"
                 : t("modelTest", "Test")}
-          </button>
+          </Button>
           {defaultState.phase === "error" && (
             <span
               title={defaultState.message}
@@ -689,12 +689,11 @@ export function ModelDetail({
               {defaultState.message || t("modelSetDefaultFailed", "Failed to set the default model.")}
             </span>
           )}
-          <button
+          <Button
             type="button"
             onClick={handleSetDefault}
             disabled={isDefault || !model.id.trim() || savingDefault}
             title={t("modelSetAsDefaultHint", "New conversations start with this model")}
-            className="pi-btn"
             style={{
               height: 32,
               padding: "0 10px",
@@ -712,15 +711,15 @@ export function ModelDetail({
               : isDefault
                 ? t("modelCurrentDefault", "Default")
                 : t("modelSetAsDefault", "Set as default")}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={onDelete}
-            className="pi-btn pi-btn-danger"
+            variant="danger"
             style={{ height: 32, padding: "0 10px", borderRadius: 4, fontSize: 12, boxSizing: "border-box" }}
           >
             {t("modelRemove", "Remove")}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -757,7 +756,7 @@ export function ModelDetail({
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <button
+        <Button
           type="button"
           onClick={() => void handleFillInfo()}
           disabled={!model.id.trim() || fillState.phase === "loading"}
@@ -765,7 +764,6 @@ export function ModelDetail({
             "modelFillInfoHint",
             "Fills context window, max output tokens, and pricing from the models.dev database.",
           )}
-          className="pi-btn"
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -794,7 +792,7 @@ export function ModelDetail({
           {fillState.phase === "loading"
             ? t("modelFillInfoLoading", "Querying models.dev…")
             : t("modelFillInfo", "Fill model info")}
-        </button>
+        </Button>
         {fillStatus}
         {fillState.phase === "error" && (
           <span style={{ fontSize: 11, color: "#f87171", lineHeight: 1.5, overflowWrap: "anywhere" }}>
@@ -878,17 +876,16 @@ export function ModelDetail({
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <SectionTitle>{t("modelThinkingLevelMap", "Thinking level map")}</SectionTitle>
               {model.thinkingLevelMap && (
-                <button
+                <Button
                   type="button"
                   onClick={() => {
                     set("thinkingLevelMap", undefined);
                     validField("thinkingLevelMap", true);
                   }}
-                  className="pi-btn"
                   style={{ minHeight: 32, fontSize: 12, padding: "0 9px", borderRadius: 4 }}
                 >
                   {t("modelClearAll", "Clear all")}
-                </button>
+                </Button>
               )}
             </div>
             <ThinkingLevelMapEditor

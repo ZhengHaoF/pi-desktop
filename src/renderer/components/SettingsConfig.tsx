@@ -39,6 +39,7 @@ import { DefaultThinkingLevelSettings } from "./settings/DefaultThinkingLevelSet
 import { SessionListSettings } from "./settings/SessionListSettings";
 import { McpConfig, type McpConfigHandle } from "./mcp/McpConfig";
 import { WebSearchSettings } from "./settings/WebSearchSettings";
+import { Button } from "@/components/ui/Button";
 
 export type SettingsTab =
   "general" | "herdr" | "browser" | "search" | "channels" | "models" | "tools" | "skills" | "plugins" | "mcp" | "about";
@@ -223,12 +224,12 @@ export function SettingsConfig({
               </div>
             )}
           </div>
-          <button
+          <Button
             ref={closeButtonRef}
             type="button"
             onClick={() => requestSettingsTransition(onClose)}
             aria-label={t("close", "Close")}
-            className="pi-btn pi-btn-ghost"
+            variant="ghost"
             style={{
               fontSize: 20,
               lineHeight: 1,
@@ -242,7 +243,7 @@ export function SettingsConfig({
             }}
           >
             ×
-          </button>
+          </Button>
         </div>
 
         <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex", overflow: "hidden" }}>
@@ -265,7 +266,7 @@ export function SettingsConfig({
             {tabs.map((tab) => {
               const active = tab.id === activeTab;
               return (
-                <button
+                <Button
                   key={tab.id}
                   id={`settings-tab-${tab.id}`}
                   type="button"
@@ -304,7 +305,7 @@ export function SettingsConfig({
                   }}
                 >
                   {tab.label}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -423,11 +424,11 @@ function AboutSettings({ onClose }: { onClose: () => void }) {
             <AboutRow
               label={t("officialWebsite", "Official website")}
               value={
-                <button
+                <Button
                   type="button"
                   title={t("openOfficialWebsite", "Open official website")}
                   onClick={() => void window.piBridge.openExternal(APP_WEBSITE_URL)}
-                  className="pi-btn pi-btn-link"
+                  variant="link"
                   style={{
                     maxWidth: "100%",
                     padding: 0,
@@ -438,17 +439,17 @@ function AboutSettings({ onClose }: { onClose: () => void }) {
                   }}
                 >
                   https://zhenghaof.github.io/pi-desktop/ ↗
-                </button>
+                </Button>
               }
             />
             <AboutRow
               label={t("githubRepository", "GitHub repository")}
               value={
-                <button
+                <Button
                   type="button"
                   title={t("openGithubRepository", "Open GitHub repository")}
                   onClick={() => void window.piBridge.openExternal(APP_GITHUB_URL)}
-                  className="pi-btn pi-btn-link"
+                  variant="link"
                   style={{
                     maxWidth: "100%",
                     padding: 0,
@@ -459,7 +460,7 @@ function AboutSettings({ onClose }: { onClose: () => void }) {
                   }}
                 >
                   github.com/ZhengHaoF/pi-desktop ↗
-                </button>
+                </Button>
               }
               last
             />
@@ -836,13 +837,13 @@ function UpdateButton({
   busy?: boolean;
 }) {
   return (
-    <button
+    <Button
       type="button"
       aria-label={label}
       aria-busy={busy || undefined}
       disabled={disabled}
       onClick={onClick}
-      className={primary ? "pi-btn pi-btn-primary" : "pi-btn"}
+      variant={primary ? "primary" : "default"}
       style={{
         minHeight: 34,
         padding: "7px 12px",
@@ -851,7 +852,7 @@ function UpdateButton({
       }}
     >
       {label}
-    </button>
+    </Button>
   );
 }
 

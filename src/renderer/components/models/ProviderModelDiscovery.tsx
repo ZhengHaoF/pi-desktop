@@ -3,6 +3,7 @@ import { call } from "@/lib/api-client";
 import { mergeDiscoveredModels, type ProviderEntry } from "@/lib/models-config-state";
 import { useI18n } from "@/i18n";
 import type { DiscoveredModel } from "@contract/types";
+import { Button } from "@/components/ui/Button";
 
 function connectionKey(provider: ProviderEntry): string {
   return JSON.stringify([provider.baseUrl, provider.api, provider.apiKey, provider.headers]);
@@ -125,15 +126,14 @@ export function ProviderModelDiscovery({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <button
+      <Button
         type="button"
         onClick={() => void discover()}
         disabled={disabled}
-        className="pi-btn"
         style={{ alignSelf: "flex-start", minHeight: 32, padding: "0 12px", borderRadius: 4, fontSize: 12 }}
       >
         {busy ? t("modelDiscovering", "Fetching models…") : t("modelDiscover", "Fetch model list")}
-      </button>
+      </Button>
       {supported ? (
         <span style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.6 }}>
           {t(
@@ -154,14 +154,9 @@ export function ProviderModelDiscovery({
         <div role="alert" style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
           <span style={{ color: "var(--danger)", lineHeight: 1.5, overflowWrap: "anywhere" }}>{current.message}</span>
           {!current.unsupported && (
-            <button
-              type="button"
-              onClick={() => void discover()}
-              className="pi-btn"
-              style={{ ...subtleLayout, alignSelf: "flex-start" }}
-            >
+            <Button type="button" onClick={() => void discover()} style={{ ...subtleLayout, alignSelf: "flex-start" }}>
               {t("modelImportRetry", "Retry")}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -192,16 +187,16 @@ export function ProviderModelDiscovery({
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>
               {t("modelImportTitle", "Fetch model list")}
             </span>
-            <button
+            <Button
               type="button"
               onClick={close}
               title={t("modelImportClose", "Done")}
               aria-label={t("modelImportClose", "Done")}
-              className="pi-btn pi-btn-ghost"
+              variant="ghost"
               style={{ width: 28, height: 28, padding: 0, borderRadius: 5, fontSize: 16, lineHeight: 1 }}
             >
               ×
-            </button>
+            </Button>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px" }}>
@@ -337,21 +332,21 @@ export function ProviderModelDiscovery({
                 : t("modelImportFetchedCount", "Fetched {count} models").replace("{count}", String(models.length))}
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <button type="button" onClick={close} className="pi-btn" style={subtleLayout}>
+              <Button type="button" onClick={close} style={subtleLayout}>
                 {t("modelImportClose", "Done")}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={addSelected}
                 disabled={pendingSelected.length === 0}
-                className="pi-btn pi-btn-primary"
+                variant="primary"
                 style={{ minHeight: 30, padding: "0 14px", borderRadius: 5, fontSize: 12, fontWeight: 600 }}
               >
                 {t("modelImportAddSelectedCount", "Add selected models ({count})").replace(
                   "{count}",
                   String(pendingSelected.length),
                 )}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

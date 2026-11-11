@@ -42,7 +42,9 @@ const { MarkdownBody, getMarkdownComponentIdentityForTest, parseStats } = await 
                               ? "export const useCopyFeedback = () => ({ copied: false, copy: async () => true });"
                               : args.path === "@/lib/syntax-highlight"
                                 ? "export const SyntaxHighlighter = 'pre'; export const vs = {}; export const vscDarkPlus = {};"
-                                : "export const SessionProfiler = ({ children }) => children;",
+                                : args.path === "@/components/ui/Button"
+                                  ? "export const Button = (props) => null;"
+                                  : "export const SessionProfiler = ({ children }) => children;",
           }));
         },
       },

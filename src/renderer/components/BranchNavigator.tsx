@@ -10,6 +10,7 @@ import {
 } from "@/lib/branch-navigator-model";
 import { useI18n } from "@/i18n";
 import { formatNumber } from "@/lib/locale-format";
+import { Button } from "@/components/ui/Button";
 
 interface Props {
   tree: SessionTreeNode[];
@@ -314,11 +315,10 @@ export function BranchNavigator({
   if (inline) {
     return (
       <div ref={rootRef} style={{ height: "100%", display: "flex", alignItems: "stretch" }}>
-        <button
+        <Button
           ref={btnRef}
           onClick={handleInlineToggle}
           aria-pressed={open}
-          className="pi-btn"
           style={{
             display: "flex",
             alignItems: "center",
@@ -337,7 +337,7 @@ export function BranchNavigator({
         >
           {branchIcon}
           {!compact && <span>{t("branches", "Branches")}</span>}
-        </button>
+        </Button>
         {open && dropdownPos && (
           <div
             style={{
@@ -370,9 +370,9 @@ export function BranchNavigator({
       style={{ borderBottom: "1px solid var(--border)", background: "var(--bg)", flexShrink: 0, position: "relative" }}
     >
       {/* Header toggle */}
-      <button
+      <Button
         onClick={() => setOpenInternal((v) => !v)}
-        className="pi-btn pi-btn-ghost"
+        variant="ghost"
         style={{
           display: "flex",
           alignItems: "center",
@@ -387,7 +387,7 @@ export function BranchNavigator({
         {branchIcon}
         <span style={{ color: "var(--text-muted)" }}>{t("branches", "Branches")}</span>
         {chevron}
-      </button>
+      </Button>
 
       {/* Tree panel - overlay */}
       {open && (

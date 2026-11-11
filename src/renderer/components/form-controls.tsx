@@ -12,6 +12,7 @@ import {
   type KeyboardEventHandler,
   type ReactNode,
 } from "react";
+import { Button } from "@/components/ui/Button";
 
 const FieldControlIdContext = createContext<string | undefined>(undefined);
 
@@ -110,12 +111,12 @@ export function SecretTextInput({
         autoComplete={autoComplete}
         spellCheck={spellCheck}
       />
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => setVisible((v) => !v)}
         aria-label={visible ? "Hide API key" : "Show API key"}
         title={visible ? "Hide API key" : "Show API key"}
-        className="pi-btn pi-btn-ghost"
         style={{
           position: "absolute",
           right: 2,
@@ -161,7 +162,7 @@ export function SecretTextInput({
             <circle cx="12" cy="12" r="3" />
           </svg>
         )}
-      </button>
+      </Button>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useI18n } from "@/i18n";
 import type { ImageContent } from "@/lib/types";
 import { persistedImageSource } from "@/lib/persisted-image";
 import { EnlargableImage } from "./ImageLightbox";
+import { Button } from "@/components/ui/Button";
 
 export function ReplyImage({
   image,
@@ -78,14 +79,14 @@ export function ReplyImage({
             ? t("replyImageLoadError", "Could not load this image from history.")
             : t("replyImageLoading", "Loading image…")}
           {failed && (
-            <button
+            <Button
               type="button"
-              className="pi-btn pi-btn-link"
+              variant="link"
               onClick={() => setAttempt((value) => value + 1)}
               style={{ marginLeft: 10, padding: 0 }}
             >
               {t("replyImageRetry", "Retry loading image")}
-            </button>
+            </Button>
           )}
         </div>
       )}

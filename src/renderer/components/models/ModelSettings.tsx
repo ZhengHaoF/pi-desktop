@@ -11,6 +11,7 @@ import type {
 import { Field, Check, NumInput, Select, SectionTitle } from "../form-controls";
 import { JsonObjectField } from "./JsonObjectField";
 import { THINKING_LEVELS } from "@shared/thinking-levels";
+import { Button } from "@/components/ui/Button";
 
 const buttonLayout = {
   padding: "7px 12px",
@@ -94,12 +95,12 @@ function SettingsActions({
       )}
       {saved && <p role="status">{t("saved", "Saved")}</p>}
       <div style={{ display: "flex", gap: 8 }}>
-        <button className="pi-btn" style={buttonLayout} disabled={busy || !canSave} onClick={onSave}>
+        <Button style={buttonLayout} disabled={busy || !canSave} onClick={onSave}>
           {t("save", "Save")}
-        </button>
-        <button className="pi-btn" style={buttonLayout} disabled={busy} onClick={onReload}>
+        </Button>
+        <Button style={buttonLayout} disabled={busy} onClick={onReload}>
           {t("reload", "Reload")}
-        </button>
+        </Button>
       </div>
     </>
   );

@@ -5,6 +5,7 @@ import { useDirectoryListing, useFileExplorer } from "@/hooks/useFileExplorer";
 import type { FileNode } from "@/lib/file-explorer-data";
 import { useI18n } from "@/i18n";
 import { formatNumber } from "@/lib/locale-format";
+import { Button } from "@/components/ui/Button";
 
 interface Props {
   cwd: string;
@@ -68,7 +69,7 @@ function TreeNode({
           margin: "1px 0",
         }}
       >
-        <button
+        <Button
           type="button"
           onClick={handleClick}
           aria-expanded={node.isDir ? open : undefined}
@@ -141,11 +142,10 @@ function TreeNode({
               <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4" />
             </svg>
           )}
-        </button>
+        </Button>
         {onAtMention && (hovered || focusedWithin) && (
-          <button
+          <Button
             type="button"
-            className="pi-btn"
             onClick={(e) => {
               e.stopPropagation();
               onAtMention(getRelativeFilePath(node.fullPath, cwd), node.isDir);
@@ -183,12 +183,11 @@ function TreeNode({
               <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
             </svg>
             {t("mention", "mention")}
-          </button>
+          </Button>
         )}
         {(hovered || focusedWithin) && !node.isDir && (
-          <button
+          <Button
             type="button"
-            className="pi-btn"
             disabled={downloading}
             onClick={(e) => {
               e.stopPropagation();
@@ -232,7 +231,7 @@ function TreeNode({
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-          </button>
+          </Button>
         )}
       </div>
       {node.isDir && open && (

@@ -6,6 +6,7 @@ import type { ProviderStatus as OAuthProvider, LoginProgressEvent } from "@contr
 import { AuthReplacementNotice } from "./AuthReplacementNotice";
 import type { CredentialMutationOptions } from "@contract/auth";
 import { oauthProviderName, authPromptLabel } from "./provider-display";
+import { Button } from "@/components/ui/Button";
 
 type OAuthLoginState =
   | { phase: "idle" }
@@ -335,14 +336,13 @@ export function OAuthDetail({
             <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>{loginState.message}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {loginState.options.map((option) => (
-                <button
+                <Button
                   key={option.id}
                   onClick={() => submitSelection(loginState.token, option.id)}
-                  className="pi-btn"
                   style={{ padding: "6px 9px", borderRadius: 5, fontSize: 12, textAlign: "left" }}
                 >
                   {option.label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -400,14 +400,14 @@ export function OAuthDetail({
                   boxSizing: "border-box",
                 }}
               />
-              <button
+              <Button
                 onClick={() => submitCode(loginState.token, inputValue)}
                 disabled={!inputValue.trim()}
-                className="pi-btn pi-btn-primary"
+                variant="primary"
                 style={{ padding: "6px 12px", borderRadius: 5, fontSize: 12, fontWeight: 600, flexShrink: 0 }}
               >
                 {t("submit", "Submit")}
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -482,18 +482,14 @@ export function OAuthDetail({
       {/* Actions */}
       <div style={{ display: "flex", gap: 8 }}>
         {isWorking ? (
-          <button
-            onClick={handleCancelLogin}
-            className="pi-btn"
-            style={{ padding: "5px 12px", borderRadius: 5, fontSize: 12 }}
-          >
+          <Button onClick={handleCancelLogin} style={{ padding: "5px 12px", borderRadius: 5, fontSize: 12 }}>
             {t("cancel", "Cancel")}
-          </button>
+          </Button>
         ) : (
           <>
-            <button
+            <Button
               onClick={requestLogin}
-              className="pi-btn pi-btn-primary"
+              variant="primary"
               style={{ padding: "5px 14px", borderRadius: 5, fontSize: 12, fontWeight: 600 }}
             >
               {authType === "api_key"
@@ -501,15 +497,15 @@ export function OAuthDetail({
                 : provider.loggedIn
                   ? t("modelRelogin", "Re-login")
                   : t("modelLogin", "Login")}
-            </button>
+            </Button>
             {provider.loggedIn && (
-              <button
+              <Button
                 onClick={handleLogout}
-                className="pi-btn pi-btn-danger"
+                variant="danger"
                 style={{ padding: "5px 12px", borderRadius: 5, fontSize: 12 }}
               >
                 {t("modelDisconnect", "Disconnect")}
-              </button>
+              </Button>
             )}
           </>
         )}

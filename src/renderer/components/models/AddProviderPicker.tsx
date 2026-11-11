@@ -3,6 +3,7 @@ import { useI18n } from "@/i18n";
 import { oauthProviderName } from "./provider-display";
 import type { ProviderStatus as OAuthProvider, ApiKeyProviderStatus as ApiKeyProvider } from "@contract/types";
 import { ProviderIcon } from "./ProviderIcon";
+import { Button } from "@/components/ui/Button";
 
 interface AddProviderPickerProps {
   oauthProviders: OAuthProvider[];
@@ -175,12 +176,11 @@ export function AddProviderPicker({
                 </div>
               )}
               {showCustom && (
-                <button
+                <Button
                   onClick={() => {
                     onAddCustom();
                     onClose();
                   }}
-                  className="pi-btn"
                   style={cardStyle}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -229,7 +229,7 @@ export function AddProviderPicker({
                       <line x1="5" y1="12" x2="19" y2="12" />
                     </svg>
                   </span>
-                </button>
+                </Button>
               )}
 
               {availableOAuth.length > 0 && (
@@ -248,13 +248,12 @@ export function AddProviderPicker({
                 </div>
               )}
               {availableOAuth.map((p) => (
-                <button
+                <Button
                   key={p.id}
                   onClick={() => {
                     onSelectOAuth(p.id);
                     onClose();
                   }}
-                  className="pi-btn"
                   style={cardStyle}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -274,7 +273,7 @@ export function AddProviderPicker({
                     <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>OAuth</div>
                   </div>
                   <ProviderIcon id={p.id} size={28} />
-                </button>
+                </Button>
               ))}
 
               {availableApiKey.length > 0 && (
@@ -293,13 +292,12 @@ export function AddProviderPicker({
                 </div>
               )}
               {availableApiKey.map((p) => (
-                <button
+                <Button
                   key={p.id}
                   onClick={() => {
                     onSelectApiKey(p.id);
                     onClose();
                   }}
-                  className="pi-btn"
                   style={cardStyle}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -321,7 +319,7 @@ export function AddProviderPicker({
                     </div>
                   </div>
                   <ProviderIcon id={p.id} size={28} />
-                </button>
+                </Button>
               ))}
             </div>
           )}

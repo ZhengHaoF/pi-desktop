@@ -4,6 +4,7 @@ import { copyText } from "@/lib/clipboard";
 import { formatCompactNumber } from "@/lib/locale-format";
 import type { SessionPresentationStore } from "@/lib/session-presentation-store";
 import { LatestRequestGate } from "@/lib/latest-request-gate";
+import { Button } from "@/components/ui/Button";
 
 type SessionCopyField = "file" | "id";
 type SessionCopyFeedback = { field: SessionCopyField; status: "copied" | "error" };
@@ -112,13 +113,12 @@ export function SessionInfoPanel({
           const tooltip = tooltipParts.join("  |  ");
 
           return (
-            <button
+            <Button
               type="button"
               onClick={toggleTopPanel}
               title={tooltip || t("sessionInfo", "Session info")}
               aria-label={t("sessionInfo", "Session info")}
               aria-pressed={activeTopPanel === "session"}
-              className="pi-btn"
               style={{
                 marginLeft: "auto",
                 display: "flex",
@@ -177,7 +177,7 @@ export function SessionInfoPanel({
                   {ctxStr}
                 </span>
               )}
-            </button>
+            </Button>
           );
         })()}
       {/* Top panel dropdown — shared, only one active at a time */}
@@ -296,12 +296,11 @@ export function SessionInfoPanel({
                         ? t("copyFailed", "Copy failed")
                         : defaultLabel;
                     return (
-                      <button
+                      <Button
                         type="button"
                         title={label}
                         aria-label={label}
                         onClick={() => handleCopySessionField(field, value)}
-                        className="pi-btn"
                         style={{
                           alignSelf: "start",
                           display: "inline-flex",
@@ -360,7 +359,7 @@ export function SessionInfoPanel({
                             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                           </svg>
                         )}
-                      </button>
+                      </Button>
                     );
                   };
                   const sessionInfoSection = (

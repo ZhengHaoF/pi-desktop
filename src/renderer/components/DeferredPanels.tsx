@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ComponentProps } from "react";
 import { useI18n } from "@/i18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { Button } from "@/components/ui/Button";
 
 type SettingsConfigModule = { default: typeof import("./SettingsConfig").SettingsConfig };
 
@@ -131,10 +132,10 @@ function SettingsLoading({
               </div>
             )}
           </div>
-          <button
+          <Button
             ref={closeButtonRef}
             type="button"
-            className="pi-btn pi-btn-ghost"
+            variant="ghost"
             onClick={onClose}
             aria-label={t("close", "Close")}
             style={{
@@ -151,7 +152,7 @@ function SettingsLoading({
             }}
           >
             ×
-          </button>
+          </Button>
         </div>
         <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
           <div

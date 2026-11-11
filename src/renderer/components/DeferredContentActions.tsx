@@ -2,6 +2,7 @@ import { useState } from "react";
 import { formatByteSize } from "@/lib/message-metadata";
 import { scaledChatFont } from "@/lib/chat-appearance";
 import type { AssistantContentBlock, TextContent, ImageContent } from "@/lib/types";
+import { Button } from "@/components/ui/Button";
 
 export function DeferredContentActions({
   content,
@@ -25,10 +26,9 @@ export function DeferredContentActions({
         const key = `${reference.entryId}:${reference.blockIndex ?? 0}`;
         const loading = loadingKey === key;
         return (
-          <button
+          <Button
             key={key}
             type="button"
-            className="pi-btn"
             disabled={loading}
             onClick={() => {
               setLoadingKey(key);
@@ -44,7 +44,7 @@ export function DeferredContentActions({
             }}
           >
             {loading ? "Loading full content…" : `Load full content (${formatByteSize(reference.originalBytes)})`}
-          </button>
+          </Button>
         );
       })}
       {loadError && (

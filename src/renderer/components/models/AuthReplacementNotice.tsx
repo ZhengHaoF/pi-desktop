@@ -1,4 +1,5 @@
 import { useI18n } from "@/i18n";
+import { Button } from "@/components/ui/Button";
 
 export function AuthReplacementNotice({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
   const { t } = useI18n();
@@ -14,16 +15,12 @@ export function AuthReplacementNotice({ onConfirm, onCancel }: { onConfirm: () =
         )}
       </span>
       <div style={{ display: "flex", gap: 8 }}>
-        <button
-          className="pi-btn pi-btn-primary"
-          style={{ padding: "6px 12px", borderRadius: 5, fontSize: 12 }}
-          onClick={onConfirm}
-        >
+        <Button variant="primary" style={{ padding: "6px 12px", borderRadius: 5, fontSize: 12 }} onClick={onConfirm}>
           {t("modelConfirmAuthSwitch", "Switch authentication")}
-        </button>
-        <button className="pi-btn" style={{ padding: "6px 12px", borderRadius: 5, fontSize: 12 }} onClick={onCancel}>
+        </Button>
+        <Button style={{ padding: "6px 12px", borderRadius: 5, fontSize: 12 }} onClick={onCancel}>
           {t("cancel", "Cancel")}
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { AuthReplacementNotice } from "./AuthReplacementNotice";
 import type { CredentialMutationOptions } from "@contract/auth";
 import { OAuthDetail } from "./OAuthDetail";
 import { AuxiliaryModels } from "./AuxiliaryModels";
+import { Button } from "@/components/ui/Button";
 
 // These providers collect account fields or an authentication-method choice in addition to a key.
 const GUIDED_CREDENTIAL_PROVIDERS = new Set([
@@ -207,10 +208,10 @@ export function ApiKeyDetail({
             spellCheck={false}
             mono
           />
-          <button
+          <Button
             onClick={handleSave}
             disabled={saving || !apiKey.trim() || savedOk}
-            className="pi-btn pi-btn-primary"
+            variant="primary"
             style={{
               padding: "6px 12px",
               borderRadius: 5,
@@ -238,7 +239,7 @@ export function ApiKeyDetail({
               </svg>
             )}
             {savedOk ? t("saved", "Saved") : saving ? t("saving", "Saving…") : t("save", "Save")}
-          </button>
+          </Button>
         </div>
       </Field>
 
@@ -248,14 +249,14 @@ export function ApiKeyDetail({
       <AuxiliaryModels providerId={provider.id} models={provider.auxiliaryModels ?? []} />
 
       {provider.configured && (provider.storedAuthType === undefined || provider.storedAuthType === "api_key") && (
-        <button
+        <Button
           onClick={handleRemove}
           disabled={removing}
-          className="pi-btn pi-btn-danger"
+          variant="danger"
           style={{ alignSelf: "flex-start", padding: "5px 12px", borderRadius: 5, fontSize: 12 }}
         >
           {removing ? t("modelRemoving", "Removing…") : t("modelDisconnect", "Disconnect")}
-        </button>
+        </Button>
       )}
     </div>
   );

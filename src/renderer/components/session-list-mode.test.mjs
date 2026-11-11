@@ -26,7 +26,7 @@ test("aggregated mode replaces the top-level controls with a project opener", ()
   assert.match(sidebar, /\{aggregated \? \(/);
   assert.match(sidebar, /<ProjectPicker\s+compact/);
   // The else branch of the same ternary keeps the historical controls.
-  assert.match(sidebar, /\) : \(\s*<>\s*<button[\s\S]{0,120}?onClick=\{handleNewSession\}/);
+  assert.match(sidebar, /\) : \(\s*<>\s*<Button[\s\S]{0,120}?onClick=\{handleNewSession\}/);
   assert.match(sidebar, /<WorktreePicker/);
   assert.match(picker, /openProjectEllipsis/);
   // The compact trigger keeps the actions that open a project without sessions.

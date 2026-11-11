@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ToolCapabilityId, ToolchainActionRequest } from "@shared/toolchains/types";
 import { isToolCapabilityId } from "@shared/toolchains/types";
 import { useI18n } from "@/i18n";
+import { Button } from "@/components/ui/Button";
 
 export interface CapabilityIssue {
   code: string;
@@ -149,9 +150,9 @@ function PromptButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
-      className={primary ? "pi-btn pi-btn-primary" : "pi-btn"}
+      variant={primary ? "primary" : "default"}
       disabled={disabled}
       onClick={onClick}
       style={{
@@ -165,7 +166,7 @@ function PromptButton({
       }}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 

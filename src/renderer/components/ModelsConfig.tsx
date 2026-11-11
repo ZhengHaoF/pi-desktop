@@ -33,6 +33,7 @@ import { OAuthDetail } from "./models/OAuthDetail";
 import { ApiKeyDetail } from "./models/ApiKeyDetail";
 import { AddProviderPicker } from "./models/AddProviderPicker";
 import { AzureUpgradeNotice } from "./models/AzureUpgradeNotice";
+import { Button } from "@/components/ui/Button";
 
 type Selection = ModelsConfigSelection;
 
@@ -509,12 +510,12 @@ export function ModelsConfig({
                   ~/.pi/agent/models.json
                 </code>
               </div>
-              <button
+              <Button
                 type="button"
                 onClick={onClose}
                 title={t("modelCloseModels", "Close models")}
                 aria-label={t("modelCloseModels", "Close models")}
-                className="pi-btn pi-btn-ghost"
+                variant="ghost"
                 style={{
                   fontSize: 20,
                   lineHeight: 1,
@@ -525,7 +526,7 @@ export function ModelsConfig({
                 }}
               >
                 ×
-              </button>
+              </Button>
             </div>
           )}
 
@@ -576,12 +577,12 @@ export function ModelsConfig({
             >
               <div style={{ flex: 1, overflowY: "auto", padding: "8px 6px" }}>
                 {(["routing", "advanced"] as const).map((type) => (
-                  <button
+                  <Button
                     key={type}
                     type="button"
                     onClick={() => setSelection({ type })}
                     aria-pressed={selection?.type === type}
-                    className="pi-btn pi-btn-ghost"
+                    variant="ghost"
                     style={{
                       display: "block",
                       width: "100%",
@@ -596,7 +597,7 @@ export function ModelsConfig({
                     {type === "routing"
                       ? t("modelAutoRouting", "Auto routing")
                       : t("modelAdvancedSettings", "Advanced model settings")}
-                  </button>
+                  </Button>
                 ))}
                 {/* Active OAuth subscriptions */}
                 {activeOAuth.map((p) => {
@@ -700,11 +701,11 @@ export function ModelsConfig({
 
               {/* Add provider */}
               <div style={{ borderTop: "1px solid var(--border)", padding: "8px 6px" }}>
-                <button
+                <Button
                   ref={addProviderButtonRef}
                   aria-label={t("addProvider", "Add provider")}
                   onClick={() => setPickerOpen(true)}
-                  className="pi-btn pi-btn-dashed"
+                  variant="dashed"
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -717,7 +718,7 @@ export function ModelsConfig({
                   }}
                 >
                   + {t("addProvider", "Add provider")}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -775,33 +776,31 @@ export function ModelsConfig({
                 </span>
               )}
               {(saveConflict || configIssues.length > 0) && (
-                <button
+                <Button
                   type="button"
                   onClick={() => void loadModelsConfig()}
                   disabled={loading || saving}
                   title={t("modelReloadDiskVersionHint", "Discard local edits and load the current models.json")}
-                  className="pi-btn"
                   style={{
                     padding: "6px 12px",
                     fontSize: 12,
                   }}
                 >
                   {t("modelReloadDiskVersion", "Reload disk version")}
-                </button>
+                </Button>
               )}
               {!embedded && (
-                <button
+                <Button
                   onClick={onClose}
-                  className="pi-btn"
                   style={{
                     padding: "6px 14px",
                     fontSize: 13,
                   }}
                 >
                   {t("cancel", "Cancel")}
-                </button>
+                </Button>
               )}
-              <button
+              <Button
                 onClick={handleSave}
                 disabled={saveDisabled}
                 title={
@@ -810,7 +809,7 @@ export function ModelsConfig({
                     ? t("modelCannotSaveBeforeLoad", "Cannot save until config loads successfully")
                     : undefined)
                 }
-                className="pi-btn pi-btn-primary"
+                variant="primary"
                 style={{
                   position: "relative",
                   padding: "6px 16px",
@@ -845,7 +844,7 @@ export function ModelsConfig({
                   </svg>
                 )}
                 <span>{savedOk ? t("saved", "Saved") : saving ? t("saving", "Saving…") : t("save", "Save")}</span>
-              </button>
+              </Button>
             </div>
           )}
         </div>

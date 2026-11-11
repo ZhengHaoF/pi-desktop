@@ -104,10 +104,12 @@ test("copy feedback and a late clipboard failure cannot leak across session sele
     old.reject(new Error("old clipboard failure"));
   });
   assert.equal(fixture.root.findAllByProps({ role: "alert" }).length, 0);
-  assert.equal(fixture.root.findAllByProps({ "aria-label": "Copy session ID" }).length, 1);
+  const copyButtons = () =>
+    fixture.root.findAll((node) => typeof node.type === "string" && node.props["aria-label"] === "Copy session ID");
+  assert.equal(copyButtons().length, 1);
   const current = createDeferred();
   clipboard.setResult(current.promise);
-  await act(async () => fixture.root.findByProps({ "aria-label": "Copy session ID" }).props.onClick());
+  await act(async () => copyButtons()[0].props.onClick());
   await act(async () => {
     current.reject(new Error("current clipboard failure"));
   });

@@ -210,7 +210,9 @@ test("one mounted catalog serves sidebar updates and metadata without duplicatin
   await fixture.change({ cwd: "/project", session: session("one", "Renamed") });
   assert.deepEqual(await fixture.current.findSession("one"), session("one", "Renamed"));
   assert.equal(
-    fixture.renderer.root.findAll((node) => node.props["aria-label"] === "Session actions for Renamed").length,
+    fixture.renderer.root.findAll(
+      (node) => typeof node.type === "string" && node.props["aria-label"] === "Session actions for Renamed",
+    ).length,
     1,
   );
   assert.equal(fixture.requests.length, 1);
@@ -218,7 +220,9 @@ test("one mounted catalog serves sidebar updates and metadata without duplicatin
   await fixture.change({ cwd: "/project", sessionId: "one", deleted: true });
   assert.deepEqual(fixture.deleted, ["one"]);
   assert.equal(
-    fixture.renderer.root.findAll((node) => node.props["aria-label"] === "Session actions for Renamed").length,
+    fixture.renderer.root.findAll(
+      (node) => typeof node.type === "string" && node.props["aria-label"] === "Session actions for Renamed",
+    ).length,
     0,
   );
   await fixture.unmount();
@@ -354,9 +358,15 @@ test("session tree expansion survives index updates and row menus close with Esc
   assert.ok(button("Session actions for Updated child"));
   await fixture.click("Session actions for Updated child");
   assert.equal(button("Session actions for Updated child").props["aria-expanded"], true);
+  // The Button composite wraps the host button; the Escape handler sits on the
+  // wrapping div, reachable as the host node's parent's parent.
+  const hostNode = button("Session actions for Updated child");
+  let menuWrapper = hostNode.parent;
+  while (menuWrapper && typeof menuWrapper.props.onKeyDown !== "function") menuWrapper = menuWrapper.parent;
+  assert.ok(menuWrapper, "Escape handler reachable from the actions button");
   let prevented = false;
   await act(async () =>
-    button("Session actions for Updated child").parent.props.onKeyDown({
+    menuWrapper.props.onKeyDown({
       key: "Escape",
       preventDefault() {
         prevented = true;

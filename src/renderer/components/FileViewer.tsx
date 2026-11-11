@@ -10,6 +10,7 @@ import { INITIAL_TEXT_FILE_LOAD_STATE, textFileLoadReducer, type TextFileData } 
 import { createBoundedTextDiff, type DiffLine } from "@/lib/text-diff";
 import { useI18n } from "@/i18n";
 import { formatFileSize, formatNumber } from "@/lib/locale-format";
+import { Button } from "@/components/ui/Button";
 
 interface Props {
   filePath: string;
@@ -21,9 +22,8 @@ function DownloadLink({ filePath, sourceSessionId }: { filePath: string; sourceS
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   return (
-    <button
+    <Button
       type="button"
-      className="pi-btn"
       title={t("downloadFile", "Download file")}
       aria-label={t("downloadFile", "Download file")}
       disabled={busy}
@@ -61,7 +61,7 @@ function DownloadLink({ filePath, sourceSessionId }: { filePath: string; sourceS
         <polyline points="7 10 12 15 17 10" />
         <line x1="12" y1="15" x2="12" y2="3" />
       </svg>
-    </button>
+    </Button>
   );
 }
 
@@ -933,9 +933,8 @@ function TextFileViewer({ filePath, cwd, sourceSessionId }: Props) {
         {/* Diff / Source toggle — shown only when there are changes */}
         {hasDiff && (
           <div style={{ display: "flex", borderRadius: 5, overflow: "hidden", border: "1px solid var(--border)" }}>
-            <button
+            <Button
               type="button"
-              className="pi-btn"
               onClick={() => setViewMode("source")}
               style={{
                 minHeight: 32,
@@ -948,10 +947,9 @@ function TextFileViewer({ filePath, cwd, sourceSessionId }: Props) {
               }}
             >
               {t("source", "Source")}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="pi-btn"
               onClick={() => setViewMode("diff")}
               style={{
                 minHeight: 32,
@@ -968,15 +966,14 @@ function TextFileViewer({ filePath, cwd, sourceSessionId }: Props) {
               {changeCount > 0 && (
                 <span style={{ color: "var(--success)", marginLeft: 2 }}>+{formatNumber(changeCount, language)}</span>
               )}
-            </button>
+            </Button>
           </div>
         )}
 
         {/* Word wrap toggle */}
         {viewMode === "source" && !previewMode && (
-          <button
+          <Button
             type="button"
-            className="pi-btn"
             onClick={() => setWrapLines((v) => !v)}
             title={wrapLines ? t("disableWordWrap", "Disable word wrap") : t("enableWordWrap", "Enable word wrap")}
             style={{
@@ -991,15 +988,14 @@ function TextFileViewer({ filePath, cwd, sourceSessionId }: Props) {
             }}
           >
             {t("wrap", "wrap")}
-          </button>
+          </Button>
         )}
 
         {/* HTML source/preview toggle */}
         {isHtml && viewMode === "source" && (
           <div style={{ display: "flex", borderRadius: 5, overflow: "hidden", border: "1px solid var(--border)" }}>
-            <button
+            <Button
               type="button"
-              className="pi-btn"
               onClick={() => setPreviewMode(false)}
               style={{
                 minHeight: 32,
@@ -1012,10 +1008,9 @@ function TextFileViewer({ filePath, cwd, sourceSessionId }: Props) {
               }}
             >
               {t("code", "Code")}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="pi-btn"
               onClick={() => setPreviewMode(true)}
               style={{
                 minHeight: 32,
@@ -1029,16 +1024,15 @@ function TextFileViewer({ filePath, cwd, sourceSessionId }: Props) {
               }}
             >
               {t("preview", "Preview")}
-            </button>
+            </Button>
           </div>
         )}
 
         {/* Markdown preview/raw toggle */}
         {isMarkdown && viewMode === "source" && (
           <div style={{ display: "flex", borderRadius: 5, overflow: "hidden", border: "1px solid var(--border)" }}>
-            <button
+            <Button
               type="button"
-              className="pi-btn"
               onClick={() => setPreviewMode(true)}
               style={{
                 minHeight: 32,
@@ -1051,10 +1045,9 @@ function TextFileViewer({ filePath, cwd, sourceSessionId }: Props) {
               }}
             >
               {t("preview", "Preview")}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="pi-btn"
               onClick={() => setPreviewMode(false)}
               style={{
                 minHeight: 32,
@@ -1068,7 +1061,7 @@ function TextFileViewer({ filePath, cwd, sourceSessionId }: Props) {
               }}
             >
               {t("raw", "Raw")}
-            </button>
+            </Button>
           </div>
         )}
         <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />

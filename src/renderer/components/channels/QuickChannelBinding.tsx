@@ -7,6 +7,7 @@ import {
   type QuickChannelBindingPopoverLayout,
 } from "@/lib/quick-channel-binding-layout";
 import { useI18n } from "@/i18n";
+import { Button } from "@/components/ui/Button";
 
 interface QuickChannelBindingProps {
   sessionId: string;
@@ -170,7 +171,7 @@ export function QuickChannelBinding({ sessionId, snapshot, isMobile, onSnapshotC
   return (
     <>
       <div ref={rootRef} style={{ position: "relative", marginLeft: 10, minWidth: 0, flexShrink: 1 }}>
-        <button
+        <Button
           ref={triggerRef}
           type="button"
           data-testid={bound ? "channel-binding-indicator" : "channel-quick-bind-button"}
@@ -182,7 +183,6 @@ export function QuickChannelBinding({ sessionId, snapshot, isMobile, onSnapshotC
             setError("");
             setOpen((value) => !value);
           }}
-          className="pi-btn"
           style={{
             minWidth: 0,
             maxWidth: isMobile ? 148 : 280,
@@ -224,7 +224,7 @@ export function QuickChannelBinding({ sessionId, snapshot, isMobile, onSnapshotC
           <span aria-hidden="true" style={{ fontSize: 9, opacity: 0.7 }}>
             ▾
           </span>
-        </button>
+        </Button>
       </div>
 
       {open &&
@@ -356,11 +356,11 @@ export function QuickChannelBinding({ sessionId, snapshot, isMobile, onSnapshotC
                           </div>
                         )}
                       </div>
-                      <button
+                      <Button
                         type="button"
                         disabled={busyBindingId !== null}
                         onClick={() => void updateBinding(binding, !boundHere)}
-                        className={boundHere ? "pi-btn pi-btn-danger" : "pi-btn pi-btn-primary"}
+                        variant={boundHere ? "danger" : "primary"}
                         style={{
                           borderRadius: 6,
                           padding: "6px 9px",
@@ -378,7 +378,7 @@ export function QuickChannelBinding({ sessionId, snapshot, isMobile, onSnapshotC
                             : boundElsewhere
                               ? t("rebindHere", "Rebind here")
                               : t("bindHere", "Bind here")}
-                      </button>
+                      </Button>
                     </div>
                   );
                 })

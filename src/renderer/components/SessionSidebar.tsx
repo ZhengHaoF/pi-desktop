@@ -32,6 +32,7 @@ import { ProjectSessionGroup } from "./sidebar/ProjectSessionGroup";
 import { WorktreePicker } from "./sidebar/WorktreePicker";
 import { useSidebarWorkspace, getRecentProjects } from "@/hooks/useSidebarWorkspace";
 import { useSessionListMode } from "@/hooks/useSessionListMode";
+import { Button } from "@/components/ui/Button";
 
 interface Props {
   selectedSessionId: string | null;
@@ -563,9 +564,8 @@ export function SessionSidebar({
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <PiAgentTitle />
-          <button
+          <Button
             onClick={() => loadSessions(false)}
-            className="pi-btn"
             style={{
               display: "flex",
               alignItems: "center",
@@ -615,7 +615,7 @@ export function SessionSidebar({
                 <path d="M3 3v5h5" />
               </svg>
             )}
-          </button>
+          </Button>
         </div>
 
         {aggregated ? (
@@ -633,10 +633,10 @@ export function SessionSidebar({
           />
         ) : (
           <>
-            <button
+            <Button
               onClick={handleNewSession}
               disabled={!selectedCwd}
-              className="pi-btn pi-btn-primary"
+              variant="primary"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -658,7 +658,7 @@ export function SessionSidebar({
             >
               <span style={{ fontSize: 14, lineHeight: 1 }}>+</span>
               {t("newSession", "new session")}
-            </button>
+            </Button>
             <ProjectPicker
               selectedCwd={selectedCwd}
               selectedProject={selectedProject}
@@ -749,12 +749,12 @@ export function SessionSidebar({
               }}
             />
             {sessionFilter && (
-              <button
+              <Button
                 type="button"
                 onClick={() => setSessionFilter("")}
                 title={t("clearSessionSearch", "Clear session search")}
                 aria-label={t("clearSessionSearch", "Clear session search")}
-                className="pi-btn pi-btn-ghost"
+                variant="ghost"
                 style={{
                   position: "absolute",
                   top: 1,
@@ -767,7 +767,7 @@ export function SessionSidebar({
                 }}
               >
                 ×
-              </button>
+              </Button>
             )}
           </div>
         </div>

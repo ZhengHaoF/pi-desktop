@@ -244,7 +244,7 @@ test("max can be selected independently of xhigh and disappears for unsupported 
   const f = await mount(t);
   await f.update({ availableThinkingLevels: ["off", "xhigh", "max"], thinkingLevel: "xhigh" });
   await f.clickLabel("Change reasoning level:");
-  const choices = () => f.root.findAll((node) => node.props.role === "menuitemradio");
+  const choices = () => f.root.findAll((node) => typeof node.type === "string" && node.props.role === "menuitemradio");
   assert.equal(choices().filter((node) => text(node).startsWith("Extra high")).length, 1);
   const maximum = choices().find((node) => text(node).startsWith("Maximum"));
   assert.ok(maximum);
@@ -269,7 +269,7 @@ test("mapped reasoning labels retain the selected Pi level and show the raw prov
   });
   assert.ok(f.root.find((node) => node.props["aria-label"] === "Change reasoning level: Minimal → max"));
   await f.clickLabel("Change reasoning level:");
-  const choices = f.root.findAll((node) => node.props.role === "menuitemradio");
+  const choices = f.root.findAll((node) => typeof node.type === "string" && node.props.role === "menuitemradio");
   const mapped = choices.find((node) => text(node).startsWith("Minimal → max"));
   assert.ok(mapped);
   assert.match(text(mapped), /Provider value: max/);
@@ -277,7 +277,7 @@ test("mapped reasoning labels retain the selected Pi level and show the raw prov
   assert.ok(!choices.some((node) => text(node).startsWith("Maximum") || text(node).startsWith("Extra high")));
   await f.update({ thinkingLevel: "high" });
   const choice = f.root
-    .findAll((node) => node.props.role === "menuitemradio")
+    .findAll((node) => typeof node.type === "string" && node.props.role === "menuitemradio")
     .find((node) => text(node).startsWith("Minimal → max"));
   await act(async () => choice.props.onClick());
   assert.deepEqual(f.actions.at(-1), ["thinking", "minimal"]);

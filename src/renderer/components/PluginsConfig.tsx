@@ -7,6 +7,7 @@ import type { PluginActionParams, PluginPackageInfo, PluginsResponse } from "@/l
 import { CapabilityRequired, parseCapabilityIssue, type CapabilityIssue } from "@/components/CapabilityRequired";
 import { formatNumber } from "@/lib/locale-format";
 import { pluginResourceSummary, pluginStatusLabel, pluginVersionSummary } from "@/lib/plugin-presentation";
+import { Button } from "@/components/ui/Button";
 
 type Translate = (key: string, fallback: string) => string;
 
@@ -181,7 +182,7 @@ function Toggle({
   label: string;
 }) {
   return (
-    <button
+    <Button
       type="button"
       onClick={onToggle}
       disabled={loading}
@@ -216,7 +217,7 @@ function Toggle({
           transition: "left 0.18s cubic-bezier(.4,0,.2,1)",
         }}
       />
-    </button>
+    </Button>
   );
 }
 
@@ -235,11 +236,11 @@ function SegmentedScope({ value, onChange }: { value: PluginScope; onChange: (sc
       {(["global", "project"] as PluginScope[]).map((scope) => {
         const active = value === scope;
         return (
-          <button
+          <Button
             key={scope}
             onClick={() => onChange(scope)}
             aria-pressed={active}
-            className="pi-btn pi-btn-ghost"
+            variant="ghost"
             style={{
               width: 76,
               border: "none",
@@ -249,7 +250,7 @@ function SegmentedScope({ value, onChange }: { value: PluginScope; onChange: (sc
             }}
           >
             {pluginScopeLabel(scope, t)}
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -322,15 +323,15 @@ function AddPluginPanel({
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <SegmentedScope value={scope} onChange={onScopeChange} />
-        <button
+        <Button
           type="button"
           onClick={onInstall}
           disabled={busy || !source.trim()}
-          className="pi-btn pi-btn-primary"
+          variant="primary"
           style={buttonLayout}
         >
           {busy ? t("installing", "Installing…") : t("install", "Install")}
-        </button>
+        </Button>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
@@ -339,11 +340,10 @@ function AddPluginPanel({
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {examples.map((example) => (
-            <button
+            <Button
               key={example}
               type="button"
               onClick={() => onSourceChange(example)}
-              className="pi-btn"
               style={{
                 width: "100%",
                 minHeight: 30,
@@ -355,7 +355,7 @@ function AddPluginPanel({
               }}
             >
               {example}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -454,18 +454,12 @@ function PackageDetail({
         </div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            onClick={() => onAction("update", pkg)}
-            disabled={busy || reloadBusy}
-            className="pi-btn"
-            style={buttonLayout}
-          >
+          <Button onClick={() => onAction("update", pkg)} disabled={busy || reloadBusy} style={buttonLayout}>
             {busyKey === `update:${key}` ? t("pluginUpdating", "Updating…") : t("pluginUpdate", "Update")}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onReloadSession}
             disabled={!sessionId || reloadBusy || busy}
-            className="pi-btn"
             style={buttonLayout}
             title={
               sessionId
@@ -474,15 +468,15 @@ function PackageDetail({
             }
           >
             {reloadBusy ? t("pluginReloading", "Reloading…") : t("pluginReloadSession", "Reload session")}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => onAction("remove", pkg)}
             disabled={busy || reloadBusy}
-            className="pi-btn pi-btn-danger"
+            variant="danger"
             style={buttonLayout}
           >
             {busyKey === `remove:${key}` ? t("pluginRemoving", "Removing…") : t("pluginRemove", "Remove")}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -772,9 +766,9 @@ export function PluginsConfig({
                 {shortenPath(cwd)}
               </code>
             </div>
-            <button
+            <Button
               onClick={onClose}
-              className="pi-btn pi-btn-ghost"
+              variant="ghost"
               style={{
                 fontSize: 20,
                 lineHeight: 1,
@@ -782,7 +776,7 @@ export function PluginsConfig({
               }}
             >
               ×
-            </button>
+            </Button>
           </div>
         )}
 
@@ -910,14 +904,14 @@ export function PluginsConfig({
               )}
             </div>
             <div style={{ padding: "8px 6px", borderTop: "1px solid var(--border)", flexShrink: 0 }}>
-              <button
+              <Button
                 type="button"
                 onClick={() => {
                   setAddMode(true);
                   setActionError(null);
                   setActionMessage(null);
                 }}
-                className="pi-btn pi-btn-ghost"
+                variant="ghost"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -945,7 +939,7 @@ export function PluginsConfig({
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
                 {t("addPlugin", "Add plugin")}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -1052,18 +1046,13 @@ export function PluginsConfig({
               </span>
             )}
           </div>
-          <button
-            onClick={() => void loadPlugins()}
-            disabled={loading || busyKey !== null}
-            className="pi-btn"
-            style={buttonLayout}
-          >
+          <Button onClick={() => void loadPlugins()} disabled={loading || busyKey !== null} style={buttonLayout}>
             {t("refresh", "Refresh")}
-          </button>
+          </Button>
           {!embedded && (
-            <button onClick={onClose} className="pi-btn" style={buttonLayout}>
+            <Button onClick={onClose} style={buttonLayout}>
               {t("close", "Close")}
-            </button>
+            </Button>
           )}
         </div>
       </div>

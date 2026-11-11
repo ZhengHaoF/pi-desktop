@@ -1,6 +1,7 @@
 import { useEffect, useState, type ImgHTMLAttributes } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "@/i18n";
+import { Button } from "@/components/ui/Button";
 
 /**
  * Full-screen image preview overlay.
@@ -49,9 +50,9 @@ export function ImageLightbox({ src, alt, onClose }: { src: string; alt?: string
           cursor: "default",
         }}
       />
-      <button
+      <Button
         type="button"
-        className="pi-btn pi-btn-ghost"
+        variant="ghost"
         onClick={onClose}
         title={t("close", "Close")}
         aria-label={t("close", "Close")}
@@ -70,7 +71,7 @@ export function ImageLightbox({ src, alt, onClose }: { src: string; alt?: string
         }}
       >
         ×
-      </button>
+      </Button>
     </div>,
     document.body,
   );

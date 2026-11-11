@@ -61,6 +61,7 @@ import type { BrowserAgentAuthorizationRequest, BrowserAgentAuthorizationDecisio
 import { isManagedProcessActiveState } from "@contract/processes";
 import { QuickHerdrFleet } from "./herdr/QuickHerdrFleet";
 import type { HerdrPane } from "@contract/herdr";
+import { Button } from "@/components/ui/Button";
 
 const EXPLORER_TAB_ID = "explorer";
 const BROWSER_TAB_ID = "browser";
@@ -738,9 +739,9 @@ export function AppShell({
         onCwdChange={handleCwdChange}
       />
       <div style={{ padding: "8px", flexShrink: 0 }}>
-        <button
+        <Button
           type="button"
-          className="pi-btn pi-btn-ghost"
+          variant="ghost"
           onClick={() => setSettingsOpen(true)}
           title={t("settings", "Settings")}
           style={{
@@ -777,7 +778,7 @@ export function AppShell({
             <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.12.38.33.72.6 1 .3.29.69.42 1.1.4h.09v4h-.09a1.7 1.7 0 0 0-1.7.6Z" />
           </svg>
           {t("settings", "Settings")}
-        </button>
+        </Button>
       </div>
     </>
   );
@@ -920,8 +921,8 @@ export function AppShell({
               zIndex: 2,
             }}
           >
-            <button
-              className="pi-btn pi-btn-ghost"
+            <Button
+              variant="ghost"
               onClick={handleSidebarToggle}
               title={sidebarOpen ? t("hideSidebar", "Hide sidebar") : t("showSidebar", "Show sidebar")}
               aria-label={sidebarOpen ? t("hideSidebar", "Hide sidebar") : t("showSidebar", "Show sidebar")}
@@ -966,9 +967,9 @@ export function AppShell({
                   <line x1="3" y1="18" x2="21" y2="18" />
                 </svg>
               )}
-            </button>
-            <button
-              className="pi-btn pi-btn-ghost"
+            </Button>
+            <Button
+              variant="ghost"
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 toggleTheme({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
@@ -1025,7 +1026,7 @@ export function AppShell({
                   <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                 </svg>
               )}
-            </button>
+            </Button>
             {selectedSession && !isMobile && (
               <div
                 role="heading"
@@ -1201,9 +1202,8 @@ export function AppShell({
               boxSizing: "border-box",
             }}
           >
-            <button
+            <Button
               type="button"
-              className="pi-btn"
               onClick={() => dispatchFileTab({ type: "select", tabId: EXPLORER_TAB_ID })}
               aria-pressed={activeFileTabId === EXPLORER_TAB_ID}
               style={{
@@ -1235,10 +1235,9 @@ export function AppShell({
                 <path d="M3 5a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
               </svg>
               {t("explorer", "Explorer")}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="pi-btn"
               onClick={() => dispatchFileTab({ type: "select", tabId: BROWSER_TAB_ID })}
               aria-pressed={activeFileTabId === BROWSER_TAB_ID}
               style={{
@@ -1271,10 +1270,9 @@ export function AppShell({
                 <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
               </svg>
               {t("browser", "Browser")}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="pi-btn"
               onClick={() => dispatchFileTab({ type: "select", tabId: PROCESSES_TAB_ID })}
               aria-pressed={activeFileTabId === PROCESSES_TAB_ID}
               style={{
@@ -1325,10 +1323,9 @@ export function AppShell({
                   {managedProcessCount > 0 ? managedProcessCount : "!"}
                 </span>
               )}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="pi-btn"
               onClick={() => dispatchFileTab({ type: "select", tabId: HERDR_TERMINAL_TAB_ID })}
               aria-pressed={activeFileTabId === HERDR_TERMINAL_TAB_ID}
               style={{
@@ -1348,7 +1345,7 @@ export function AppShell({
             >
               <span aria-hidden="true">›_</span>
               {t("herdrTerminal", "Herdr Terminal")}
-            </button>
+            </Button>
             <div style={{ flex: 1, overflow: "hidden" }}>
               <TabBar
                 tabs={fileTabs}
@@ -1358,9 +1355,9 @@ export function AppShell({
               />
             </div>
             {activeFileTabId === EXPLORER_TAB_ID && explorerCwd && (
-              <button
+              <Button
                 type="button"
-                className="pi-btn pi-btn-ghost"
+                variant="ghost"
                 onClick={() => setExplorerRefreshKey((key) => key + 1)}
                 title={t("refreshExplorer", "Refresh explorer")}
                 aria-label={t("refreshExplorer", "Refresh explorer")}
@@ -1391,7 +1388,7 @@ export function AppShell({
                   <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
                   <path d="M3 3v5h5" />
                 </svg>
-              </button>
+              </Button>
             )}
           </div>
 
@@ -1464,8 +1461,7 @@ export function AppShell({
         </div>
       </div>
       {/* File panel toggle — always visible at top-right */}
-      <button
-        className="pi-btn"
+      <Button
         onClick={handleRightPanelToggle}
         title={rightPanelOpen ? t("hideFilePanel", "Hide file panel") : t("showFilePanel", "Show file panel")}
         aria-label={rightPanelOpen ? t("hideFilePanel", "Hide file panel") : t("showFilePanel", "Show file panel")}
@@ -1500,7 +1496,7 @@ export function AppShell({
           <rect x="3" y="3" width="18" height="18" rx="2" />
           <line x1="15" y1="3" x2="15" y2="21" />
         </svg>
-      </button>
+      </Button>
       {settingsOpen && (
         <SettingsConfig
           cwd={activeCwd ?? selectedSession?.cwd ?? newSessionCwd ?? null}

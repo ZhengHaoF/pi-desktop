@@ -2,6 +2,7 @@ import { useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { useI18n } from "@/i18n";
 import type { ThinkingExpansionStore } from "@/lib/thinking-expansion-store";
 import { scaledChatFont } from "@/lib/chat-appearance";
+import { Button } from "@/components/ui/Button";
 
 interface Props {
   messageCount: number;
@@ -31,9 +32,9 @@ export function ProcessDetailsGroup({ messageCount, toolCallCount, children, sta
 
   return (
     <div style={{ marginBottom: 14 }}>
-      <button
+      <Button
         type="button"
-        className="pi-btn pi-btn-ghost"
+        variant="ghost"
         aria-expanded={expanded}
         onClick={() => expansionStore.toggle(stateKey)}
         style={{
@@ -69,7 +70,7 @@ export function ProcessDetailsGroup({ messageCount, toolCallCount, children, sta
         <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {parts.join(" · ")}
         </span>
-      </button>
+      </Button>
       {expanded && <div style={{ marginTop: 8 }}>{children}</div>}
     </div>
   );

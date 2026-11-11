@@ -16,6 +16,7 @@ import type {
 import { TOOL_PREFERENCES } from "@shared/toolchains/types";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useI18n } from "@/i18n";
+import { Button } from "@/components/ui/Button";
 
 const TOOL_CATEGORIES: ReadonlyArray<{
   id: "javascript" | "python" | "cli";
@@ -193,7 +194,7 @@ export function ToolchainStateView({
                   const itemState = state?.capabilities[capability];
                   const selectedItem = selected === capability;
                   return (
-                    <button
+                    <Button
                       key={capability}
                       type="button"
                       data-tool-id={capability}
@@ -201,7 +202,7 @@ export function ToolchainStateView({
                       aria-current={selectedItem ? "true" : undefined}
                       onClick={() => setSelected(capability)}
                       aria-pressed={selectedItem}
-                      className="pi-btn pi-btn-ghost"
+                      variant="ghost"
                       style={{
                         width: "100%",
                         display: "flex",
@@ -238,7 +239,7 @@ export function ToolchainStateView({
                       >
                         {CAPABILITY_LABELS[capability]}
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -264,14 +265,14 @@ export function ToolchainStateView({
                 {state ? `${state.components.herdr?.health === "healthy" ? 1 : 0}/1` : "–"}
               </span>
             </div>
-            <button
+            <Button
               type="button"
               data-tool-id="component.herdr"
               aria-label={`Herdr · ${healthLabel(state?.components.herdr?.health ?? "missing", t)}`}
               aria-current={herdrSelected ? "true" : undefined}
               onClick={() => setSelected("component.herdr")}
               aria-pressed={herdrSelected}
-              className="pi-btn pi-btn-ghost"
+              variant="ghost"
               style={{
                 width: "100%",
                 display: "flex",
@@ -308,7 +309,7 @@ export function ToolchainStateView({
               >
                 Herdr
               </span>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -1078,12 +1079,12 @@ function ActionButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
       disabled={disabled}
       aria-busy={busy || undefined}
       onClick={onClick}
-      className={primary ? "pi-btn pi-btn-primary" : "pi-btn"}
+      variant={primary ? "primary" : "default"}
       style={{
         width: fullWidth ? "100%" : undefined,
         minHeight: 32,
@@ -1095,7 +1096,7 @@ function ActionButton({
       }}
     >
       {busy ? "…" : children}
-    </button>
+    </Button>
   );
 }
 

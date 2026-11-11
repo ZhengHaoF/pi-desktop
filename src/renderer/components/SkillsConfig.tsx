@@ -6,6 +6,7 @@ import type { SkillRecord as Skill, SkillSearchResult } from "@/lib/api-types";
 import { LatestAbortableRequest } from "@/lib/latest-abortable-request";
 import { CapabilityRequired, parseCapabilityIssue, type CapabilityIssue } from "@/components/CapabilityRequired";
 import { formatCompactNumber } from "@/lib/locale-format";
+import { Button } from "@/components/ui/Button";
 
 type Translate = (key: string, fallback: string) => string;
 
@@ -31,7 +32,7 @@ function sourceLabelText(label: string, t: Translate): string {
 function Toggle({ enabled, loading, onToggle }: { enabled: boolean; loading: boolean; onToggle: () => void }) {
   const { t } = useI18n();
   return (
-    <button
+    <Button
       type="button"
       role="switch"
       aria-checked={enabled}
@@ -74,7 +75,7 @@ function Toggle({ enabled, loading, onToggle }: { enabled: boolean; loading: boo
           transition: "left 0.18s cubic-bezier(.4,0,.2,1)",
         }}
       />
-    </button>
+    </Button>
   );
 }
 
@@ -216,11 +217,11 @@ const SkillDetail = forwardRef<
           <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}>
             {t("skillFileName", "SKILL.md")}
           </span>
-          <button
+          <Button
             type="button"
             onClick={() => void saveContent()}
             disabled={contentLoading || contentSaving || content === savedContent}
-            className={content !== savedContent ? "pi-btn pi-btn-primary" : "pi-btn"}
+            variant={content !== savedContent ? "primary" : "default"}
             style={{
               minHeight: 32,
               padding: "0 11px",
@@ -229,7 +230,7 @@ const SkillDetail = forwardRef<
             }}
           >
             {contentSaving ? t("saving", "Saving…") : t("saveChanges", "Save changes")}
-          </button>
+          </Button>
         </div>
         {contentLoading ? (
           <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>
@@ -379,11 +380,11 @@ function AddSkillPanel({ cwd, onInstalled }: { cwd: string; onInstalled: () => v
               outline: "none",
             }}
           />
-          <button
+          <Button
             type="button"
             onClick={() => search(query)}
             disabled={searching || !query.trim()}
-            className="pi-btn pi-btn-primary"
+            variant="primary"
             style={{
               minHeight: 36,
               padding: "7px 16px",
@@ -393,7 +394,7 @@ function AddSkillPanel({ cwd, onInstalled }: { cwd: string; onInstalled: () => v
             }}
           >
             {searching ? t("searching", "Searching…") : t("search", "Search")}
-          </button>
+          </Button>
         </div>
 
         {/* Scope + install path row */}
@@ -409,11 +410,11 @@ function AddSkillPanel({ cwd, onInstalled }: { cwd: string; onInstalled: () => v
             }}
           >
             {(["global", "project"] as const).map((s) => (
-              <button
+              <Button
                 key={s}
                 onClick={() => setScope(s)}
                 aria-pressed={scope === s}
-                className="pi-btn pi-btn-ghost"
+                variant="ghost"
                 style={{
                   padding: "3px 10px",
                   border: "none",
@@ -423,7 +424,7 @@ function AddSkillPanel({ cwd, onInstalled }: { cwd: string; onInstalled: () => v
                 }}
               >
                 {sourceLabelText(s, t)}
-              </button>
+              </Button>
             ))}
           </div>
           <span
@@ -537,10 +538,9 @@ function AddSkillPanel({ cwd, onInstalled }: { cwd: string; onInstalled: () => v
                     )}
                   </div>
                 </div>
-                <button
+                <Button
                   onClick={() => !isInstalled && !isInstalling && install(r.package)}
                   disabled={isInstalled || isInstalling || installing !== null}
-                  className="pi-btn"
                   style={{
                     flexShrink: 0,
                     padding: "5px 14px",
@@ -556,7 +556,7 @@ function AddSkillPanel({ cwd, onInstalled }: { cwd: string; onInstalled: () => v
                     : isInstalling
                       ? t("installing", "Installing…")
                       : t("install", "Install")}
-                </button>
+                </Button>
               </div>
             );
           })}
@@ -790,9 +790,9 @@ export const SkillsConfig = forwardRef<
                 {shortenPath(cwd)}
               </code>
             </div>
-            <button
+            <Button
               onClick={() => requestTransition(onClose)}
-              className="pi-btn pi-btn-ghost"
+              variant="ghost"
               style={{
                 fontSize: 20,
                 lineHeight: 1,
@@ -800,7 +800,7 @@ export const SkillsConfig = forwardRef<
               }}
             >
               ×
-            </button>
+            </Button>
           </div>
         )}
 
@@ -875,7 +875,7 @@ export const SkillsConfig = forwardRef<
                         const isSelected = !addMode && selected === skill.filePath;
                         const disabled = skill.disableModelInvocation;
                         return (
-                          <button
+                          <Button
                             key={skill.filePath}
                             type="button"
                             aria-current={isSelected ? "true" : undefined}
@@ -887,7 +887,7 @@ export const SkillsConfig = forwardRef<
                                 setAddMode(false);
                               });
                             }}
-                            className="pi-btn pi-btn-ghost"
+                            variant="ghost"
                             style={{
                               display: "flex",
                               alignItems: "center",
@@ -925,7 +925,7 @@ export const SkillsConfig = forwardRef<
                             >
                               {skill.name}
                             </span>
-                          </button>
+                          </Button>
                         );
                       })}
                     </div>
@@ -941,12 +941,12 @@ export const SkillsConfig = forwardRef<
                 flexShrink: 0,
               }}
             >
-              <button
+              <Button
                 type="button"
                 aria-current={addMode ? "true" : undefined}
                 aria-pressed={addMode}
                 onClick={() => requestTransition(() => setAddMode(true))}
-                className="pi-btn pi-btn-ghost"
+                variant="ghost"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -975,7 +975,7 @@ export const SkillsConfig = forwardRef<
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
                 {t("addSkill", "Add skill")}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -1029,9 +1029,8 @@ export const SkillsConfig = forwardRef<
               flexShrink: 0,
             }}
           >
-            <button
+            <Button
               onClick={() => requestTransition(onClose)}
-              className="pi-btn"
               style={{
                 padding: "6px 14px",
                 borderRadius: 6,
@@ -1039,7 +1038,7 @@ export const SkillsConfig = forwardRef<
               }}
             >
               {t("close", "Close")}
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -1087,33 +1086,31 @@ export const SkillsConfig = forwardRef<
               {t("unsavedSkillChangesDescription", "Save your SKILL.md changes before leaving this editor?")}
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button
+              <Button
                 type="button"
                 disabled={transitionSaving}
                 onClick={discardAndContinue}
-                className="pi-btn"
                 style={leavePromptButtonLayout}
               >
                 {t("discard", "Discard")}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 disabled={transitionSaving}
                 onClick={() => setPendingTransition(null)}
-                className="pi-btn"
                 style={leavePromptButtonLayout}
               >
                 {t("cancel", "Cancel")}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 disabled={transitionSaving}
                 onClick={() => void saveAndContinue()}
-                className="pi-btn pi-btn-primary"
+                variant="primary"
                 style={leavePromptButtonLayout}
               >
                 {transitionSaving ? t("saving", "Saving…") : t("save", "Save")}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

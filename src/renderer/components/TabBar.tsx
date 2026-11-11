@@ -1,5 +1,6 @@
 import { getFileIcon } from "./FileIcons";
 import type { FileTab } from "@/lib/file-tab-state";
+import { Button } from "@/components/ui/Button";
 
 interface Props {
   tabs: FileTab[];
@@ -60,9 +61,9 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
             >
               {tab.label}
             </span>
-            <button
+            <Button
               type="button"
-              className="pi-btn pi-btn-ghost"
+              variant="ghost"
               onClick={(e) => {
                 e.stopPropagation();
                 onCloseTab(tab.id);
@@ -92,7 +93,7 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
                 <line x1="2" y1="2" x2="8" y2="8" />
                 <line x1="8" y1="2" x2="2" y2="8" />
               </svg>
-            </button>
+            </Button>
           </div>
         );
       })}

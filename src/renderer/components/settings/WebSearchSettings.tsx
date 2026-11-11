@@ -3,6 +3,7 @@ import { useI18n } from "@/i18n";
 import { getWebSearchSettings, setWebSearchSettings, testWebSearchSettings } from "@/lib/api-client";
 import type { WebSearchSnapshot } from "@shared/web-search";
 import { SettingRow } from "./settings-controls";
+import { Button } from "@/components/ui/Button";
 
 const inputStyle = {
   minWidth: 220,
@@ -229,24 +230,22 @@ export function WebSearchSettings() {
               disabled={busy || testing || !providerId}
               onChange={(event) => setKeyDrafts((drafts) => ({ ...drafts, [providerId]: event.target.value }))}
             />
-            <button
+            <Button
               type="button"
-              className="pi-btn"
               style={{ ...buttonLayout, opacity: keyDirty && !busy ? 1 : 0.6 }}
               disabled={!keyDirty || busy}
               onClick={() => void saveKey()}
             >
               {t("webSearchApiKeyOverrideSave", "Save key")}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="pi-btn"
               style={{ ...buttonLayout, opacity: testing ? 0.65 : 1 }}
               disabled={busy || testing || !providerId}
               onClick={() => void test()}
             >
               {testing ? t("webSearchTesting", "Testing…") : t("webSearchTest", "Test")}
-            </button>
+            </Button>
           </div>
         </SettingRow>
         <p style={hintStyle}>
