@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useI18n } from "@/i18n";
 import { getWebSearchSettings, setWebSearchSettings, testWebSearchSettings } from "@/lib/api-client";
 import type { WebSearchSnapshot } from "@shared/web-search";
@@ -23,13 +23,27 @@ const buttonLayout = {
 
 const hintStyle = { margin: "8px 0 0", fontSize: 12, lineHeight: 1.55, color: "var(--text-dim)" } as const;
 
+/** Per-provider hint lines; each provider declares what it supports and how its key resolves. */
+const providerHintKeys: Record<string, string> = {
+  deepseek: "webSearchProviderDeepSeekHint",
+  "tencent-wsa": "webSearchProviderTencentWsaHint",
+};
+
+const placeholderKeys: Record<string, string> = {
+  deepseek: "webSearchApiKeyOverridePlaceholderDeepSeek",
+  "tencent-wsa": "webSearchApiKeyOverridePlaceholderTencentWsa",
+};
+
 /**
  * Web search tools panel. The feature is off by default because every
  * successful provider call is billed; the panel owns its own load/save cycle.
+ * The provider choice and each provider's key draft live here; saving
+ * persists only the edited provider's fields.
  */
 export function WebSearchSettings() {
   const { t } = useI18n();
   const controlId = useId();
+  const providerControlId = useId();
   const keyControlId = useId();
   const [snapshot, setSnapshot] = useState<WebSearchSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,7 +51,7 @@ export function WebSearchSettings() {
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState<"load" | "save" | null>(null);
   const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
-  const [keyDraft, setKeyDraft] = useState("");
+  const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let disposed = false;
@@ -45,7 +59,7 @@ export function WebSearchSettings() {
       .then((result) => {
         if (disposed) return;
         setSnapshot(result);
-        setKeyDraft(result.settings.apiKeyOverride);
+        setKeyDrafts({ ...(result.settings.apiKeys ?? {}) });
         setError(result.loadFailed ? "load" : null);
       })
       .catch(() => {
@@ -65,12 +79,12 @@ export function WebSearchSettings() {
     try {
       const result = await setWebSearchSettings(patch);
       setSnapshot(result);
-      if (patch.apiKeyOverride !== undefined) setKeyDraft(result.settings.apiKeyOverride);
+      if (patch.apiKeys !== undefined) setKeyDrafts({ ...(result.settings.apiKeys ?? {}) });
     } catch {
       try {
         const reloaded = await getWebSearchSettings();
         setSnapshot(reloaded);
-        setKeyDraft(reloaded.settings.apiKeyOverride);
+        setKeyDrafts({ ...(reloaded.settings.apiKeys ?? {}) });
       } catch {
         /* keep the last known snapshot */
       }
@@ -80,13 +94,38 @@ export function WebSearchSettings() {
     }
   };
 
+  const providerId = snapshot?.settings.providerId ?? "";
+  // Stable identity keeps the useMemo below from recomputing on every render.
+  const providers = useMemo(() => snapshot?.providers ?? [], [snapshot]);
+  const activeProvider = useMemo(
+    () => providers.find((provider) => provider.id === providerId),
+    [providers, providerId],
+  );
+  // Optional chains guard against a host that predates multi-provider settings.
+  const savedKey = snapshot?.settings.apiKeys?.[providerId] ?? "";
+  const keyDraft = keyDrafts[providerId] ?? "";
+  const keyDirty = snapshot !== null && keyDraft.trim() !== savedKey;
+
+  const switchProvider = async (id: string): Promise<void> => {
+    setTestResult(null);
+    await save({ providerId: id });
+  };
+
+  const saveKey = async (): Promise<void> => {
+    if (!providerId) return;
+    await save({ apiKeys: { ...snapshot?.settings.apiKeys, [providerId]: keyDraft.trim() } });
+  };
   const test = async (): Promise<void> => {
+    if (!providerId) return;
     setTesting(true);
     setTestResult(null);
     try {
       // A dirty draft is validated as typed; otherwise the saved key is tested.
-      const draft = keyDraft.trim() !== (snapshot?.settings.apiKeyOverride ?? "") ? keyDraft.trim() : undefined;
-      const response = await testWebSearchSettings(draft);
+      const draft = keyDirty ? keyDraft.trim() : undefined;
+      const response = await testWebSearchSettings({
+        providerId,
+        ...(draft === undefined ? {} : { apiKeyOverride: draft }),
+      });
       setTestResult({
         ok: response.ok,
         text: response.ok
@@ -105,7 +144,6 @@ export function WebSearchSettings() {
 
   const credential = snapshot?.credential.source;
   const busy = loading || saving;
-  const keyDirty = snapshot !== null && keyDraft.trim() !== snapshot.settings.apiKeyOverride;
 
   return (
     <div style={{ width: "100%", overflowY: "auto", padding: "28px clamp(18px, 5vw, 52px)" }}>
@@ -116,7 +154,7 @@ export function WebSearchSettings() {
         <p style={{ ...hintStyle, margin: "6px 0 16px" }}>
           {t(
             "webSearchDescription",
-            "Give the Agent web_search and web_fetch tools for current information. Search runs on DeepSeek; fetched page content is treated as untrusted data.",
+            "Give the Agent web_search and web_fetch tools for current information. Search is billed per call; fetched page content is treated as untrusted data.",
           )}
         </p>
         <SettingRow label={t("webSearchEnable", "Enable web search tools")} controlId={controlId}>
@@ -137,7 +175,7 @@ export function WebSearchSettings() {
         <p style={hintStyle}>
           {t(
             "webSearchBilling",
-            "Search and fetch are billed per successful request (DeepSeek charges per 1,000 calls); failed requests are not billed. Each call is recorded in the session execution history.",
+            "Search and fetch are billed per successful request; failed requests are not billed. Each call is recorded in the session execution history.",
           )}
         </p>
         <p style={hintStyle}>
@@ -147,6 +185,34 @@ export function WebSearchSettings() {
           )}
         </p>
         <div style={{ height: 1, background: "var(--border)", margin: "20px 0" }} />
+        <SettingRow label={t("webSearchProvider", "Search provider")} controlId={providerControlId}>
+          <select
+            id={providerControlId}
+            style={{ ...inputStyle, minWidth: 180 }}
+            value={providerId}
+            disabled={busy}
+            onChange={(event) => void switchProvider(event.target.value)}
+          >
+            {providers.map((provider) => (
+              <option key={provider.id} value={provider.id}>
+                {provider.label}
+              </option>
+            ))}
+          </select>
+        </SettingRow>
+        {activeProvider && (
+          <p style={hintStyle}>
+            {providerHintKeys[activeProvider.id]
+              ? t(providerHintKeys[activeProvider.id], "")
+              : activeProvider.supportsFetch
+                ? ""
+                : t(
+                    "webSearchProviderTencentWsaHint",
+                    "This provider offers web_search only; web_fetch is unavailable while it is selected.",
+                  )}
+          </p>
+        )}
+        <div style={{ height: 1, background: "var(--border)", margin: "20px 0" }} />
         <SettingRow label={t("webSearchApiKeyOverride", "Dedicated API key (optional)")} controlId={keyControlId}>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <input
@@ -154,17 +220,21 @@ export function WebSearchSettings() {
               style={inputStyle}
               type="password"
               autoComplete="new-password"
-              placeholder={t("webSearchApiKeyOverridePlaceholder", "Reuse the DeepSeek provider key")}
+              placeholder={
+                placeholderKeys[providerId]
+                  ? t(placeholderKeys[providerId], "")
+                  : t("webSearchApiKeyOverridePlaceholderDeepSeek", "Reuse the provider key")
+              }
               value={keyDraft}
-              disabled={busy || testing}
-              onChange={(event) => setKeyDraft(event.target.value)}
+              disabled={busy || testing || !providerId}
+              onChange={(event) => setKeyDrafts((drafts) => ({ ...drafts, [providerId]: event.target.value }))}
             />
             <button
               type="button"
               className="pi-btn"
               style={{ ...buttonLayout, opacity: keyDirty && !busy ? 1 : 0.6 }}
               disabled={!keyDirty || busy}
-              onClick={() => void save({ apiKeyOverride: keyDraft.trim() })}
+              onClick={() => void saveKey()}
             >
               {t("webSearchApiKeyOverrideSave", "Save key")}
             </button>
@@ -172,7 +242,7 @@ export function WebSearchSettings() {
               type="button"
               className="pi-btn"
               style={{ ...buttonLayout, opacity: testing ? 0.65 : 1 }}
-              disabled={busy || testing}
+              disabled={busy || testing || !providerId}
               onClick={() => void test()}
             >
               {testing ? t("webSearchTesting", "Testing…") : t("webSearchTest", "Test")}
@@ -183,10 +253,10 @@ export function WebSearchSettings() {
           {credential === "override"
             ? t("webSearchCredentialOverride", "Using the dedicated key saved above.")
             : credential === "provider"
-              ? t("webSearchCredentialProvider", "Using the DeepSeek API key from Settings → Models.")
+              ? t("webSearchCredentialProvider", "Using the provider API key from Settings → Models.")
               : t(
                   "webSearchCredentialNone",
-                  "No key configured. Add a DeepSeek provider in Settings → Models, or save a dedicated key above.",
+                  "No key configured. Add a matching provider in Settings → Models, or save a dedicated key above.",
                 )}
         </p>
         {testResult && (

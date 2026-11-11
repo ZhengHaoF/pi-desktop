@@ -420,7 +420,7 @@ export interface Api {
   "settings.setDefaultToolPreset": { params: { preset: SelectableToolPreset }; result: ToolPresetSettings };
   "settings.getWebSearch": { params: void; result: WebSearchSnapshot };
   "settings.setWebSearch": { params: Partial<WebSearchSettings>; result: WebSearchSnapshot };
-  "settings.testWebSearch": { params: { apiKeyOverride?: string } | void; result: TestResult };
+  "settings.testWebSearch": { params: { apiKeyOverride?: string; providerId?: string } | void; result: TestResult };
   "settings.getCacheWarming": {
     params: void;
     result: {

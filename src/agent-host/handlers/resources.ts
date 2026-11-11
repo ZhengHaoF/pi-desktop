@@ -59,13 +59,6 @@ async function resolveLoadedSkill(cwd: string, filePath: string) {
     if (typeof enabled !== "boolean") throw bad("enabled must be a boolean");
     patch.enabled = enabled;
   }
-  const apiKeyOverride: unknown = record.apiKeyOverride;
-  if (apiKeyOverride !== undefined) {
-    if (typeof apiKeyOverride !== "string") throw bad("apiKeyOverride must be a string");
-    if (apiKeyOverride.trim().length > WEB_SEARCH_LIMITS.apiKeyOverrideMaxLength)
-      throw bad(`apiKeyOverride must be at most ${String(WEB_SEARCH_LIMITS.apiKeyOverrideMaxLength)} characters`);
-    patch.apiKeyOverride = apiKeyOverride.trim();
-  }
   const maxResults: unknown = record.maxResults;
   if (maxResults !== undefined) {
     const { min, max } = WEB_SEARCH_LIMITS.maxResults;
@@ -87,6 +80,24 @@ async function resolveLoadedSkill(cwd: string, filePath: string) {
     const runtime = peekWebSearchRuntime();
     if (runtime && !runtime.getProvider(id)) throw bad(`Unknown web search provider: ${id}`);
     patch.providerId = id;
+  }
+  const apiKeys: unknown = record.apiKeys;
+  if (apiKeys !== undefined) {
+    if (!apiKeys || typeof apiKeys !== "object" || Array.isArray(apiKeys)) throw bad("apiKeys must be an object");
+    const entries: Record<string, string> = {};
+    for (const [id, key] of Object.entries(apiKeys as Record<string, unknown>)) {
+      if (typeof key !== "string") throw bad("apiKeys values must be strings");
+      const provider = id.trim();
+      if (!provider) continue;
+      const runtime = peekWebSearchRuntime();
+      if (runtime && !runtime.getProvider(provider)) throw bad(`Unknown web search provider: ${provider}`);
+      if (key.trim().length > WEB_SEARCH_LIMITS.apiKeyOverrideMaxLength)
+        throw bad(
+          `apiKeys[${provider}] must be at most ${String(WEB_SEARCH_LIMITS.apiKeyOverrideMaxLength)} characters`,
+        );
+      entries[provider] = key.trim();
+    }
+    patch.apiKeys = entries;
   }
   return normalizeWebSearchSettings({ ...webSearchSettings.get(), ...patch });
 }
@@ -152,6 +163,7 @@ export const resourceHandlers = {
     return {
       settings,
       credential: { source, providerId: settings.providerId },
+      providers: initializeWebSearchRuntime().listProviders(),
       loadFailed: webSearchSettings.hasLoadFailed(),
     };
   },
@@ -160,17 +172,30 @@ export const resourceHandlers = {
     const patch = readWebSearchPatch(params);
     const settings = await webSearchSettings.patch(patch);
     const source = await probeWebSearchCredential(settings);
-    return { settings, credential: { source, providerId: settings.providerId }, loadFailed: false };
+    return {
+      settings,
+      credential: { source, providerId: settings.providerId },
+      providers: initializeWebSearchRuntime().listProviders(),
+      loadFailed: false,
+    };
   },
 
   testWebSearch: async (params): Promise<TestResult> => {
     // A draft key can be validated without persisting it; otherwise the saved settings are tested.
-    const draft = (params as { apiKeyOverride?: unknown } | undefined)?.apiKeyOverride;
+    const draft = (params as { apiKeyOverride?: unknown; providerId?: unknown } | undefined)?.apiKeyOverride;
+    const draftProvider = (params as { apiKeyOverride?: unknown; providerId?: unknown } | undefined)?.providerId;
     if (draft !== undefined && typeof draft !== "string")
       throw new RpcError({ code: "BAD_REQUEST", message: "apiKeyOverride must be a string" });
+    if (draftProvider !== undefined && typeof draftProvider !== "string")
+      throw new RpcError({ code: "BAD_REQUEST", message: "providerId must be a string" });
     const stored = webSearchSettings.get();
-    const settings = draft === undefined ? stored : normalizeWebSearchSettings({ ...stored, apiKeyOverride: draft });
     const runtime = initializeWebSearchRuntime();
+    // The panel tests the provider being configured, which may differ from the saved selection.
+    const settings = normalizeWebSearchSettings({
+      ...stored,
+      ...(draftProvider === undefined ? {} : { providerId: draftProvider }),
+      ...(draft === undefined ? {} : { apiKeys: { ...stored.apiKeys, [draftProvider ?? stored.providerId]: draft } }),
+    });
     const provider = runtime.getProvider(settings.providerId);
     if (!provider) return { ok: false, error: `Web search provider "${settings.providerId}" is not available.` };
     const startedAt = Date.now();

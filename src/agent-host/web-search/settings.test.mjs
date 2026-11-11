@@ -35,14 +35,36 @@ test("a corrupt file degrades to defaults and a successful patch clears the fail
 
 test("patch merges into the persisted state and serializes concurrent writes", async () => {
   const { file, store: settings } = store();
-  await settings.patch({ enabled: true, apiKeyOverride: "sk-one" });
+  await settings.patch({ enabled: true, apiKeys: { deepseek: "sk-one" } });
   const [second, third] = await Promise.all([settings.patch({ maxResults: 7 }), settings.patch({ timeoutMs: 30_000 })]);
   assert.equal(second.maxResults, 7);
   assert.equal(third.timeoutMs, 30_000);
 
   const merged = new WebSearchSettingsStore(file).get();
   assert.equal(merged.enabled, true);
-  assert.equal(merged.apiKeyOverride, "sk-one");
+  assert.deepEqual(merged.apiKeys, { deepseek: "sk-one" });
   assert.equal(merged.maxResults, 7);
   assert.equal(merged.timeoutMs, 30_000);
+});
+
+test("a legacy apiKeyOverride migrates onto the active provider's key slot", () => {
+  const { file, store: settings } = store();
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      version: 1,
+      enabled: true,
+      providerId: "deepseek",
+      apiKeyOverride: "sk-legacy",
+      maxResults: 5,
+      timeoutMs: 20_000,
+    }),
+    "utf8",
+  );
+  assert.deepEqual(settings.get().apiKeys, { deepseek: "sk-legacy" });
+
+  // Re-reading through a fresh store must not re-apply or lose the migrated key.
+  const reloaded = new WebSearchSettingsStore(file);
+  assert.deepEqual(reloaded.get().apiKeys, { deepseek: "sk-legacy" });
+  assert.equal(reloaded.get().apiKeyOverride, undefined);
 });

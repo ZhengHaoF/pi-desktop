@@ -81,13 +81,13 @@ export function mapUpstreamStatus(
     case 401:
       return new WebSearchError(
         "UNAUTHORIZED",
-        "The configured DeepSeek API key was rejected. Check the key in Settings → Search or Settings → Models.",
+        "The configured search API key was rejected. Check the key in Settings → Search or Settings → Models.",
         status,
       );
     case 402:
       return new WebSearchError(
         "PAYMENT_REQUIRED",
-        "The DeepSeek account balance is insufficient. Top up the account to keep using web search.",
+        "The search provider account balance is insufficient. Top up the account to keep using web search.",
         status,
       );
     case 403:

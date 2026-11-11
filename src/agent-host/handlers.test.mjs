@@ -182,9 +182,16 @@ test("web search settings persist, gate availability, and test the effective key
   assert.equal(initial.settings.enabled, false);
   assert.equal(initial.credential.source, "none");
   assert.equal(initial.credential.providerId, "deepseek");
+  assert.deepEqual(
+    initial.providers.map((provider) => provider.id),
+    ["deepseek", "tencent-wsa"],
+  );
 
   // Saving a dedicated key makes it the reported credential source.
-  const saved = await handlers["settings.setWebSearch"]({ enabled: true, apiKeyOverride: "sk-web-search-fixture" });
+  const saved = await handlers["settings.setWebSearch"]({
+    enabled: true,
+    apiKeys: { deepseek: "sk-web-search-fixture" },
+  });
   assert.equal(saved.settings.enabled, true);
   assert.equal(saved.credential.source, "override");
 
@@ -201,7 +208,7 @@ test("web search settings persist, gate availability, and test the effective key
   const draft = await handlers["settings.testWebSearch"]({ apiKeyOverride: "sk-draft" });
   assert.equal(draft.ok, true, draft.error);
   assert.equal(calls[1].auth, "Bearer sk-draft");
-  assert.equal((await handlers["settings.getWebSearch"]()).settings.apiKeyOverride, "sk-web-search-fixture");
+  assert.equal((await handlers["settings.getWebSearch"]()).settings.apiKeys.deepseek, "sk-web-search-fixture");
 
   // Non-retryable provider failures map to readable errors.
   globalThis.fetch = async () =>
@@ -209,6 +216,39 @@ test("web search settings persist, gate availability, and test the effective key
   const failed = await handlers["settings.testWebSearch"]({ apiKeyOverride: "sk-draft" });
   assert.equal(failed.ok, false);
   assert.match(failed.error, /balance/);
+});
+
+test("the web search test endpoint can probe a non-active provider without persisting it", async (t) => {
+  const { handlers } = await captureHandlers();
+  const { Response } = globalThis;
+  const original = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, auth: init.headers.Authorization, body: JSON.parse(init.body) });
+    return new Response(
+      JSON.stringify({ Response: { Pages: [JSON.stringify({ title: "元宝首页", url: "https://www.qq.com" })] } }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  };
+  t.after(() => {
+    globalThis.fetch = original;
+  });
+
+  // The saved selection stays DeepSeek while the Yuanbao provider is probed with a draft key.
+  await handlers["settings.setWebSearch"]({ enabled: true, apiKeys: { deepseek: "sk-deepseek-fixture" } });
+  const passed = await handlers["settings.testWebSearch"]({
+    providerId: "tencent-wsa",
+    apiKeyOverride: "sk-wsa-draft",
+  });
+  assert.equal(passed.ok, true, passed.error);
+  assert.equal(passed.responseText, "元宝首页");
+  assert.equal(calls[0].url, "https://api.wsa.cloud.tencent.com/SearchPro");
+  assert.equal(calls[0].auth, "Bearer sk-wsa-draft");
+  assert.equal(calls[0].body.Query, "DeepSeek");
+
+  const after = await handlers["settings.getWebSearch"]();
+  assert.equal(after.settings.providerId, "deepseek");
+  assert.equal(after.settings.apiKeys["tencent-wsa"], undefined);
 });
 
 test("model discovery uses isolated configuration and parses provider catalogs", async (t) => {

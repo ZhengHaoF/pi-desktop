@@ -22,14 +22,28 @@ const { probeWebSearchCredential, resolveWebSearchApiKey, WebSearchError } = awa
   },
 );
 
-const settings = { enabled: true, providerId: "deepseek", apiKeyOverride: "", maxResults: 5, timeoutMs: 20_000 };
+const settings = {
+  enabled: true,
+  providerId: "deepseek",
+  apiKeys: {},
+  maxResults: 5,
+  timeoutMs: 20_000,
+};
 
 test("an explicit override wins over the provider credential", async () => {
   const resolved = await resolveWebSearchApiKey(
-    { ...settings, apiKeyOverride: "sk-override" },
+    { ...settings, apiKeys: { deepseek: "sk-override" } },
     async () => "sk-provider",
   );
   assert.deepEqual(resolved, { apiKey: "sk-override", source: "override" });
+});
+
+test("the override is resolved per provider, not globally", async () => {
+  const resolved = await resolveWebSearchApiKey(
+    { ...settings, providerId: "tencent-wsa", apiKeys: { deepseek: "sk-deepseek" } },
+    async () => "sk-provider",
+  );
+  assert.deepEqual(resolved, { apiKey: "sk-provider", source: "provider" });
 });
 
 test("the provider credential is used when no override is set", async () => {
@@ -44,6 +58,7 @@ test("a missing provider key fails with an actionable configuration error", asyn
       assert.ok(error instanceof WebSearchError);
       assert.equal(error.code, "NOT_CONFIGURED");
       assert.match(error.message, /Settings → Models/);
+      assert.match(error.message, /deepseek/);
       return true;
     },
   );
@@ -51,7 +66,7 @@ test("a missing provider key fails with an actionable configuration error", asyn
 
 test("the credential probe reports override, provider and none without throwing", async () => {
   assert.equal(
-    await probeWebSearchCredential({ ...settings, apiKeyOverride: "sk" }, async () => undefined),
+    await probeWebSearchCredential({ ...settings, apiKeys: { deepseek: "sk" } }, async () => undefined),
     "override",
   );
   assert.equal(await probeWebSearchCredential(settings, async () => "sk"), "provider");

@@ -1,5 +1,10 @@
-import { WEB_SEARCH_TOOL_NAMES, type WebSearchCredentialSource } from "../../shared/web-search.ts";
+import {
+  WEB_SEARCH_TOOL_NAMES,
+  type WebSearchCredentialSource,
+  type WebSearchProviderInfo,
+} from "../../shared/web-search.ts";
 import { deepseekProvider } from "./providers/deepseek.ts";
+import { tencentWsaProvider } from "./providers/tencent-wsa.ts";
 import {
   probeWebSearchCredential,
   readProviderApiKey,
@@ -28,18 +33,34 @@ export class WebSearchRuntime {
   private readonly store: WebSearchSettingsStore;
   private readonly providers: Map<string, WebSearchProvider>;
   private readonly readProviderKey: ProviderKeyReader;
-  private availability: WebSearchAvailability = { enabled: false, hasCredential: false, source: "none" };
+  private availability: WebSearchAvailability = {
+    enabled: false,
+    hasCredential: false,
+    source: "none",
+    toolNames: [],
+  };
   private refreshing: Promise<void> = Promise.resolve();
   private refreshedAt = 0;
 
   constructor(options: WebSearchRuntimeOptions = {}) {
     this.store = options.store ?? webSearchSettings;
-    this.providers = new Map((options.providers ?? [deepseekProvider]).map((provider) => [provider.id, provider]));
+    this.providers = new Map(
+      (options.providers ?? [deepseekProvider, tencentWsaProvider]).map((provider) => [provider.id, provider]),
+    );
     this.readProviderKey = options.readProviderKey ?? readProviderApiKey;
   }
 
   getProvider(id: string): WebSearchProvider | undefined {
     return this.providers.get(id);
+  }
+
+  /** Registry metadata for the settings UI, in registration order. */
+  listProviders(): WebSearchProviderInfo[] {
+    return [...this.providers.values()].map((provider) => ({
+      id: provider.id,
+      label: provider.label,
+      supportsFetch: provider.supportsFetch,
+    }));
   }
 
   getSettings() {
@@ -65,7 +86,18 @@ export class WebSearchRuntime {
         const source: WebSearchCredentialSource = settings.enabled
           ? await probeWebSearchCredential(settings, this.readProviderKey)
           : "none";
-        this.availability = { enabled: settings.enabled, hasCredential: source !== "none", source };
+        const available = settings.enabled && source !== "none";
+        this.availability = {
+          enabled: settings.enabled,
+          hasCredential: source !== "none",
+          source,
+          // web_fetch joins only when the active provider implements it.
+          toolNames: available
+            ? [...WEB_SEARCH_TOOL_NAMES].filter(
+                (name) => name !== "web_fetch" || this.getProvider(settings.providerId)?.supportsFetch,
+              )
+            : [],
+        };
         this.refreshedAt = Date.now();
       })
       .catch(() => undefined);
@@ -92,5 +124,5 @@ export function getWebSearchRuntime(): WebSearchRuntime {
 
 /** Tool names the model may see right now; empty while the feature is off or unconfigured. */
 export function webSearchToolNamesForAvailability(availability: WebSearchAvailability | undefined): string[] {
-  return availability && availability.enabled && availability.hasCredential ? [...WEB_SEARCH_TOOL_NAMES] : [];
+  return availability && availability.enabled && availability.hasCredential ? availability.toolNames : [];
 }

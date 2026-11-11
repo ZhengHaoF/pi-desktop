@@ -13,18 +13,33 @@ test("defaults keep web search off and reuse the deepseek provider", () => {
   assert.equal(WEB_SEARCH_DEFAULTS.providerId, "deepseek");
 });
 
+test("a legacy apiKeyOverride migrates onto the saved provider's key slot", () => {
+  const migrated = normalizeWebSearchSettings({ providerId: "deepseek", apiKeyOverride: "sk-old" });
+  assert.deepEqual(migrated.apiKeys, { deepseek: "sk-old" });
+  // Explicit apiKeys win; the legacy field is never re-applied over them.
+  const kept = normalizeWebSearchSettings({
+    providerId: "deepseek",
+    apiKeys: { deepseek: "sk-new" },
+    apiKeyOverride: "sk-old",
+  });
+  assert.deepEqual(kept.apiKeys, { deepseek: "sk-new" });
+});
+
 test("normalization clamps ranges, trims keys and drops unknown fields", () => {
   const settings = normalizeWebSearchSettings({
     enabled: "yes",
     providerId: "  deepseek  ",
-    apiKeyOverride: "  sk-test  ",
+    apiKeys: { deepseek: "  sk-test  ", "  tencent-wsa ": "" },
+    apiKeyOverride: "  sk-legacy  ",
     maxResults: 99,
     timeoutMs: 1,
     unknown: "ignored",
   });
   assert.equal(settings.enabled, false);
   assert.equal(settings.providerId, "deepseek");
-  assert.equal(settings.apiKeyOverride, "sk-test");
+  // Keys are trimmed per provider; empty entries drop out. An explicit apiKeys
+  // object wins over the legacy field, which is only migrated when absent.
+  assert.deepEqual(settings.apiKeys, { deepseek: "sk-test" });
   assert.equal(settings.maxResults, WEB_SEARCH_LIMITS.maxResults.max);
   assert.equal(settings.timeoutMs, WEB_SEARCH_LIMITS.timeoutMs.min);
   assert.equal("unknown" in settings, false);

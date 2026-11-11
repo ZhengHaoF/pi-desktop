@@ -55,6 +55,7 @@ function normalizeResult(value: unknown): WebSearchResultItem | undefined {
 export const deepseekProvider: WebSearchProvider = {
   id: "deepseek",
   label: "DeepSeek",
+  supportsFetch: true,
 
   async search({ query, count }, ctx: WebSearchRequestContext) {
     const trimmed = query.trim();

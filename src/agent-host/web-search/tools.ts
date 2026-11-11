@@ -65,9 +65,13 @@ async function callProvider<T>(
 /**
  * Desktop web tools. Both are read-only, billed per successful provider call,
  * and declared inactive by default so they never join a preset implicitly.
+ * Both stay registered so a mid-session provider switch needs no reload;
+ * availability (and the execute-time capability check) hides web_fetch for
+ * search-only providers.
  */
 export function createWebSearchToolDefinitions(runtime?: WebSearchRuntime): ToolDefinition[] {
   const resolve = (): WebSearchRuntime => runtime ?? getWebSearchRuntime();
+  const currentProvider = (instance: WebSearchRuntime) => instance.getProvider(instance.getSettings().providerId);
   return [
     defineTool({
       name: "web_search",
@@ -129,8 +133,14 @@ export function createWebSearchToolDefinitions(runtime?: WebSearchRuntime): Tool
       async execute(_toolCallId, input, signal) {
         const active = resolve();
         const settings = active.getSettings();
-        const page = await callProvider(active, (provider, apiKey) =>
-          provider.fetch({ url: input.url }, { apiKey, timeoutMs: settings.timeoutMs, signal }),
+        const provider = currentProvider(active);
+        if (!provider?.fetch)
+          throw new WebSearchError(
+            "NOT_CONFIGURED",
+            "The active search provider does not support web_fetch. Switch the provider in Settings → Search.",
+          );
+        const page = await callProvider(active, (registered, apiKey) =>
+          registered.fetch!(input, { apiKey, timeoutMs: settings.timeoutMs, signal }),
         );
         const body = withBudget(page.title ? `# ${page.title}\n\n${page.content}` : page.content);
         return {

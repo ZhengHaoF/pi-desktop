@@ -33,15 +33,18 @@ function harness(provider = deepseekProvider) {
   const spy = {
     id: provider.id,
     label: provider.label,
+    supportsFetch: provider.supportsFetch,
     async search(input, ctx) {
       searchCalls.push({ query: input.query, count: input.count, apiKey: ctx.apiKey });
       return provider.search(input, ctx);
     },
-    async fetch(input, ctx) {
+  };
+  // Mirror the wrapped provider's shape so capability probes see the same surface.
+  if (provider.fetch)
+    spy.fetch = async (input, ctx) => {
       fetchCalls.push({ url: input.url, apiKey: ctx.apiKey });
       return provider.fetch(input, ctx);
-    },
-  };
+    };
   const runtime = new WebSearchRuntime({ store, providers: [spy], readProviderKey: async () => undefined });
   const [search, fetch] = createWebSearchToolDefinitions(runtime);
   return { store, runtime, search, fetch, searchCalls, fetchCalls };
@@ -62,6 +65,7 @@ const items = [
 const stubProvider = {
   id: "deepseek",
   label: "Stub",
+  supportsFetch: true,
   async search() {
     return items;
   },
@@ -74,7 +78,7 @@ const { Response } = globalThis;
 
 test("web_search formats results, marks them untrusted and forwards the resolved key", async () => {
   const { store, search, searchCalls } = harness(stubProvider);
-  await store.patch({ enabled: true, apiKeyOverride: "sk-override" });
+  await store.patch({ enabled: true, apiKeys: { deepseek: "sk-override" } });
   const result = await search.execute("call-1", { query: "DeepSeek V4", count: 3 }, undefined, undefined, {});
   const text = result.content[0].text;
   assert.match(text, /1\. DeepSeek V4 发布 — 2026-06-01, authority 3/);
@@ -86,14 +90,14 @@ test("web_search formats results, marks them untrusted and forwards the resolved
 
 test("web_search defaults the result count from settings", async () => {
   const { store, search, searchCalls } = harness(stubProvider);
-  await store.patch({ enabled: true, apiKeyOverride: "sk-override", maxResults: 2 });
+  await store.patch({ enabled: true, apiKeys: { deepseek: "sk-override" }, maxResults: 2 });
   await search.execute("call-1", { query: "q" }, undefined, undefined, {});
   assert.equal(searchCalls[0].count, 2);
 });
 
 test("a disabled feature fails closed before contacting the provider", async () => {
   const { store, search, searchCalls } = harness(stubProvider);
-  await store.patch({ apiKeyOverride: "sk-override" });
+  await store.patch({ apiKeys: { deepseek: "sk-override" } });
   await assert.rejects(
     () => search.execute("call-1", { query: "q" }, undefined, undefined, {}),
     (error) => {
@@ -121,7 +125,7 @@ test("a missing key fails closed with configuration guidance", async () => {
 
 test("web_fetch returns the page with its title and the untrusted footer", async () => {
   const { store, fetch, fetchCalls } = harness(stubProvider);
-  await store.patch({ enabled: true, apiKeyOverride: "sk-override" });
+  await store.patch({ enabled: true, apiKeys: { deepseek: "sk-override" } });
   const result = await fetch.execute("call-1", { url: "https://example.com/article" }, undefined, undefined, {});
   assert.match(result.content[0].text, /^# Example article/);
   assert.match(result.content[0].text, /Article content\./);
@@ -138,7 +142,7 @@ test("web_fetch rejects invalid URLs before any billable request", async () => {
   };
   try {
     const { store, fetch } = harness();
-    await store.patch({ enabled: true, apiKeyOverride: "sk-override" });
+    await store.patch({ enabled: true, apiKeys: { deepseek: "sk-override" } });
     for (const url of ["not-a-url", "ftp://example.com", "https://user:pass@example.com"]) {
       await assert.rejects(
         () => fetch.execute("call-1", { url }, undefined, undefined, {}),
@@ -155,6 +159,44 @@ test("web_fetch rejects invalid URLs before any billable request", async () => {
   }
 });
 
+test("a search-only provider keeps both tools registered but hides web_fetch via availability", async () => {
+  const searchOnly = {
+    id: "search-only",
+    label: "Search Only",
+    supportsFetch: false,
+    async search() {
+      return items;
+    },
+  };
+  const { store, runtime, search, fetch } = harness(searchOnly);
+  // Both stay registered so a mid-session provider switch needs no reload.
+  assert.ok(fetch);
+  await store.patch({ enabled: true, providerId: "search-only", apiKeys: { "search-only": "sk-override" } });
+  await runtime.refresh();
+  assert.deepEqual(runtime.getAvailability().toolNames, ["web_search"]);
+
+  // The execute-time guard still fails closed for the unsupported tool.
+  await assert.rejects(
+    () => fetch.execute("call-1", { url: "https://example.com" }, undefined, undefined, {}),
+    (error) => {
+      assert.ok(error instanceof WebSearchError);
+      assert.equal(error.code, "NOT_CONFIGURED");
+      assert.match(error.message, /does not support web_fetch/);
+      return true;
+    },
+  );
+
+  const result = await search.execute("call-1", { query: "q" }, undefined, undefined, {});
+  assert.match(result.content[0].text, /1\. DeepSeek V4 发布/);
+});
+
+test("the fetch-capable provider exposes both tool names in availability", async () => {
+  const { store, runtime } = harness(stubProvider);
+  await store.patch({ enabled: true, apiKeys: { deepseek: "sk-override" } });
+  await runtime.refresh();
+  assert.deepEqual(runtime.getAvailability().toolNames, ["web_search", "web_fetch"]);
+});
+
 test("both tools declare read-only annotations and never activate by default", () => {
   const { search, fetch } = harness(stubProvider);
   for (const tool of [search, fetch]) {
@@ -167,7 +209,12 @@ test("both tools declare read-only annotations and never activate by default", (
 test("settings defaults leave the tools registered but unavailable", async () => {
   const { runtime } = harness(stubProvider);
   await runtime.refresh();
-  assert.deepEqual(runtime.getAvailability(), { enabled: false, hasCredential: false, source: "none" });
+  assert.deepEqual(runtime.getAvailability(), {
+    enabled: false,
+    hasCredential: false,
+    source: "none",
+    toolNames: [],
+  });
 });
 
 test("enabling the feature with a resolvable provider key flips availability", async () => {
@@ -183,5 +230,10 @@ test("enabling the feature with a resolvable provider key flips availability", a
 
   await store.patch({ enabled: true });
   await runtime.refresh();
-  assert.deepEqual(runtime.getAvailability(), { enabled: true, hasCredential: true, source: "provider" });
+  assert.deepEqual(runtime.getAvailability(), {
+    enabled: true,
+    hasCredential: true,
+    source: "provider",
+    toolNames: ["web_search", "web_fetch"],
+  });
 });

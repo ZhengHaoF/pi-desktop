@@ -225,9 +225,9 @@ export async function setWebSearchSettings(patch: Partial<WebSearchSettings>) {
   return call("settings.setWebSearch", patch);
 }
 
-/** Validates the saved configuration, or an unsaved draft key, with one real search call. */
-export async function testWebSearchSettings(apiKeyOverride?: string) {
-  return call("settings.testWebSearch", apiKeyOverride === undefined ? undefined : { apiKeyOverride });
+/** Validates the saved configuration, or an unsaved draft key for a given provider, with one real search call. */
+export async function testWebSearchSettings(draft?: { apiKeyOverride?: string; providerId?: string }) {
+  return call("settings.testWebSearch", draft);
 }
 
 export async function listModels(cwd?: string) {
