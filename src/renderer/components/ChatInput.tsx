@@ -1099,7 +1099,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                         {group.items.map(({ command, index }) => {
                           const active = index === slashActiveIndex;
                           return (
-                            <button
+                            <Button
                               key={`${command.source}:${command.name}`}
                               ref={(node) => {
                                 slashItemRefs.current[index] = node;
@@ -1155,7 +1155,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                                   {command.description}
                                 </span>
                               )}
-                            </button>
+                            </Button>
                           );
                         })}
                       </div>
@@ -1233,7 +1233,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                         const name = entry.path.split("/").pop() ?? entry.path;
                         const dirPrefix = entry.path.slice(0, entry.path.length - name.length);
                         return (
-                          <button
+                          <Button
                             key={`${entry.isDir ? "d" : "f"}:${entry.path}`}
                             ref={(node) => {
                               atItemRefs.current[index] = node;
@@ -1275,7 +1275,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                               {name}
                               {entry.isDir && <span style={{ color: "var(--text-dim)" }}>/</span>}
                             </span>
-                          </button>
+                          </Button>
                         );
                       })
                     )}

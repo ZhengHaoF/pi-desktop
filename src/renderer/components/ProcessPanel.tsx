@@ -227,7 +227,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
             </div>
           ) : (
             processes.map((process) => (
-              <button
+              <Button
                 type="button"
                 key={process.processId}
                 onClick={() => setSelectedId(process.processId)}
@@ -284,7 +284,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                     {process.lastOutput.text}
                   </div>
                 )}
-              </button>
+              </Button>
             ))
           )}
         </div>

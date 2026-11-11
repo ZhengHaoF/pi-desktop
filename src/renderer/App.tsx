@@ -3,6 +3,7 @@ import { AppShell } from "@/components/AppShell";
 import { ensureRpc, resetRpc } from "@/lib/api-client";
 import { useChatAppearance } from "@/hooks/useChatAppearance";
 import { useSessionListMode } from "@/hooks/useSessionListMode";
+import { Button } from "@/components/ui/Button";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
@@ -23,9 +24,9 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
             <h1 style={titleStyle}>UI crashed</h1>
             <p style={bodyStyle}>{this.state.error.message}</p>
             <pre style={preStyle}>{this.state.error.stack}</pre>
-            <button type="button" onClick={() => window.location.reload()} style={btnPrimary}>
+            <Button type="button" onClick={() => window.location.reload()} style={btnPrimary}>
               Reload
-            </button>
+            </Button>
           </div>
         </div>
       );
@@ -104,12 +105,12 @@ export function App() {
           <p style={{ ...bodyStyle, fontSize: 12 }}>
             Host must be running (utilityProcess). Check logs if this persists.
           </p>
-          <button type="button" onClick={() => window.location.reload()} style={btnPrimary}>
+          <Button type="button" onClick={() => window.location.reload()} style={btnPrimary}>
             Retry
-          </button>
-          <button type="button" onClick={() => void window.piBridge?.openLogs()} style={btnSecondary}>
+          </Button>
+          <Button type="button" onClick={() => void window.piBridge?.openLogs()} style={btnSecondary}>
             Open logs
-          </button>
+          </Button>
         </div>
       </div>
     );

@@ -871,7 +871,7 @@ export function ChatWindow({
                 bottom and re-magnets the viewport so streaming thinking/tool
                 output keeps the view attached until the user scrolls away. */}
             {isAwayFromBottom && (
-              <button
+              <Button
                 type="button"
                 className="chat-scroll-to-bottom"
                 onClick={reattachAutoFollow}
@@ -910,7 +910,7 @@ export function ChatWindow({
                     }}
                   />
                 )}
-              </button>
+              </Button>
             )}
           </div>
         </>

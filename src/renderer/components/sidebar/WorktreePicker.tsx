@@ -213,7 +213,7 @@ export function WorktreePicker({
         })()}
       {inactiveWorktreeSelector && (
         <>
-          <button
+          <Button
             type="button"
             aria-disabled="true"
             tabIndex={-1}
@@ -265,7 +265,7 @@ export function WorktreePicker({
               <path d="M18 9a9 9 0 0 1-9 9" />
             </svg>
             <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{inactiveWorktreeSelector.label}</span>
-          </button>
+          </Button>
           {wtGuideHintOpen && (
             <div
               style={{
