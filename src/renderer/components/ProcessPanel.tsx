@@ -5,6 +5,7 @@ import { call, subscribe } from "@/lib/api-client";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 
 type Props = {
   onActiveCountChange?: (count: number) => void;
@@ -480,21 +481,12 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                 flexWrap: "wrap",
               }}
             >
-              <input
+              <Input
+                size="sm"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder={t("searchLogs", "Search logs")}
-                style={{
-                  flex: 1,
-                  minWidth: 100,
-                  height: 26,
-                  border: "1px solid var(--border)",
-                  borderRadius: 6,
-                  background: "var(--bg)",
-                  color: "var(--text)",
-                  padding: "0 7px",
-                  fontSize: 11,
-                }}
+                style={{ flex: 1, minWidth: 100, height: 26, padding: "0 7px" }}
               />
               {(["stdout", "stderr", "system"] as ManagedProcessLogStream[]).map((stream) => (
                 <label
@@ -587,21 +579,12 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                 }}
                 style={{ padding: 8, borderTop: "1px solid var(--border)", display: "flex", gap: 6 }}
               >
-                <input
+                <Input
+                  size="sm"
                   value={stdin}
                   onChange={(event) => setStdin(event.target.value)}
                   placeholder={t("processStdin", "Send line to stdin")}
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    height: 28,
-                    border: "1px solid var(--border)",
-                    borderRadius: 6,
-                    background: "var(--bg)",
-                    color: "var(--text)",
-                    padding: "0 7px",
-                    fontSize: 11,
-                  }}
+                  style={{ flex: 1, minWidth: 0, height: 28, padding: "0 7px" }}
                 />
                 <Button type="submit" disabled={busy || !stdin} style={buttonStyle}>
                   {t("send", "Send")}

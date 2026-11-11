@@ -1,7 +1,8 @@
 import { useEffect, useId, useState } from "react";
+import { Select } from "@/components/ui/Select";
 import { useI18n } from "@/i18n";
 import { getCacheWarmingStatus, setCacheWarmingMode } from "@/lib/api-client";
-import { SettingRow, selectStyle } from "./settings-controls";
+import { SettingRow } from "./settings-controls";
 
 type CacheWarmingMode = "off" | "streaming" | "idle";
 
@@ -61,19 +62,20 @@ export function CacheWarmingSettings() {
   return (
     <>
       <SettingRow label={t("cacheWarming", "Prompt cache warming")} controlId={controlId}>
-        <select
+        <Select
           id={controlId}
           value={mode}
           disabled={loading || saving || error === "load"}
-          onChange={(event) => {
-            void save(event.target.value as CacheWarmingMode);
+          onChange={(value) => {
+            void save(value as CacheWarmingMode);
           }}
-          style={{ ...selectStyle, cursor: saving ? "wait" : "pointer" }}
-        >
-          <option value="off">{t("cacheWarmingOff", "Off")}</option>
-          <option value="streaming">{t("cacheWarmingStreaming", "During long tool runs")}</option>
-          <option value="idle">{t("cacheWarmingIdle", "Also while idle")}</option>
-        </select>
+          style={saving ? { cursor: "wait" } : undefined}
+          options={[
+            { value: "off", label: t("cacheWarmingOff", "Off") },
+            { value: "streaming", label: t("cacheWarmingStreaming", "During long tool runs") },
+            { value: "idle", label: t("cacheWarmingIdle", "Also while idle") },
+          ]}
+        />
       </SettingRow>
       <p style={{ margin: 0, fontSize: 12, lineHeight: 1.55, color: "var(--text-dim)" }}>
         {t("cacheWarmingDescription", "Cache warming may use model tokens. This setting is shared with the Pi CLI.")}

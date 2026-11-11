@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n";
 import { Field } from "../form-controls";
+import { Textarea } from "@/components/ui/Textarea";
 
 export function JsonObjectField({
   label,
@@ -29,7 +30,7 @@ export function JsonObjectField({
   }, [serialized, pretty]);
   return (
     <Field label={label}>
-      <textarea
+      <Textarea
         aria-label={label}
         placeholder={example}
         value={text}

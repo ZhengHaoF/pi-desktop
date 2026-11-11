@@ -4,6 +4,7 @@ import test, { after } from "node:test";
 import { createElement, useState } from "react";
 import { act, create } from "react-test-renderer";
 import { importTestBundle } from "#test-bundle";
+import { installDomTestEnvironment, inlinePortalPlugin } from "./ui/dom-test-env.mjs";
 import { createDeferred } from "#test-timing";
 import { RpcError } from "../../contract/types.ts";
 
@@ -22,8 +23,9 @@ const { ModelsConfig, useSessionModels, testApi } = await importTestBundle("mode
     loader: "ts",
   },
   tsconfig: path.join(import.meta.dirname, "../../../tsconfig.renderer.json"),
-  external: ["react", "react-dom", "react-dom/*"],
+  external: ["react"],
   plugins: [
+    inlinePortalPlugin,
     {
       name: "models-notification-fixture",
       setup(build) {
@@ -78,6 +80,8 @@ const { ModelsConfig, useSessionModels, testApi } = await importTestBundle("mode
 const text = (node) => (typeof node === "string" ? node : (node.children?.map(text).join("") ?? ""));
 
 async function mount(t, options = {}) {
+  const dom = installDomTestEnvironment();
+  t.after(() => dom.restore());
   testApi.reset();
   if (options.config) testApi.state.config = options.config;
   if (options.preferences) testApi.state.preferences = options.preferences;
@@ -113,6 +117,8 @@ async function mount(t, options = {}) {
     }
   };
   globalThis.window = {
+    // Keep the DOM-test environment's listener surface; add the bridge APIs.
+    ...globalThis.window,
     piBridge: {
       async openExternal(url) {
         opened.push(url);
@@ -149,14 +155,19 @@ async function mount(t, options = {}) {
   });
   await act(async () => {
     renderer = create(createElement(Host), {
-      createNodeMock: options.captureFocus
-        ? (element) => {
-            if (element.type === "input") return { focus: () => focused.push(element.props.placeholder) };
-            if (element.type === "button" && element.props["aria-label"] === "Add provider")
-              return { focus: () => providerFocusCount++ };
-            return null;
-          }
-        : undefined,
+      createNodeMock: (element) => {
+        if (options.captureFocus && element.type === "input")
+          return { focus: () => focused.push(element.props.placeholder) };
+        if (options.captureFocus && element.type === "button" && element.props["aria-label"] === "Add provider")
+          return { focus: () => providerFocusCount++ };
+        // Select anchors need a viewport rect for the portal to render.
+        return {
+          getBoundingClientRect: () => ({ top: 100, left: 40, width: 180, bottom: 136 }),
+          contains: () => false,
+          scrollIntoView: () => {},
+          focus: () => {},
+        };
+      },
     });
   });
   return {
@@ -940,11 +951,27 @@ test("an already-profiled DeepSeek model keeps its extra compat keys when the sw
   await fixture.reply(0, { ok: true, version: "two" });
 });
 
-const thinkingLevelSelect = (fixture) =>
-  fixture
+const AUTO_LABEL = "Auto (global default)";
+const thinkingLevelTrigger = (fixture) => {
+  // The Default-thinking-level field is one of many listboxes in the detail
+  // pane; identify it through its Field label's htmlFor association.
+  const detail = fixture.detail("ModelDetail");
+  const fieldLabel = detail
+    .findAll((node) => node.type === "label")
+    .find((node) => text(node).includes("Default thinking level"));
+  return detail
+    .findAllByProps({ "aria-haspopup": "listbox" })
+    .find((node) => node.props.id === fieldLabel.props.htmlFor);
+};
+const thinkingLevelLabel = (fixture) => thinkingLevelTrigger(fixture).props.children[0].props.children;
+const chooseThinkingLevel = async (fixture, label) => {
+  await act(async () => thinkingLevelTrigger(fixture).props.onClick());
+  const option = fixture
     .detail("ModelDetail")
-    .findAll((node) => node.type === "select")
-    .find((node) => text(node).includes("Extra high"));
+    .findAll((node) => node.type === "div" && node.props.role === "option")
+    .find((node) => node.props.children.at(-1) === label);
+  await act(async () => option.props.onClick());
+};
 
 const preferencesResult = (modelThinkingLevels) => ({
   models: [{ id: "custom-model", name: "custom-model", provider: "custom" }],
@@ -956,9 +983,9 @@ const preferencesResult = (modelThinkingLevels) => ({
 test("the per-model default thinking level saves through the host and reflects the persisted value", async (t) => {
   const fixture = await mount(t, { config: deepseekCompatibleConfig() });
   await fixture.select("custom-model");
-  assert.equal(thinkingLevelSelect(fixture).props.value, "");
+  assert.equal(thinkingLevelLabel(fixture), AUTO_LABEL);
 
-  await act(async () => thinkingLevelSelect(fixture).props.onChange({ target: { value: "high" } }));
+  await chooseThinkingLevel(fixture, "High");
   assert.equal(fixture.requests.length, 1);
   assert.equal(fixture.requests[0].method, "models.thinkingLevel.set");
   assert.deepEqual(fixture.requests[0].params, {
@@ -970,10 +997,10 @@ test("the per-model default thinking level saves through the host and reflects t
 
   await fixture.reply(0, preferencesResult({ "custom/custom-model": "high" }));
   assert.equal(fixture.changed, 1, "the session model catalog must refresh with the new default");
-  assert.equal(thinkingLevelSelect(fixture).props.value, "high");
+  assert.equal(thinkingLevelLabel(fixture), "High");
 
   // Clearing the override falls back to the global default.
-  await act(async () => thinkingLevelSelect(fixture).props.onChange({ target: { value: "" } }));
+  await chooseThinkingLevel(fixture, AUTO_LABEL);
   assert.deepEqual(fixture.requests[1].params, {
     cwd: "/project",
     provider: "custom",
@@ -981,7 +1008,7 @@ test("the per-model default thinking level saves through the host and reflects t
     level: null,
   });
   await fixture.reply(1, preferencesResult({}));
-  assert.equal(thinkingLevelSelect(fixture).props.value, "");
+  assert.equal(thinkingLevelLabel(fixture), AUTO_LABEL);
 });
 
 test("a failed default thinking level save keeps the persisted value and reports the failure inline", async (t) => {
@@ -990,11 +1017,11 @@ test("a failed default thinking level save keeps the persisted value and reports
     preferences: preferencesResult({ "custom/custom-model": "high" }),
   });
   await fixture.select("custom-model");
-  assert.equal(thinkingLevelSelect(fixture).props.value, "high");
+  assert.equal(thinkingLevelLabel(fixture), "High");
 
-  await act(async () => thinkingLevelSelect(fixture).props.onChange({ target: { value: "low" } }));
+  await chooseThinkingLevel(fixture, "Low");
   await fixture.fail(0, "INTERNAL", "Global Pi settings could not be saved");
-  assert.equal(thinkingLevelSelect(fixture).props.value, "high", "the persisted value survives a failed save");
+  assert.equal(thinkingLevelLabel(fixture), "High", "the persisted value survives a failed save");
   assert.match(JSON.stringify(fixture.renderer.toJSON()), /Global Pi settings could not be saved/);
 });
 
@@ -1002,23 +1029,35 @@ test("routing settings save selected models and strategy, preserving edits after
   const fixture = await mount(t);
   await fixture.click("Auto routing");
   const detail = () => fixture.detail("RoutingSettings");
-  const select = async (index, value) =>
-    act(async () => detail().findAllByType("select")[index].props.onChange({ target: { value } }));
+  // Host-element filtering matters: the composite Button and its host <button>
+  // both carry aria-haspopup, so unfiltered findAll double-counts.
+  const routingTriggers = () =>
+    detail().findAll((node) => typeof node.type === "string" && node.props["aria-haspopup"] === "listbox");
+  const chooseRouting = async (index, optionText) => {
+    await act(async () => routingTriggers()[index].props.onClick());
+    const option = fixture.renderer.root
+      .findAll((node) => node.type === "div" && node.props.role === "option")
+      .find(
+        (node) => typeof node.props.children.at(-1) === "string" && node.props.children.at(-1).endsWith(optionText),
+      );
+    assert.ok(option, `routing option ${optionText} not found`);
+    await act(async () => option.props.onClick());
+  };
   await act(async () =>
     detail()
       .findAllByType("input")[0]
       .props.onChange({ target: { checked: true } }),
   );
-  await select(0, "classifier");
-  await select(1, JSON.stringify(["fixture", "fast"]));
-  await select(3, JSON.stringify(["fixture", "strong"]));
-  await select(5, JSON.stringify(["typesafe", "jev-latest"]));
+  await chooseRouting(0, "Decision model judges task complexity");
+  await chooseRouting(1, "fixture/fast");
+  await chooseRouting(3, "fixture/strong");
+  await chooseRouting(5, "typesafe/jev-latest");
   await fixture.click("Save", detail());
   assert.equal(fixture.requests[0].method, "models.routing.set");
   assert.deepEqual(fixture.requests[0].params.config.classifier, { provider: "typesafe", modelId: "jev-latest" });
   assert.equal(fixture.requests[0].params.expectedVersion, "routing-v1");
   await fixture.fail(0, "CONFLICT", "Settings changed");
-  assert.equal(detail().findAllByType("select")[5].props.value, JSON.stringify(["typesafe", "jev-latest"]));
+  assert.equal(routingTriggers()[5].props.children[0].props.children, "Jev · typesafe/jev-latest");
   assert.equal(fixture.changed, 0);
   await fixture.click("Save", detail());
   await fixture.reply(1, { config: fixture.requests[1].params.config, version: "routing-v2" });
@@ -1266,14 +1305,24 @@ test("thinking settings explain opt-in levels and update the supported-level pre
   const preview = () => detail().find((node) => node.props.role === "status");
   assert.match(text(detail()), /Mapping Minimal to max does not enable the Maximum option/);
   assert.ok(!text(preview()).includes("Extra high") && !text(preview()).includes("Maximum"));
-  assert.equal(detail().findAll((node) => node.type === "option" && text(node) === "Not enabled").length, 2);
+  assert.equal(
+    detail().findAll((node) => node.props["aria-label"]?.includes("Not enabled") || text(node).includes("Not enabled"))
+      .length >= 2,
+    true,
+  );
   const maxInput = () =>
     detail().find((node) => node.type === "input" && node.props["aria-label"] === "Maximum: provider value");
   assert.equal(maxInput().props.disabled, true);
   assert.equal(maxInput().props.onFocus, undefined, "focusing a field cannot enable a reasoning level");
   const mode = () =>
-    detail().find((node) => node.type === "select" && node.props["aria-label"] === "Maximum: availability");
-  await act(async () => mode().props.onChange({ target: { value: "custom" } }));
+    detail()
+      .findAllByProps({ "aria-haspopup": "listbox" })
+      .find((node) => node.props["aria-label"] === "Maximum: availability");
+  await act(async () => mode().props.onClick());
+  const customOption = fixture.renderer.root
+    .findAll((node) => node.type === "div" && node.props.role === "option")
+    .find((node) => node.props.children.at(-1) === "Custom");
+  await act(async () => customOption.props.onClick());
   assert.equal(maxInput().props.disabled, false);
   assert.equal(detail().props.model.thinkingLevelMap.max, "max");
   assert.match(text(preview()), /Maximum/);

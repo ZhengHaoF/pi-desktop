@@ -8,6 +8,7 @@ import { CapabilityRequired, parseCapabilityIssue, type CapabilityIssue } from "
 import { formatNumber } from "@/lib/locale-format";
 import { pluginResourceSummary, pluginStatusLabel, pluginVersionSummary } from "@/lib/plugin-presentation";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 
 type Translate = (key: string, fallback: string) => string;
 
@@ -292,9 +293,10 @@ function AddPluginPanel({
         <label htmlFor="plugin-source" style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>
           {t("pluginSource", "Source")}
         </label>
-        <input
+        <Input
           id="plugin-source"
           ref={inputRef}
+          mono
           value={source}
           onChange={(e) => onSourceChange(e.target.value)}
           placeholder={t("pluginSourcePlaceholder", "npm:@scope/package")}
@@ -302,11 +304,6 @@ function AddPluginPanel({
             width: "100%",
             height: 36,
             padding: "0 11px",
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            background: "var(--bg-panel)",
-            color: "var(--text)",
-            fontFamily: "var(--font-mono)",
             fontSize: 13,
             outline: "none",
           }}

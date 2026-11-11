@@ -1,4 +1,5 @@
 import { useI18n } from "@/i18n";
+import { Select } from "@/components/ui/Select";
 import { useCodingToolChoices } from "@/hooks/useCodingToolChoices";
 import { getToolNamesForPreset } from "@shared/tool-presets";
 import { isOrchestrationTool } from "@shared/orchestration-tools";
@@ -23,26 +24,17 @@ export function ChannelToolSelection({
   const preset = Object.entries(presets).find(([, names]) => [...names].sort().join(",") === key)?.[0] ?? "custom";
   return (
     <>
-      <select
+      <Select
         aria-label={t("defaultTools", "Default tools")}
         value={preset}
-        style={{
-          width: "100%",
-          minHeight: 36,
-          background: "var(--bg)",
-          color: "var(--text)",
-          border: "1px solid var(--border)",
-          borderRadius: 6,
-        }}
-        onChange={(event) => onChange([...presets[event.target.value as keyof typeof presets]])}
-      >
-        <option value="custom" disabled>
-          {t("permissionCustom", "Custom")}
-        </option>
-        <option value="none">{t("toolPresetNone", "No tools (recommended)")}</option>
-        <option value="read">{t("toolPresetRead", "Read-only tools")}</option>
-        <option value="full">{t("toolPresetFull", "Full coding tools")}</option>
-      </select>
+        onChange={(value) => onChange([...presets[value as keyof typeof presets]])}
+        options={[
+          { value: "custom", label: t("permissionCustom", "Custom"), disabled: true },
+          { value: "none", label: t("toolPresetNone", "No tools (recommended)") },
+          { value: "read", label: t("toolPresetRead", "Read-only tools") },
+          { value: "full", label: t("toolPresetFull", "Full coding tools") },
+        ]}
+      />
       <span style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.5 }}>
         {t(
           "defaultToolsHint",

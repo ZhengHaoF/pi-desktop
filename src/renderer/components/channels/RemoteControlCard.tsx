@@ -4,6 +4,7 @@ import { call } from "@/lib/api-client";
 import { useI18n } from "@/i18n";
 import type { LanAddress, RemoteControlConfig, RemoteControlStatus, RelayServiceStatus } from "@contract/desktop";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 
 const DEFAULT_PORT = 8788;
 const DEFAULT_RELAY_URL = `ws://127.0.0.1:${DEFAULT_PORT}/ws`;
@@ -75,15 +76,6 @@ function QrCode({ value, size = 132 }: { value: string; size?: number }) {
     </svg>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  padding: "8px 10px",
-  borderRadius: 8,
-  border: "1px solid var(--border)",
-  fontSize: 12,
-  color: "var(--text)",
-  background: "var(--bg)",
-};
 
 export function RemoteControlCard() {
   const { t } = useI18n();
@@ -349,14 +341,14 @@ export function RemoteControlCard() {
           <>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{t("relayPort", "Port")}</span>
-              <input
+              <Input
                 type="number"
                 min={1}
                 max={65535}
                 value={draft.lanPort}
                 disabled={saving}
                 onChange={(e) => setDraft({ ...draft, lanPort: Number(e.target.value) || DEFAULT_PORT })}
-                style={{ ...inputStyle, width: 96 }}
+                style={{ width: 96 }}
               />
               <Button
                 type="button"
@@ -454,14 +446,15 @@ export function RemoteControlCard() {
           <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
             <div style={{ flex: 1, display: "grid", gap: 8 }}>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <input
+                <Input
                   type="text"
                   value={draft.relayUrl}
                   disabled={saving}
                   spellCheck={false}
                   onChange={(e) => setDraft({ ...draft, relayUrl: e.target.value })}
                   placeholder="wss://relay.example.com/ws"
-                  style={{ ...inputStyle, flex: 1, fontFamily: "var(--font-mono, monospace)" }}
+                  mono
+                  style={{ flex: 1 }}
                 />
                 <Button
                   type="button"
@@ -489,7 +482,7 @@ export function RemoteControlCard() {
           <span style={{ fontSize: 11, color: "var(--text-dim)", flex: "none" }}>
             {t("remotePcName", "PC name (shown on device selectors)")}
           </span>
-          <input
+          <Input
             type="text"
             value={draft.name}
             disabled={saving}
@@ -497,7 +490,7 @@ export function RemoteControlCard() {
             spellCheck={false}
             onChange={(e) => setDraft({ ...draft, name: e.target.value })}
             placeholder="My-PC"
-            style={{ ...inputStyle, flex: 1 }}
+            style={{ flex: 1 }}
           />
           <Button
             type="button"

@@ -13,6 +13,7 @@ import { countHerdrAgents, herdrPaneMatchesFilter } from "./fleet-selectors";
 import { getFleetPresentation, getFleetTriggerSpacing } from "./fleet-presentation";
 import { herdrErrorLabel, herdrRuntimeStatusLabel, publicHerdrErrorLabel } from "./herdr-ui-copy";
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 
 const FILTER_STATES: Array<HerdrAgentState | "all"> = ["all", "working", "blocked", "idle", "done", "unknown"];
 
@@ -288,18 +289,13 @@ export function QuickHerdrFleet({
                 </Button>
               </div>
               {hasFleet && (
-                <select
+                <Select
                   value={filter}
-                  onChange={(event) => setFilter(event.currentTarget.value as typeof filter)}
+                  onChange={(value) => setFilter(value as typeof filter)}
                   aria-label={t("filterAgentState", "Filter agent state")}
-                  style={{ width: "100%", height: 30, marginTop: 10, fontSize: 11 }}
-                >
-                  {FILTER_STATES.map((state) => (
-                    <option key={state} value={state}>
-                      {stateLabel(state)}
-                    </option>
-                  ))}
-                </select>
+                  style={{ width: "100%", marginTop: 10, fontSize: 11 }}
+                  options={FILTER_STATES.map((state) => ({ value: state, label: stateLabel(state) }))}
+                />
               )}
             </div>
 

@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { Input } from "@/components/ui/Input";
 import { useI18n } from "@/i18n";
 import { abbreviateHomePath } from "@/lib/display-path";
 import type { WorktreeEntry } from "@/hooks/useSidebarWorkspace";
@@ -284,7 +285,7 @@ export function WorktreeDropdownPanel({
         </Button>
       ) : (
         <div style={{ padding: "6px 8px" }}>
-          <input
+          <Input
             ref={newInputRef}
             value={newBranch}
             onChange={(e) => {
@@ -311,8 +312,6 @@ export function WorktreeDropdownPanel({
               border: "1px solid var(--accent)",
               borderRadius: 5,
               outline: "none",
-              background: "var(--bg)",
-              color: "var(--text)",
               boxSizing: "border-box",
             }}
           />

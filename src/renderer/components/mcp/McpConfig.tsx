@@ -17,6 +17,9 @@ import { McpServerEditor } from "./McpServerEditor";
 import { McpProjectOverrideEditor } from "./McpProjectOverrideEditor";
 import { McpToolsPanel } from "./McpToolsPanel";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
+import { Select } from "@/components/ui/Select";
 import { McpServerSidebar } from "./McpServerSidebar";
 
 export interface McpConfigHandle {
@@ -234,11 +237,11 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
           <div className="mcp-scope-picker">
             <label>
               {t("mcpScope", "Scope")}{" "}
-              <select
+              <Select
                 value={scope}
                 disabled={busy}
-                onChange={(event) => {
-                  const nextScope = event.target.value as McpScope;
+                onChange={(value) => {
+                  const nextScope = value as McpScope;
                   leave(() => {
                     setScope(nextScope);
                     setSelected(undefined);
@@ -247,12 +250,11 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                     setImportText(undefined);
                   });
                 }}
-              >
-                <option value="global">{t("mcpGlobal", "Global")}</option>
-                <option value="project" disabled={!cwd}>
-                  {t("mcpProject", "Current project")}
-                </option>
-              </select>
+                options={[
+                  { value: "global", label: t("mcpGlobal", "Global") },
+                  { value: "project", label: t("mcpProject", "Current project"), disabled: !cwd },
+                ]}
+              />
             </label>
           </div>
           <McpServerSidebar
@@ -597,7 +599,7 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
             <section>
               <label>
                 {t("mcpImportJson", "Standard mcpServers JSON")}
-                <textarea
+                <Textarea
                   value={importText}
                   onChange={(event) => {
                     setImportText(event.target.value);
@@ -651,7 +653,7 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                 <>
                   <label>
                     {t("mcpCallbackUrl", "Paste callback URL")}
-                    <input value={callbackUrl} onChange={(event) => setCallbackUrl(event.target.value)} />
+                    <Input value={callbackUrl} onChange={(event) => setCallbackUrl(event.target.value)} />
                   </label>
                   <Button
                     disabled={busy || !callbackUrl}

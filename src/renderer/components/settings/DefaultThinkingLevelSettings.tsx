@@ -1,7 +1,8 @@
 import { useEffect, useId, useState } from "react";
+import { Select } from "@/components/ui/Select";
 import { useI18n } from "@/i18n";
 import { getModelPreferences, setThinkingLevelDefault } from "@/lib/api-client";
-import { SettingRow, selectStyle } from "./settings-controls";
+import { SettingRow } from "./settings-controls";
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
 
@@ -74,22 +75,19 @@ export function DefaultThinkingLevelSettings() {
   return (
     <>
       <SettingRow label={t("defaultThinkingLevel", "Default thinking level")} controlId={controlId}>
-        <select
+        <Select
           id={controlId}
           value={level}
           disabled={loading || saving || error === "load"}
-          onChange={(event) => {
-            void save(event.target.value);
+          onChange={(value) => {
+            void save(value);
           }}
-          style={{ ...selectStyle, cursor: saving ? "wait" : "pointer" }}
-        >
-          <option value="">{t("defaultThinkingLevelUnset", "Built-in default (Medium)")}</option>
-          {THINKING_LEVELS.map((value) => (
-            <option key={value} value={value}>
-              {thinkingLevelLabel(value, t)}
-            </option>
-          ))}
-        </select>
+          style={saving ? { cursor: "wait" } : undefined}
+          options={[
+            { value: "", label: t("defaultThinkingLevelUnset", "Built-in default (Medium)") },
+            ...THINKING_LEVELS.map((value) => ({ value, label: thinkingLevelLabel(value, t) })),
+          ]}
+        />
       </SettingRow>
       <p style={{ margin: 0, fontSize: 12, lineHeight: 1.55, color: "var(--text-dim)" }}>
         {t(

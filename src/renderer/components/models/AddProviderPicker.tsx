@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Input } from "@/components/ui/Input";
 import { useI18n } from "@/i18n";
 import { oauthProviderName } from "./provider-display";
 import type { ProviderStatus as OAuthProvider, ApiKeyProviderStatus as ApiKeyProvider } from "@contract/types";
@@ -96,8 +97,6 @@ export function AddProviderPicker({
           width: 820,
           maxWidth: "calc(100vw - 32px)",
           maxHeight: "min(72vh, calc(100vh - 32px))",
-          background: "var(--bg)",
-          border: "1px solid var(--border)",
           borderRadius: 10,
           display: "flex",
           flexDirection: "column",
@@ -130,7 +129,7 @@ export function AddProviderPicker({
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
-          <input
+          <Input
             ref={inputRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -140,7 +139,6 @@ export function AddProviderPicker({
               background: "none",
               border: "none",
               outline: "none",
-              color: "var(--text)",
               fontSize: 13,
               boxSizing: "border-box",
             }}

@@ -4,6 +4,7 @@ import test from "node:test";
 import { createElement } from "react";
 import { act, create } from "react-test-renderer";
 import { importTestBundle } from "#test-bundle";
+import { installDomTestEnvironment, inlinePortalPlugin } from "./ui/dom-test-env.mjs";
 const { DefaultToolPresetSetting, api } = await importTestBundle("default-tool-preset-setting-ui", {
   stdin: {
     resolveDir: import.meta.dirname,
@@ -14,6 +15,7 @@ const { DefaultToolPresetSetting, api } = await importTestBundle("default-tool-p
   tsconfig: path.join(import.meta.dirname, "../../../tsconfig.renderer.json"),
   external: ["react"],
   plugins: [
+    inlinePortalPlugin,
     {
       name: "default-preset-setting-api",
       setup(build) {
@@ -31,31 +33,40 @@ const { DefaultToolPresetSetting, api } = await importTestBundle("default-tool-p
 });
 
 test("settings persist one default preset, explain the new-session scope and retain the saved value after failure", async (t) => {
-  const before = Object.getOwnPropertyDescriptor(globalThis, "IS_REACT_ACT_ENVIRONMENT");
-  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const dom = installDomTestEnvironment();
   api.state.calls.length = 0;
   api.state.preset = "default";
   let renderer;
   await act(async () => {
-    renderer = create(createElement(DefaultToolPresetSetting));
+    renderer = create(createElement(DefaultToolPresetSetting), {
+      createNodeMock: () => ({
+        getBoundingClientRect: () => ({ top: 100, left: 40, width: 180, bottom: 136 }),
+        contains: () => false,
+        scrollIntoView: () => {},
+        focus: () => {},
+      }),
+    });
   });
   t.after(async () => {
     await act(async () => renderer.unmount());
-    if (before) Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", before);
-    else delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+    dom.restore();
   });
-  const select = () => renderer.root.findByType("select");
-  assert.equal(select().props.value, "default");
-  assert.deepEqual(
-    renderer.root.findAllByType("option").map((option) => option.props.value),
-    ["none", "default", "full"],
-  );
+  const trigger = () => renderer.root.findByProps({ "aria-haspopup": "listbox" });
+  const value = () => trigger().props.children[0].props.children;
+  const choose = async (label) => {
+    await act(async () => trigger().props.onClick());
+    const option = renderer.root
+      .findAll((node) => node.type === "div" && node.props.role === "option")
+      .find((node) => node.props.children.at(-1) === label);
+    await act(async () => option.props.onClick());
+  };
+  assert.equal(value(), "Standard");
   assert.match(JSON.stringify(renderer.toJSON()), /Existing sessions keep their saved tool selection/);
-  await act(async () => select().props.onChange({ target: { value: "full" } }));
-  assert.equal(select().props.value, "full");
+  await choose("Full access");
+  assert.equal(value(), "Full access");
   assert.deepEqual(api.state.calls.at(-1), { method: "settings.setDefaultToolPreset", params: { preset: "full" } });
   api.state.fail = true;
-  await act(async () => select().props.onChange({ target: { value: "none" } }));
-  assert.equal(select().props.value, "full");
+  await choose("Read only");
+  assert.equal(value(), "Full access");
   assert.match(JSON.stringify(renderer.root.findByProps({ role: "alert" }).children), /could not be saved/);
 });

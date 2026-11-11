@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { Select } from "@/components/ui/Select";
 import { call } from "@/lib/api-client";
 import { useI18n } from "@/i18n";
 import type { AgentShell, AgentShellSettings } from "@shared/agent-shell";
@@ -68,28 +69,21 @@ export function AgentShellSetting({ state }: { state: PublicToolchainState }) {
         <label htmlFor={id} style={{ fontSize: 14, color: "var(--text)" }}>
           {t("agentShell", "Default Agent shell")}
         </label>
-        <select
+        <Select
           id={id}
           value={settings?.shell ?? ""}
           disabled={!settings || saving}
-          onChange={(event) => void save(event.target.value as AgentShell)}
-          style={{
-            minWidth: 145,
-            minHeight: 34,
-            padding: "4px 8px",
-            borderRadius: 6,
-            border: "1px solid var(--border)",
-            color: "var(--text)",
-            background: "var(--bg)",
-          }}
-        >
-          {!settings && <option value="">{t("loading", "Loading…")}</option>}
-          {(["powershell", "bash"] as const).map((shell) => (
-            <option key={shell} value={shell} disabled={state.capabilities[`shell.${shell}`]?.health !== "healthy"}>
-              {shell === "powershell" ? "PowerShell" : "Bash"}
-            </option>
-          ))}
-        </select>
+          onChange={(value) => void save(value as AgentShell)}
+          style={{ minWidth: 145 }}
+          options={[
+            ...(!settings ? [{ value: "", label: t("loading", "Loading…") }] : []),
+            ...(["powershell", "bash"] as const).map((shell) => ({
+              value: shell,
+              label: shell === "powershell" ? "PowerShell" : "Bash",
+              disabled: state.capabilities[`shell.${shell}`]?.health !== "healthy",
+            })),
+          ]}
+        />
       </div>
       <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5 }}>
         {t(

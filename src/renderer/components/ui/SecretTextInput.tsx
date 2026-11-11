@@ -14,6 +14,7 @@ export interface SecretTextInputProps {
   onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
   autoComplete?: string;
   spellCheck?: boolean;
+  autoFocus?: boolean;
   /** Forwarded to Input; a Field-wrapped SecretTextInput gets its label id here. */
   id?: string;
   style?: CSSProperties;
@@ -28,6 +29,7 @@ export function SecretTextInput({
   onKeyDown,
   autoComplete = "off",
   spellCheck = false,
+  autoFocus,
   id,
   style,
   disabled,
@@ -49,6 +51,7 @@ export function SecretTextInput({
         placeholder={placeholder}
         mono={mono}
         disabled={disabled}
+        autoFocus={autoFocus}
         style={{ paddingRight: 40 }}
         autoComplete={autoComplete}
         spellCheck={spellCheck}

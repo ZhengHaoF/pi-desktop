@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import type { ModelsConfigSelection, ProviderEntry } from "@/lib/models-config-state";
 
 export function CustomProviderTree({
@@ -39,8 +40,9 @@ export function CustomProviderTree({
     <nav className="custom-model-tree" aria-label={t("modelCustomProviders", "Custom providers")}>
       <div className="custom-model-tree-search">
         <span>{t("modelCustomProviders", "Custom providers")}</span>
-        <input
+        <Input
           type="search"
+          size="sm"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           aria-label={t("modelSearchCustom", "Search custom providers and models")}

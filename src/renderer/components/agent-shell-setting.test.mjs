@@ -4,6 +4,7 @@ import test from "node:test";
 import { createElement } from "react";
 import { act, create } from "react-test-renderer";
 import { importTestBundle } from "#test-bundle";
+import { installDomTestEnvironment, inlinePortalPlugin } from "./ui/dom-test-env.mjs";
 const { AgentShellSetting, api } = await importTestBundle("agent-shell-setting-ui", {
   stdin: {
     resolveDir: import.meta.dirname,
@@ -13,6 +14,7 @@ const { AgentShellSetting, api } = await importTestBundle("agent-shell-setting-u
   tsconfig: path.join(import.meta.dirname, "../../../tsconfig.renderer.json"),
   external: ["react"],
   plugins: [
+    inlinePortalPlugin,
     {
       name: "shell-setting-api",
       setup(build) {
@@ -26,36 +28,56 @@ const { AgentShellSetting, api } = await importTestBundle("agent-shell-setting-u
   ],
 });
 test("settings offer one persisted shell, explain new-session scope and retain the saved value after failure", async (t) => {
-  const before = Object.getOwnPropertyDescriptor(globalThis, "IS_REACT_ACT_ENVIRONMENT");
-  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const dom = installDomTestEnvironment();
   const state = {
     platform: "win32",
     capabilities: { "shell.bash": { health: "healthy" }, "shell.powershell": { health: "healthy" } },
   };
   let renderer;
   await act(async () => {
-    renderer = create(createElement(AgentShellSetting, { state }));
+    renderer = create(createElement(AgentShellSetting, { state }), {
+      createNodeMock: () => ({
+        getBoundingClientRect: () => ({ top: 100, left: 40, width: 180, bottom: 136 }),
+        contains: () => false,
+        scrollIntoView: () => {},
+        focus: () => {},
+      }),
+    });
   });
   t.after(async () => {
     await act(async () => renderer.unmount());
-    if (before) Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", before);
-    else delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+    dom.restore();
   });
-  const select = () => renderer.root.findByType("select");
-  assert.equal(select().props.value, "powershell");
+  const trigger = () => renderer.root.findByProps({ "aria-haspopup": "listbox" });
+  const value = () => trigger().props.children[0].props.children;
+  const choose = async (label) => {
+    await act(async () => trigger().props.onClick());
+    const option = renderer.root
+      .findAll((node) => node.type === "div" && node.props.role === "option")
+      .find((node) => node.props.children.at(-1) === label);
+    await act(async () => option.props.onClick());
+  };
+  assert.equal(value(), "PowerShell");
   assert.equal(renderer.root.findAllByType("input").length, 0);
   assert.match(JSON.stringify(renderer.toJSON()), /Existing sessions keep their shell/);
-  await act(async () => select().props.onChange({ target: { value: "bash" } }));
-  assert.equal(select().props.value, "bash");
+  await choose("Bash");
+  assert.equal(value(), "Bash");
   assert.deepEqual(api.state.calls.at(-1), { method: "settings.setAgentShell", params: { shell: "bash" } });
   await act(async () => renderer.unmount());
   await act(async () => {
-    renderer = create(createElement(AgentShellSetting, { state }));
+    renderer = create(createElement(AgentShellSetting, { state }), {
+      createNodeMock: () => ({
+        getBoundingClientRect: () => ({ top: 100, left: 40, width: 180, bottom: 136 }),
+        contains: () => false,
+        scrollIntoView: () => {},
+        focus: () => {},
+      }),
+    });
   });
-  assert.equal(select().props.value, "bash");
+  assert.equal(value(), "Bash");
   api.state.fail = true;
-  await act(async () => select().props.onChange({ target: { value: "powershell" } }));
-  assert.equal(select().props.value, "bash");
+  await choose("PowerShell");
+  assert.equal(value(), "Bash");
   assert.match(JSON.stringify(renderer.root.findByProps({ role: "alert" }).children), /could not be saved/);
   await act(async () =>
     renderer.update(
@@ -64,8 +86,9 @@ test("settings offer one persisted shell, explain new-session scope and retain t
       }),
     ),
   );
-  assert.equal(
-    renderer.root.findAllByType("option").find((option) => option.props.value === "powershell").props.disabled,
-    true,
-  );
+  await act(async () => trigger().props.onClick());
+  const powershell = renderer.root
+    .findAll((node) => node.type === "div" && node.props.role === "option")
+    .find((node) => node.props.children.at(-1) === "PowerShell");
+  assert.equal(powershell.props["aria-disabled"], true);
 });

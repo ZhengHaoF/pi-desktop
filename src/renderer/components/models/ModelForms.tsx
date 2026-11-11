@@ -1,8 +1,10 @@
 import { JsonObjectField } from "./JsonObjectField";
+import { Input } from "@/components/ui/Input";
 import { ProviderModelDiscovery } from "./ProviderModelDiscovery";
 import { THINKING_LEVELS, configuredThinkingLevels, type ThinkingLevel } from "@shared/thinking-levels";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Check, Field, NumInput, SecretTextInput, Select, SectionTitle, TextInput } from "../form-controls";
+import { Select as UiSelect } from "@/components/ui/Select";
 import { applyStrictOptionalPositiveInteger } from "@/lib/strict-integer";
 import { useI18n } from "@/i18n";
 import { type ModelEntry, type ProviderEntry } from "@/lib/models-config-state";
@@ -263,31 +265,33 @@ function ThinkingLevelMapEditor({
               <tr key={level}>
                 <td>{label}</td>
                 <td>
-                  <select
+                  <UiSelect
                     aria-label={t("modelThinkingModeLabel", "{level}: availability").replace("{level}", label)}
                     value={mode}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setLevel(
                         level,
-                        event.target.value === "default"
+                        value === "default"
                           ? "omit"
-                          : event.target.value === "disabled"
+                          : value === "disabled"
                             ? null
                             : typeof raw === "string" && raw
                               ? raw
                               : level,
                       )
                     }
-                  >
-                    <option value="default">
-                      {extended ? t("modelThinkingNotEnabled", "Not enabled") : t("modelDefault", "Default")}
-                    </option>
-                    <option value="disabled">{t("modelDisabled", "Disabled")}</option>
-                    <option value="custom">{t("modelCustom", "Custom")}</option>
-                  </select>
+                    options={[
+                      {
+                        value: "default",
+                        label: extended ? t("modelThinkingNotEnabled", "Not enabled") : t("modelDefault", "Default"),
+                      },
+                      { value: "disabled", label: t("modelDisabled", "Disabled") },
+                      { value: "custom", label: t("modelCustom", "Custom") },
+                    ]}
+                  />
                 </td>
                 <td>
-                  <input
+                  <Input
                     aria-label={t("modelThinkingProviderValue", "{level}: provider value").replace("{level}", label)}
                     value={
                       typeof raw === "string"

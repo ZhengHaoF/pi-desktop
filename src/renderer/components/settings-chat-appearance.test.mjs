@@ -13,15 +13,17 @@ const messageViewSource = readFileSync(new URL("./MessageView.tsx", import.meta.
 test("General settings exposes complete accessible chat appearance controls", () => {
   for (const id of ["chatFontSizeControlId", "chatLayoutControlId", "chatAssistantWidthControlId"])
     assert.match(settingsSource, new RegExp(id));
+  // The appearance selects render through the themed listbox; option values
+  // appear as entries of the options arrays.
   for (const value of ["small", "standard", "large", "extra-large", "fixed", "wide", "comfortable", "full"]) {
-    assert.match(settingsSource, new RegExp(`<option value="${value}">`));
+    assert.match(settingsSource, new RegExp(`value: "${value}"`));
   }
   assert.match(settingsSource, /chatLayoutFixed", "Comfortable width"/);
   assert.match(settingsSource, /chatLayoutWide", "Expanded width"/);
   assert.equal(zhCN.chatLayoutFixed, "舒适宽度");
   assert.equal(zhCN.chatLayoutWide, "扩展宽度");
   assert.equal(zhCN.chatAssistantWidth, "模型回复宽度");
-  assert.match(settingsSource, /assistantWidth:\s*event.target.value as ChatAssistantWidth/);
+  assert.match(settingsSource, /assistantWidth: value as ChatAssistantWidth/);
   assert.match(settingsSource, /disabled=\{chatAppearanceSaving\}/);
   assert.match(settingsSource, /role="alert"[\s\S]*?chatAppearanceSaveFailed/);
   assert.match(settingsSource, /onChatAppearanceChange\(next\)/);

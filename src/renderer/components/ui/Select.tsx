@@ -52,6 +52,7 @@ export interface SelectProps {
   size?: SelectSize;
   /** Goes on the trigger so a Field label can associate with it. */
   id?: string;
+  autoFocus?: boolean;
   className?: string;
   style?: CSSProperties;
   "aria-label"?: string;
@@ -67,6 +68,7 @@ export function Select({
   disabled,
   size = "md",
   id,
+  autoFocus,
   className,
   style,
   "aria-label": ariaLabel,
@@ -198,6 +200,7 @@ export function Select({
         ref={setAnchor}
         type="button"
         id={id}
+        autoFocus={autoFocus}
         disabled={disabled}
         className={className}
         aria-haspopup="listbox"

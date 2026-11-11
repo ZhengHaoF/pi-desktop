@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { Input } from "@/components/ui/Input";
 import { call } from "@/lib/api-client";
 import { useI18n } from "@/i18n";
 import type { SessionInfo } from "@/lib/types";
@@ -214,8 +215,6 @@ export function ProjectPicker({
           left: 0,
           right: 0,
           zIndex: 100,
-          background: "var(--bg)",
-          border: "1px solid var(--border)",
           borderRadius: 8,
           boxShadow: "0 6px 20px rgba(0,0,0,0.10)",
           overflow: "hidden",
@@ -223,7 +222,7 @@ export function ProjectPicker({
       >
         {showProjectFilter && (
           <div style={{ padding: "6px 8px", borderBottom: "1px solid var(--border)" }}>
-            <input
+            <Input
               value={projectFilter}
               onChange={(e) => setProjectFilter(e.target.value)}
               onKeyDown={(e) => {
@@ -239,11 +238,8 @@ export function ProjectPicker({
                 fontSize: 11,
                 fontFamily: "var(--font-mono)",
                 padding: "5px 8px",
-                border: "1px solid var(--border)",
                 borderRadius: 5,
                 outline: "none",
-                background: "var(--bg)",
-                color: "var(--text)",
                 boxSizing: "border-box",
               }}
             />
@@ -425,7 +421,7 @@ export function ProjectPicker({
               borderTop: showProjectList && visibleProjects.length > 0 ? "none" : undefined,
             }}
           >
-            <input
+            <Input
               ref={customPathInputRef}
               value={customPathValue}
               onChange={(e) => {
@@ -452,8 +448,6 @@ export function ProjectPicker({
                 border: "1px solid var(--accent)",
                 borderRadius: 5,
                 outline: "none",
-                background: "var(--bg)",
-                color: "var(--text)",
                 boxSizing: "border-box",
               }}
             />

@@ -1,4 +1,6 @@
 import { useEffect, useId, useState } from "react";
+import { Select } from "@/components/ui/Select";
+import { Textarea } from "@/components/ui/Textarea";
 import type { McpExposure, McpServerConfig } from "@contract/mcp";
 import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/Button";
@@ -61,30 +63,28 @@ export function McpProjectOverrideEditor({
       </p>
       <fieldset disabled={busy}>
         <label htmlFor={`${id}-enabled`}>{t("mcpEnabled", "Enabled")}</label>
-        <select
+        <Select
           id={`${id}-enabled`}
           value={config.enabled === undefined ? "" : String(config.enabled)}
-          onChange={(event) => change("enabled", event.target.value === "" ? undefined : event.target.value === "true")}
-        >
-          <option value="">{t("mcpInheritGlobal", "Inherit global setting")}</option>
-          <option value="true">{t("mcpEnable", "Enable")}</option>
-          <option value="false">{t("mcpDisable", "Disable")}</option>
-        </select>
+          onChange={(value) => change("enabled", value === "" ? undefined : value === "true")}
+          options={[
+            { value: "", label: t("mcpInheritGlobal", "Inherit global setting") },
+            { value: "true", label: t("mcpEnable", "Enable") },
+            { value: "false", label: t("mcpDisable", "Disable") },
+          ]}
+        />
         <label htmlFor={`${id}-exposure`}>{t("mcpExposure", "Tool exposure")}</label>
-        <select
+        <Select
           id={`${id}-exposure`}
           value={config.exposure === undefined ? "" : canonicalMcpExposure(config.exposure)}
-          onChange={(event) => change("exposure", (event.target.value || undefined) as McpExposure | undefined)}
-        >
-          <option value="">{t("mcpInheritGlobal", "Inherit global setting")}</option>
-          {(["direct", "deferred", "codemode", "hidden"] as const).map((mode) => (
-            <option key={mode} value={mode}>
-              {mode}
-            </option>
-          ))}
-        </select>
+          onChange={(value) => change("exposure", (value || undefined) as McpExposure | undefined)}
+          options={[
+            { value: "", label: t("mcpInheritGlobal", "Inherit global setting") },
+            ...(["direct", "deferred", "codemode", "hidden"] as const).map((mode) => ({ value: mode, label: mode })),
+          ]}
+        />
         <label htmlFor={`${id}-tools`}>{t("mcpToolOverrides", "Per-tool exposure (JSON)")}</label>
-        <textarea
+        <Textarea
           id={`${id}-tools`}
           value={toolExposure}
           onChange={(event) => {

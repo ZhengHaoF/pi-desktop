@@ -1,4 +1,5 @@
 import { subscribeRunning, call } from "@/lib/api-client";
+import { Input } from "@/components/ui/Input";
 import { useEffect, useState, useCallback, useRef, useSyncExternalStore } from "react";
 import type { SessionInfo } from "@/lib/types";
 import { useI18n } from "@/i18n";
@@ -730,7 +731,7 @@ export function SessionSidebar({
               <circle cx="11" cy="11" r="7" />
               <line x1="20" y1="20" x2="16.5" y2="16.5" />
             </svg>
-            <input
+            <Input
               type="search"
               value={sessionFilter}
               onChange={(event) => setSessionFilter(event.target.value)}
@@ -740,10 +741,8 @@ export function SessionSidebar({
                 width: "100%",
                 height: 34,
                 padding: "0 30px 0 32px",
-                border: "1px solid var(--border)",
                 borderRadius: 8,
                 background: "var(--bg-panel)",
-                color: "var(--text)",
                 fontSize: 13,
                 outline: "none",
               }}

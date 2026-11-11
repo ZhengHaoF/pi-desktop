@@ -1,8 +1,9 @@
 import { useId, useState } from "react";
+import { Select } from "@/components/ui/Select";
 import { useI18n } from "@/i18n";
 import { useSessionListMode } from "@/hooks/useSessionListMode";
 import type { SessionListMode } from "@shared/session-list-mode";
-import { SettingRow, selectStyle } from "./settings-controls";
+import { SettingRow } from "./settings-controls";
 
 /**
  * Sidebar session list mode: independent (one project owns the window) or
@@ -31,18 +32,19 @@ export function SessionListSettings() {
         {t("sessionListModeDescription", "Choose how the sidebar organizes your sessions.")}
       </p>
       <SettingRow label={t("sessionListModeLabel", "Mode")} controlId={controlId}>
-        <select
+        <Select
           id={controlId}
           value={mode}
           disabled={saving}
-          onChange={(event) => {
-            void save(event.target.value as SessionListMode);
+          onChange={(value) => {
+            void save(value as SessionListMode);
           }}
-          style={{ ...selectStyle, cursor: saving ? "wait" : "pointer" }}
-        >
-          <option value="independent">{t("sessionListModeIndependent", "Independent")}</option>
-          <option value="aggregated">{t("sessionListModeAggregated", "Aggregated")}</option>
-        </select>
+          style={saving ? { cursor: "wait" } : undefined}
+          options={[
+            { value: "independent", label: t("sessionListModeIndependent", "Independent") },
+            { value: "aggregated", label: t("sessionListModeAggregated", "Aggregated") },
+          ]}
+        />
       </SettingRow>
       <p style={{ margin: "10px 0 0", fontSize: 12, lineHeight: 1.55, color: "var(--text-dim)" }}>
         {t(

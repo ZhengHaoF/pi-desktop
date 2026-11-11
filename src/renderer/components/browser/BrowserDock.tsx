@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Input } from "@/components/ui/Input";
 import { useI18n } from "@/i18n";
 import { browserErrorMessage as messageOf } from "./browser-error-message";
 import { browserSurfaceBounds } from "./browser-surface-bounds";
@@ -9,6 +10,7 @@ import type {
   BrowserRendererState,
 } from "../../../contract/browser";
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 
 export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; ownerSessionId: string | null }) {
   const { t } = useI18n();
@@ -293,7 +295,7 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
             void navigate();
           }}
         >
-          <input
+          <Input
             aria-label={t("browserAddress", "Browser address")}
             value={address}
             onChange={(event) => setAddress(event.target.value)}
@@ -305,25 +307,18 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
               padding: "0 9px",
               border: `1px solid ${activeTab?.url.startsWith("http:") ? "#d9872f" : "var(--border)"}`,
               borderRadius: 6,
-              background: "var(--bg)",
-              color: "var(--text)",
               fontSize: 11,
               outline: "none",
             }}
           />
         </form>
-        <select
+        <Select
           aria-label={t("browserProfileForNewTabs", "Profile for new tabs")}
           value={profileId}
-          onChange={(event) => setProfileId(event.target.value)}
-          style={{ ...selectStyle, maxWidth: 90 }}
-        >
-          {state.profiles.map((profile) => (
-            <option key={profile.id} value={profile.id}>
-              {profile.name}
-            </option>
-          ))}
-        </select>
+          onChange={setProfileId}
+          style={{ maxWidth: 90 }}
+          options={state.profiles.map((profile) => ({ value: profile.id, label: profile.name }))}
+        />
         <Button
           variant="ghost"
           style={iconButtonStyle}
@@ -584,14 +579,6 @@ const iconButtonStyle = {
   padding: 0,
   borderRadius: 5,
   fontSize: 14,
-};
-const selectStyle = {
-  height: 29,
-  border: "1px solid var(--border)",
-  borderRadius: 5,
-  background: "var(--bg)",
-  color: "var(--text-muted)",
-  fontSize: 10,
 };
 const primaryButtonStyle = {
   minHeight: 32,

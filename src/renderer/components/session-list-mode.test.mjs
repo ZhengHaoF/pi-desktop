@@ -121,8 +121,10 @@ test("the session list mode preference persists through the validated UI state p
 });
 
 test("the settings section exposes both modes with rollback feedback", () => {
-  assert.match(settingsSection, /value="independent"/);
-  assert.match(settingsSection, /value="aggregated"/);
+  // SessionListSettings renders through the themed listbox; both modes appear
+  // as options entries.
+  assert.match(settingsSection, /value: "independent"/);
+  assert.match(settingsSection, /value: "aggregated"/);
   assert.match(settingsSection, /role="alert"/);
   assert.match(settingsSection, /sessionListModeSaveFailed/);
 });

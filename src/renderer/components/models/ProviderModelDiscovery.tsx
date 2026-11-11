@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { call } from "@/lib/api-client";
 import { mergeDiscoveredModels, type ProviderEntry } from "@/lib/models-config-state";
 import { useI18n } from "@/i18n";
+import { Input } from "@/components/ui/Input";
 import type { DiscoveredModel } from "@contract/types";
 import { Button } from "@/components/ui/Button";
 
@@ -220,7 +221,7 @@ export function ProviderModelDiscovery({
               />
               {t("modelImportSelectAll", "Select all results")}
             </label>
-            <input
+            <Input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -229,14 +230,8 @@ export function ProviderModelDiscovery({
               style={{
                 flex: 1,
                 minWidth: 0,
-                boxSizing: "border-box",
                 padding: "5px 9px",
-                background: "var(--bg)",
-                border: "1px solid var(--border)",
-                borderRadius: 5,
-                color: "var(--text)",
                 fontSize: 12,
-                outline: "none",
               }}
             />
           </div>

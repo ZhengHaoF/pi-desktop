@@ -1,4 +1,6 @@
 import { call } from "@/lib/api-client";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import { forwardRef, useState, useEffect, useCallback, useImperativeHandle, useRef } from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useI18n } from "@/i18n";
@@ -237,7 +239,7 @@ const SkillDetail = forwardRef<
             {t("loadingSkillFile", "Loading skill file…")}
           </div>
         ) : (
-          <textarea
+          <Textarea
             value={content}
             onChange={(event) => setContent(event.target.value)}
             disabled={contentSaving}
@@ -358,7 +360,7 @@ function AddSkillPanel({ cwd, onInstalled }: { cwd: string; onInstalled: () => v
 
         {/* Search row */}
         <div style={{ display: "flex", gap: 8 }}>
-          <input
+          <Input
             type="search"
             ref={inputRef}
             value={query}

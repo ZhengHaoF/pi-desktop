@@ -1,4 +1,5 @@
 import { call } from "@/lib/api-client";
+import { Input } from "@/components/ui/Input";
 import { useEffect, useState, useCallback, useRef, type CSSProperties } from "react";
 import type { SessionInfo } from "@/lib/types";
 import { useI18n } from "@/i18n";
@@ -439,7 +440,7 @@ function SessionItem({
         </>
       ) : renaming ? (
         /* ── Rename: input fills the same row ── */
-        <input
+        <Input
           ref={inputRef}
           value={renameValue}
           onChange={(e) => setRenameValue(e.target.value)}
@@ -456,8 +457,6 @@ function SessionItem({
             border: "1px solid var(--accent)",
             borderRadius: 5,
             outline: "none",
-            background: "var(--bg)",
-            color: "var(--text)",
             height: 34,
           }}
         />
@@ -718,9 +717,7 @@ function SessionItem({
                   zIndex: 50,
                   minWidth: 132,
                   padding: 4,
-                  border: "1px solid var(--border)",
                   borderRadius: 8,
-                  background: "var(--bg)",
                   boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
                 }}
               >

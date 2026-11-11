@@ -40,6 +40,8 @@ import type { ThinkingExpansionStore } from "@/lib/thinking-expansion-store";
 import { skillInvocationCommandText } from "@shared/skill-invocation";
 import { localizedExtensionConfirmCopy } from "@/lib/extension-ui-copy";
 import { Button } from "@/components/ui/Button";
+import { Textarea } from "@/components/ui/Textarea";
+import { Input } from "@/components/ui/Input";
 
 interface Props {
   session: SessionInfo | null;
@@ -1172,7 +1174,7 @@ function ExtensionDialog({
             </div>
           )}
           {request.method === "input" && (
-            <input
+            <Input
               autoFocus
               value={value}
               placeholder={request.placeholder}
@@ -1185,16 +1187,13 @@ function ExtensionDialog({
                 width: "100%",
                 padding: "9px 10px",
                 borderRadius: 7,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text)",
-                outline: "none",
                 fontSize: scaledChatFont(13),
               }}
             />
           )}
           {request.method === "editor" && (
-            <textarea
+            <Textarea
+              mono={false}
               autoFocus
               value={value}
               onChange={(e) => setValue(e.target.value)}

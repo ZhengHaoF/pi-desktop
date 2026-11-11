@@ -11,6 +11,8 @@ import type {
   BrowserSettingsPatch,
 } from "../../../contract/browser";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 
 export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
   const { language, t } = useI18n();
@@ -136,23 +138,19 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
               onChange={(saveLoginState) => void update({ panel: { saveLoginState } })}
             />
             <Field label={t("browserDefaultProfile", "Default Profile for new tabs")}>
-              <select
-                style={inputStyle}
+              <Select
                 value={settings.panel.defaultProfileId}
-                onChange={(event) => void update({ panel: { defaultProfileId: event.target.value } })}
-              >
-                {state.profiles
+                onChange={(value) => void update({ panel: { defaultProfileId: value } })}
+                options={state.profiles
                   .filter((profile) => profile.mode !== "unsafe")
-                  .map((profile) => (
-                    <option key={profile.id} value={profile.id}>
-                      {profile.name} ({profileModeLabel(t, profile.mode)})
-                    </option>
-                  ))}
-              </select>
+                  .map((profile) => ({
+                    value: profile.id,
+                    label: `${profile.name} (${profileModeLabel(t, profile.mode)})`,
+                  }))}
+              />
             </Field>
             <Field label={t("browserHomepage", "Homepage")}>
-              <input
-                style={inputStyle}
+              <Input
                 value={settings.navigation.homepage}
                 onChange={(event) => setState(withNavigation(state, { homepage: event.target.value }))}
                 onBlur={(event) => void update({ navigation: { homepage: event.target.value } })}
@@ -203,20 +201,21 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
               warning
             />
             <Field label={t("browserNetworkIsolation", "Network isolation")}>
-              <select
-                style={inputStyle}
+              <Select
                 value={settings.navigation.networkIsolation}
-                onChange={(event) =>
+                onChange={(value) =>
                   void update({
-                    navigation: { networkIsolation: event.target.value as "best-effort" | "strict" },
+                    navigation: { networkIsolation: value as "best-effort" | "strict" },
                   })
                 }
-              >
-                <option value="best-effort">{t("browserNetworkBestEffort", "Best effort")}</option>
-                <option value="strict">
-                  {t("browserNetworkStrict", "Strict (unavailable without enforcing network sandbox)")}
-                </option>
-              </select>
+                options={[
+                  { value: "best-effort", label: t("browserNetworkBestEffort", "Best effort") },
+                  {
+                    value: "strict",
+                    label: t("browserNetworkStrict", "Strict (unavailable without enforcing network sandbox)"),
+                  },
+                ]}
+              />
             </Field>
             <div style={noticeStyle}>
               {settings.navigation.networkIsolation === "strict"
@@ -238,22 +237,22 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
               onChange={(enabled) => void setAutomationEnabled(enabled)}
             />
             <Field label={t("browserDefaultPermanentPermission", "Default permanent permission")}>
-              <select
-                style={inputStyle}
+              <Select
                 value={settings.automation.defaultPermission}
-                onChange={(event) =>
+                onChange={(value) =>
                   void update({
                     automation: {
-                      defaultPermission: event.target.value as "ask" | "deny" | "read" | "interact",
+                      defaultPermission: value as "ask" | "deny" | "read" | "interact",
                     },
                   })
                 }
-              >
-                <option value="ask">{t("browserPermissionAsk", "Ask for each session")}</option>
-                <option value="deny">{t("browserPermissionDeny", "Always deny")}</option>
-                <option value="read">{t("browserPermissionReadOnly", "Read only")}</option>
-                <option value="interact">{t("browserPermissionAllowInteractions", "Allow interactions")}</option>
-              </select>
+                options={[
+                  { value: "ask", label: t("browserPermissionAsk", "Ask for each session") },
+                  { value: "deny", label: t("browserPermissionDeny", "Always deny") },
+                  { value: "read", label: t("browserPermissionReadOnly", "Read only") },
+                  { value: "interact", label: t("browserPermissionAllowInteractions", "Allow interactions") },
+                ]}
+              />
             </Field>
             <Toggle
               label={t("browserAllowAgentJavaScript", "Allow Agent to run page JavaScript (advanced)")}
@@ -267,36 +266,34 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
               onChange={(allowChannelSessions) => void update({ automation: { allowChannelSessions } })}
             />
             <Field label={t("browserSensitiveActions", "Sensitive Agent actions")}>
-              <select
-                style={inputStyle}
+              <Select
                 value={settings.automation.sensitiveActions}
-                onChange={(event) =>
+                onChange={(value) =>
                   void update({
-                    automation: { sensitiveActions: event.target.value as "always-ask" | "deny" },
+                    automation: { sensitiveActions: value as "always-ask" | "deny" },
                   })
                 }
-              >
-                <option value="always-ask">{t("browserAskEveryTime", "Ask every time")}</option>
-                <option value="deny">{t("browserDeny", "Deny")}</option>
-              </select>
+                options={[
+                  { value: "always-ask", label: t("browserAskEveryTime", "Ask every time") },
+                  { value: "deny", label: t("browserDeny", "Deny") },
+                ]}
+              />
             </Field>
             <Field label={t("browserUserTakeover", "When the user acts while the Agent is working")}>
-              <select
-                style={inputStyle}
+              <Select
                 value={settings.automation.userTakeover}
-                onChange={(event) =>
+                onChange={(value) =>
                   void update({
                     automation: {
-                      userTakeover: event.target.value as "cancel-agent-action" | "wait",
+                      userTakeover: value as "cancel-agent-action" | "wait",
                     },
                   })
                 }
-              >
-                <option value="cancel-agent-action">
-                  {t("browserCancelAgentAction", "Cancel current Agent action")}
-                </option>
-                <option value="wait">{t("browserWaitForAgent", "Wait for Agent action")}</option>
-              </select>
+                options={[
+                  { value: "cancel-agent-action", label: t("browserCancelAgentAction", "Cancel current Agent action") },
+                  { value: "wait", label: t("browserWaitForAgent", "Wait for Agent action") },
+                ]}
+              />
             </Field>
             <Toggle
               label={t("browserHighlightTarget", "Highlight the Agent's target before clicking")}
@@ -359,29 +356,29 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                 )}
               </div>
               <Field label={t("browserIdentityMode", "Browser identity")}>
-                <select
-                  style={inputStyle}
+                <Select
                   value={settings.advancedBrowserMode.identityMode}
-                  onChange={(event) =>
+                  onChange={(value) =>
                     void update({
                       advancedBrowserMode: {
-                        identityMode: event.target.value as "native" | "chrome-compatible" | "custom",
+                        identityMode: value as "native" | "chrome-compatible" | "custom",
                       },
                     })
                   }
-                >
-                  <option value="chrome-compatible">
-                    {t("browserIdentityChromeCompatible", "Chromium-compatible (recommended)")}
-                  </option>
-                  <option value="native">{t("browserIdentityNative", "Electron native")}</option>
-                  <option value="custom">{t("browserIdentityCustom", "Custom consistent identity")}</option>
-                </select>
+                  options={[
+                    {
+                      value: "chrome-compatible",
+                      label: t("browserIdentityChromeCompatible", "Chromium-compatible (recommended)"),
+                    },
+                    { value: "native", label: t("browserIdentityNative", "Electron native") },
+                    { value: "custom", label: t("browserIdentityCustom", "Custom consistent identity") },
+                  ]}
+                />
               </Field>
               {settings.advancedBrowserMode.identityMode === "custom" && (
                 <>
                   <Field label={t("browserCustomUserAgent", "Custom User-Agent")}>
-                    <input
-                      style={inputStyle}
+                    <Input
                       value={settings.advancedBrowserMode.customUserAgentValue}
                       onChange={(event) =>
                         setState(withAdvancedMode(state, { customUserAgentValue: event.target.value }))
@@ -393,8 +390,7 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                     />
                   </Field>
                   <Field label={t("browserClientHintsPlatform", "Client Hints platform")}>
-                    <input
-                      style={inputStyle}
+                    <Input
                       value={settings.advancedBrowserMode.customUserAgentPlatform}
                       onChange={(event) =>
                         setState(withAdvancedMode(state, { customUserAgentPlatform: event.target.value }))
@@ -406,8 +402,7 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                     />
                   </Field>
                   <Field label={t("browserChromiumFullVersion", "Chromium full version")}>
-                    <input
-                      style={inputStyle}
+                    <Input
                       value={settings.advancedBrowserMode.customUserAgentFullVersion}
                       onChange={(event) =>
                         setState(withAdvancedMode(state, { customUserAgentFullVersion: event.target.value }))
@@ -421,8 +416,7 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                 </>
               )}
               <Field label={t("browserCertificateDomains", "Certificate bypass domains (comma separated)")}>
-                <input
-                  style={inputStyle}
+                <Input
                   value={settings.advancedBrowserMode.certificateBypassDomains.join(", ")}
                   onChange={(event) =>
                     setState(
@@ -469,11 +463,10 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
 
           <Section title={t("browserDownloadsProxy", "Downloads and proxy")}>
             <Field label={t("browserDownloadPolicy", "Download policy")}>
-              <select
-                style={inputStyle}
+              <Select
                 value={settings.downloads.mode}
-                onChange={(event) => {
-                  const mode = event.target.value as "ask" | "deny" | "allow-to-directory";
+                onChange={(raw) => {
+                  const mode = raw as "ask" | "deny" | "allow-to-directory";
                   if (mode !== "allow-to-directory") {
                     void update({ downloads: { mode } });
                     return;
@@ -482,18 +475,20 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                     if (directory) void update({ downloads: { mode, directory } });
                   });
                 }}
-              >
-                <option value="ask">{t("browserAskEveryTime", "Ask every time")}</option>
-                <option value="deny">{t("browserDeny", "Deny")}</option>
-                <option value="allow-to-directory">
-                  {t("browserAllowApprovedDirectory", "Allow to approved directory")}
-                </option>
-              </select>
+                options={[
+                  { value: "ask", label: t("browserAskEveryTime", "Ask every time") },
+                  { value: "deny", label: t("browserDeny", "Deny") },
+                  {
+                    value: "allow-to-directory",
+                    label: t("browserAllowApprovedDirectory", "Allow to approved directory"),
+                  },
+                ]}
+              />
             </Field>
             {settings.downloads.mode === "allow-to-directory" && (
               <Field label={t("browserApprovedDirectory", "Approved directory")}>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <input style={{ ...inputStyle, flex: 1 }} readOnly value={settings.downloads.directory ?? ""} />
+                  <Input style={{ flex: 1 }} readOnly value={settings.downloads.directory ?? ""} />
                   <Button
                     onClick={() =>
                       void window.piBridge.selectDirectory().then((directory) => {
@@ -507,11 +502,10 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
               </Field>
             )}
             <Field label={t("browserProxyMode", "Proxy mode")}>
-              <select
-                style={inputStyle}
+              <Select
                 value={settings.proxy.mode}
-                onChange={(event) => {
-                  const mode = event.target.value as "system" | "direct" | "custom";
+                onChange={(raw) => {
+                  const mode = raw as "system" | "direct" | "custom";
                   void update({
                     proxy: {
                       mode,
@@ -521,25 +515,24 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                     },
                   });
                 }}
-              >
-                <option value="system">{t("browserProxySystem", "System")}</option>
-                <option value="direct">{t("browserProxyDirect", "Direct")}</option>
-                <option value="custom">{t("browserProxyCustom", "Custom")}</option>
-              </select>
+                options={[
+                  { value: "system", label: t("browserProxySystem", "System") },
+                  { value: "direct", label: t("browserProxyDirect", "Direct") },
+                  { value: "custom", label: t("browserProxyCustom", "Custom") },
+                ]}
+              />
             </Field>
             {settings.proxy.mode === "custom" && (
               <>
                 <Field label={t("browserProxyRules", "Proxy rules")}>
-                  <input
-                    style={inputStyle}
+                  <Input
                     value={settings.proxy.proxyRules ?? ""}
                     onChange={(event) => setState(withProxy(state, { proxyRules: event.target.value }))}
                     onBlur={(event) => void update({ proxy: { proxyRules: event.target.value } })}
                   />
                 </Field>
                 <Field label={t("browserBypassRules", "Bypass rules")}>
-                  <input
-                    style={inputStyle}
+                  <Input
                     value={settings.proxy.proxyBypassRules ?? ""}
                     onChange={(event) => setState(withProxy(state, { proxyBypassRules: event.target.value }))}
                     onBlur={(event) => void update({ proxy: { proxyBypassRules: event.target.value } })}
@@ -547,16 +540,14 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                 </Field>
                 <div style={gridStyle}>
                   <Field label={t("browserProxyUsername", "Proxy username")}>
-                    <input
-                      style={inputStyle}
+                    <Input
                       autoComplete="off"
                       value={proxyUsername}
                       onChange={(event) => setProxyUsername(event.target.value)}
                     />
                   </Field>
                   <Field label={t("browserProxyPassword", "Proxy password")}>
-                    <input
-                      style={inputStyle}
+                    <Input
                       type="password"
                       autoComplete="new-password"
                       value={proxyPassword}
@@ -816,23 +807,24 @@ function HeaderRulesSection({
       </div>
       <div style={gridStyle}>
         <Field label={t("browserProfile", "Profile")}>
-          <select style={inputStyle} value={profileId} onChange={(event) => setProfileId(event.target.value)}>
-            {profiles.map((profile) => (
-              <option key={profile.id} value={profile.id}>
-                {profile.name} ({profileModeLabel(t, profile.mode)})
-              </option>
-            ))}
-          </select>
+          <Select
+            value={profileId}
+            onChange={setProfileId}
+            options={profiles.map((profile) => ({
+              value: profile.id,
+              label: `${profile.name} (${profileModeLabel(t, profile.mode)})`,
+            }))}
+          />
         </Field>
         <Field label={t("browserDirection", "Direction")}>
-          <select
-            style={inputStyle}
+          <Select
             value={direction}
-            onChange={(event) => setDirection(event.target.value as BrowserHeaderRuleDirection)}
-          >
-            <option value="request">{t("browserRequest", "Request")}</option>
-            <option value="response">{t("browserResponse", "Response")}</option>
-          </select>
+            onChange={(value) => setDirection(value as BrowserHeaderRuleDirection)}
+            options={[
+              { value: "request", label: t("browserRequest", "Request") },
+              { value: "response", label: t("browserResponse", "Response") },
+            ]}
+          />
         </Field>
       </div>
       {(!directionEnabled || disabled) && (
@@ -893,31 +885,30 @@ function HeaderRulesSection({
       </div>
       <div style={gridStyle}>
         <Field label={t("browserUrlPattern", "URL pattern")}>
-          <input style={inputStyle} value={urlPattern} onChange={(event) => setUrlPattern(event.target.value)} />
+          <Input value={urlPattern} onChange={(event) => setUrlPattern(event.target.value)} />
         </Field>
         <Field label={t("browserResourceTypes", "Resource types (optional, comma separated)")}>
-          <input style={inputStyle} value={resourceTypes} onChange={(event) => setResourceTypes(event.target.value)} />
+          <Input value={resourceTypes} onChange={(event) => setResourceTypes(event.target.value)} />
         </Field>
         <Field label={t("browserHeader", "Header")}>
-          <input style={inputStyle} value={header} onChange={(event) => setHeader(event.target.value)} />
+          <Input value={header} onChange={(event) => setHeader(event.target.value)} />
         </Field>
         <Field label={t("browserOperation", "Operation")}>
-          <select
-            style={inputStyle}
+          <Select
             value={operation}
-            onChange={(event) => setOperation(event.target.value as BrowserHeaderRule["operation"])}
-          >
-            <option value="set">{t("browserOperationSet", "Set")}</option>
-            <option value="append">{t("browserOperationAppend", "Append")}</option>
-            <option value="remove">{t("browserOperationRemove", "Remove")}</option>
-          </select>
+            onChange={(value) => setOperation(value as BrowserHeaderRule["operation"])}
+            options={[
+              { value: "set", label: t("browserOperationSet", "Set") },
+              { value: "append", label: t("browserOperationAppend", "Append") },
+              { value: "remove", label: t("browserOperationRemove", "Remove") },
+            ]}
+          />
         </Field>
       </div>
       {operation !== "remove" && (
         <>
           <Field label={t("browserHeaderValue", "Value (never reloaded when stored securely)")}>
-            <input
-              style={inputStyle}
+            <Input
               type={storeSecurely || header.trim().toLowerCase() === "authorization" ? "password" : "text"}
               autoComplete="off"
               value={value}
@@ -1277,9 +1268,8 @@ function TextPromptDialog({
         </div>
         <div style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.6 }}>{prompt.message}</div>
         {prompt.requiredValue && <code style={confirmationPhraseStyle}>{prompt.requiredValue}</code>}
-        <input
+        <Input
           ref={inputRef}
-          style={inputStyle}
           aria-label={prompt.message}
           autoComplete="off"
           spellCheck={false}
@@ -1433,8 +1423,7 @@ function NumberField({
 }) {
   return (
     <Field label={label}>
-      <input
-        style={inputStyle}
+      <Input
         type="number"
         min={min}
         max={max}
@@ -1496,17 +1485,6 @@ function formatBytes(value: number): string {
 const headingStyle = { margin: 0, color: "var(--text)", fontSize: 18 };
 const descriptionStyle = { margin: "6px 0 0", color: "var(--text-dim)", fontSize: 12, lineHeight: 1.6 };
 const emptyStyle = { margin: "auto", color: "var(--text-muted)", fontSize: 12 };
-const inputStyle = {
-  width: "100%",
-  minHeight: 34,
-  boxSizing: "border-box" as const,
-  border: "1px solid var(--border)",
-  borderRadius: 6,
-  padding: "6px 9px",
-  background: "var(--bg)",
-  color: "var(--text)",
-  fontSize: 12,
-};
 const promptBackdropStyle = {
   position: "fixed" as const,
   inset: 0,

@@ -4,6 +4,7 @@ import test from "node:test";
 import { createElement } from "react";
 import { act, create } from "react-test-renderer";
 import { importTestBundle } from "#test-bundle";
+import { installDomTestEnvironment, inlinePortalPlugin } from "../ui/dom-test-env.mjs";
 const { McpServerEditor, McpProjectOverrideEditor, McpConfig, McpToolsPanel, api } = await importTestBundle("mcp-ui", {
   stdin: {
     contents:
@@ -12,8 +13,9 @@ const { McpServerEditor, McpProjectOverrideEditor, McpConfig, McpToolsPanel, api
     loader: "tsx",
   },
   tsconfig: path.join(import.meta.dirname, "../../../../tsconfig.renderer.json"),
-  external: ["react", "react-dom", "react-dom/*", "react-test-renderer"],
+  external: ["react", "react-test-renderer"],
   plugins: [
+    inlinePortalPlugin,
     {
       name: "mcp-ui-api",
       setup(build) {
@@ -29,18 +31,33 @@ const { McpServerEditor, McpProjectOverrideEditor, McpConfig, McpToolsPanel, api
   ],
 });
 async function render(t, element) {
-  const previous = globalThis.IS_REACT_ACT_ENVIRONMENT;
-  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const dom = installDomTestEnvironment();
   let renderer;
   await act(async () => {
-    renderer = create(element);
+    renderer = create(element, {
+      createNodeMock: () => ({
+        getBoundingClientRect: () => ({ top: 100, left: 40, width: 180, bottom: 136 }),
+        contains: () => false,
+        scrollIntoView: () => {},
+        focus: () => {},
+      }),
+    });
   });
   t.after(async () => {
     await act(async () => renderer.unmount());
-    globalThis.IS_REACT_ACT_ENVIRONMENT = previous;
+    dom.restore();
   });
   return renderer;
 }
+
+const listboxTrigger = (renderer) => renderer.root.findByProps({ "aria-haspopup": "listbox" });
+const optionNodes = (renderer) => renderer.root.findAll((node) => node.type === "div" && node.props.role === "option");
+const chooseOption = async (renderer, label) => {
+  await act(async () => listboxTrigger(renderer).props.onClick());
+  const option = optionNodes(renderer).find((node) => node.props.children.at(-1) === label);
+  assert.ok(option, `option ${label} not found`);
+  await act(async () => option.props.onClick());
+};
 const button = (renderer, text) =>
   renderer.root.findAllByType("button").find((node) => node.children.join("") === text);
 
@@ -92,12 +109,17 @@ test("the MCP editor shows one codemode choice for legacy aliases and saves a se
       onSave: (_name, config) => saved.push(config),
     }),
   );
-  const exposure = renderer.root.findAllByType("select").find((node) => node.props.value === "codemode");
-  assert.ok(exposure);
+  const exposureTrigger = renderer.root
+    .findAllByProps({ "aria-haspopup": "listbox" })
+    .find((node) => node.props.children[0].props.children === "codemode");
+  assert.ok(exposureTrigger);
+  await act(async () => exposureTrigger.props.onClick());
+  const exposureOptions = optionNodes(renderer);
   assert.equal(
-    exposure.findAllByType("option").some((node) => node.props.value === "codemode-deferred"),
+    exposureOptions.some((node) => node.props.children.at(-1) === "codemode-deferred"),
     false,
   );
+  await act(async () => exposureTrigger.props.onClick());
   await act(async () =>
     renderer.root.findByProps({ value: "Old summary" }).props.onChange({ target: { value: "New searchable summary" } }),
   );
@@ -177,11 +199,9 @@ test("MCP scope changes capture the requested scope before discard confirmation"
   api.respond(async (_method, params) => ({ scope: params.scope, revision: "missing", entries: [] }));
   const renderer = await render(t, createElement(McpConfig, { cwd: "/fixture", sessionId: null }));
   await act(async () => button(renderer, "Import JSON").props.onClick());
-  const event = { target: { value: "project" } };
-  await act(async () => renderer.root.findByType("select").props.onChange(event));
-  event.target.value = "global";
+  await chooseOption(renderer, "Current project");
   await act(async () => button(renderer, "Discard changes").props.onClick());
-  assert.equal(renderer.root.findByType("select").props.value, "project");
+  assert.equal(listboxTrigger(renderer).props.children[0].props.children, "Current project");
   assert.equal(api.calls.at(-1).params.scope, "project");
 });
 
@@ -238,7 +258,7 @@ test("project view edits policy only, and disable and reset never copy inherited
     } else throw new Error("Unexpected mutation " + method);
   });
   const renderer = await render(t, createElement(McpConfig, { cwd: "/project", sessionId: null }));
-  await act(async () => renderer.root.findByType("select").props.onChange({ target: { value: "project" } }));
+  await chooseOption(renderer, "Current project");
   assert.equal(button(renderer, "Restore global settings").props.disabled, true);
   await act(async () => button(renderer, "Disable").props.onClick());
   assert.deepEqual(mutations[0].config, { enabled: false });
@@ -256,28 +276,26 @@ test("project view edits policy only, and disable and reset never copy inherited
   assert.equal(button(renderer, "Restore global settings").props.disabled, true);
 });
 
-test("project editor preserves inherit versus empty map and rejects malformed JSON", async (t) => {
+test("project override editor rejects malformed JSON and saves the emptied per-tool map", async (t) => {
   const saved = [];
   const renderer = await render(
     t,
     createElement(McpProjectOverrideEditor, {
-      initial: { name: "fixture", config: { enabled: false, exposure: "hidden", toolExposure: { read: "direct" } } },
+      initial: { name: "fixture", config: { enabled: false, toolExposure: { read: "direct" } } },
       busy: false,
       onDirty() {},
       onCancel() {},
       onSave: (_name, config) => saved.push(config),
     }),
   );
-  await act(async () => renderer.root.findAllByType("select")[0].props.onChange({ target: { value: "" } }));
-  await act(async () => renderer.root.findAllByType("select")[1].props.onChange({ target: { value: "" } }));
   const textarea = renderer.root.findByType("textarea");
   await act(async () => textarea.props.onChange({ target: { value: "{broken" } }));
   await act(async () => button(renderer, "Save configuration").props.onClick());
   assert.equal(saved.length, 0);
   await act(async () => textarea.props.onChange({ target: { value: "{}" } }));
   await act(async () => button(renderer, "Save configuration").props.onClick());
-  assert.deepEqual(saved[0], { toolExposure: {} });
+  assert.deepEqual(saved[0], { enabled: false, toolExposure: {} });
   await act(async () => textarea.props.onChange({ target: { value: "" } }));
   await act(async () => button(renderer, "Save configuration").props.onClick());
-  assert.deepEqual(saved[1], {});
+  assert.deepEqual(saved[1], { enabled: false });
 });

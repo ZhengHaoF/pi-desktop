@@ -2,6 +2,9 @@ import { useEffect, useId, useState } from "react";
 import type { McpServerConfig, McpExposure } from "@contract/mcp";
 import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
+import { Select } from "@/components/ui/Select";
 import { canonicalMcpExposure } from "@shared/mcp-exposure";
 
 export function McpServerEditor({
@@ -39,7 +42,7 @@ export function McpServerEditor({
   const field = (key: "args" | "env" | "headers" | "oauth" | "toolExposure", label: string) => (
     <label>
       {label}
-      <textarea
+      <Textarea
         aria-label={label}
         value={jsonFields[key] ?? JSON.stringify(config[key] ?? (key === "args" ? [] : {}), null, 2)}
         onChange={(event) => {
@@ -65,7 +68,7 @@ export function McpServerEditor({
       <h4>{initial.name ? t("mcpEditServer", "Edit MCP server") : t("mcpAddServer", "Add MCP server")}</h4>
       <fieldset disabled={busy}>
         <label htmlFor={`${id}-name`}>{t("mcpName", "Server name")}</label>
-        <input
+        <Input
           id={`${id}-name`}
           value={name}
           readOnly={Boolean(initial.name)}
@@ -97,7 +100,7 @@ export function McpServerEditor({
         {advanced ? (
           <label>
             {t("mcpServerJson", "Server configuration JSON")}
-            <textarea
+            <Textarea
               value={advancedText}
               onChange={(event) => {
                 setAdvancedText(event.target.value);
@@ -109,18 +112,18 @@ export function McpServerEditor({
           <>
             <label>
               {t("mcpDescription", "Server summary")}
-              <input
+              <Input
                 value={config.description ?? ""}
                 onChange={(event) => change({ description: event.target.value || undefined })}
               />
             </label>
             <label>
               {t("mcpTransport", "Transport")}{" "}
-              <select
+              <Select
                 value={config.url !== undefined ? "http" : "stdio"}
-                onChange={(event) => {
+                onChange={(value) => {
                   const next = { ...config };
-                  if (event.target.value === "http") {
+                  if (value === "http") {
                     delete next.command;
                     delete next.args;
                     delete next.env;
@@ -138,28 +141,29 @@ export function McpServerEditor({
                   setJsonFields({});
                   onDirty();
                 }}
-              >
-                <option value="stdio">stdio</option>
-                <option value="http">Streamable HTTP</option>
-              </select>
+                options={[
+                  { value: "stdio", label: "stdio" },
+                  { value: "http", label: "Streamable HTTP" },
+                ]}
+              />
             </label>
             {config.url !== undefined ? (
               <>
                 <label>
                   {t("mcpUrl", "MCP URL")}
-                  <input value={config.url} onChange={(event) => change({ url: event.target.value })} />
+                  <Input value={config.url} onChange={(event) => change({ url: event.target.value })} />
                 </label>
               </>
             ) : (
               <>
                 <label>
                   {t("mcpCommand", "Command")}
-                  <input value={config.command ?? ""} onChange={(event) => change({ command: event.target.value })} />
+                  <Input value={config.command ?? ""} onChange={(event) => change({ command: event.target.value })} />
                 </label>
                 {field("args", t("mcpArguments", "Arguments (JSON array)"))}
                 <label>
                   {t("mcpWorkingDirectory", "Working directory")}
-                  <input
+                  <Input
                     value={config.cwd ?? ""}
                     onChange={(event) => change({ cwd: event.target.value || undefined })}
                   />
@@ -178,24 +182,22 @@ export function McpServerEditor({
               )}
               <label>
                 {t("mcpExposure", "Tool exposure")}{" "}
-                <select
+                <Select
                   value={canonicalMcpExposure(config.exposure ?? "codemode")}
-                  onChange={(event) => change({ exposure: event.target.value as McpExposure })}
-                >
-                  {(["direct", "deferred", "codemode", "hidden"] as const).map((mode) => (
-                    <option key={mode} value={mode}>
-                      {mode}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => change({ exposure: value as McpExposure })}
+                  options={(["direct", "deferred", "codemode", "hidden"] as const).map((mode) => ({
+                    value: mode,
+                    label: mode,
+                  }))}
+                />
               </label>
               {field("toolExposure", t("mcpToolOverrides", "Per-tool exposure (JSON)"))}
               <label>
                 {t("mcpTimeout", "Request timeout (seconds)")}
-                <input
+                <Input
                   type="number"
-                  min="1"
-                  max="3600"
+                  min={1}
+                  max={3600}
                   value={config.timeout ?? 60}
                   onChange={(event) => change({ timeout: Number(event.target.value) })}
                 />

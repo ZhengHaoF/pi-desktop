@@ -1,4 +1,6 @@
 import { useEffect, useId, useMemo, useState } from "react";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { useI18n } from "@/i18n";
 import { getWebSearchSettings, setWebSearchSettings, testWebSearchSettings } from "@/lib/api-client";
 import type { WebSearchSnapshot } from "@shared/web-search";
@@ -9,10 +11,7 @@ const inputStyle = {
   minWidth: 220,
   minHeight: 36,
   padding: "7px 10px",
-  border: "1px solid var(--border)",
   borderRadius: 6,
-  background: "var(--bg)",
-  color: "var(--text)",
   fontSize: 13,
 } as const;
 
@@ -181,19 +180,14 @@ export function WebSearchSettings() {
         </p>
         <div style={{ height: 1, background: "var(--border)", margin: "20px 0" }} />
         <SettingRow label={t("webSearchProvider", "Search provider")} controlId={providerControlId}>
-          <select
+          <Select
             id={providerControlId}
-            style={{ ...inputStyle, minWidth: 180 }}
+            style={{ minWidth: 180 }}
             value={providerId}
             disabled={busy}
-            onChange={(event) => void switchProvider(event.target.value)}
-          >
-            {providers.map((provider) => (
-              <option key={provider.id} value={provider.id}>
-                {provider.label}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => void switchProvider(value)}
+            options={providers.map((provider) => ({ value: provider.id, label: provider.label }))}
+          />
         </SettingRow>
         {activeProvider && (
           <p style={hintStyle}>
@@ -210,7 +204,7 @@ export function WebSearchSettings() {
         <div style={{ height: 1, background: "var(--border)", margin: "20px 0" }} />
         <SettingRow label={t("webSearchApiKeyOverride", "Dedicated API key (optional)")} controlId={keyControlId}>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input
+            <Input
               id={keyControlId}
               style={inputStyle}
               type="password"

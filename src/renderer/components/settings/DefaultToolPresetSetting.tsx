@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { Select } from "@/components/ui/Select";
 import { call } from "@/lib/api-client";
 import { useI18n } from "@/i18n";
 import { SELECTABLE_TOOL_PRESETS, type SelectableToolPreset, type ToolPresetSettings } from "@shared/tool-presets";
@@ -48,31 +49,18 @@ export function DefaultToolPresetSetting() {
         <label htmlFor={id} style={{ fontSize: 14, color: "var(--text)" }}>
           {t("defaultToolPreset", "Default tool preset")}
         </label>
-        <select
+        <Select
           id={id}
           value={settings?.preset ?? ""}
           disabled={!settings || saving}
-          onChange={(event) => void save(event.target.value as SelectableToolPreset)}
-          style={{
-            minWidth: 145,
-            minHeight: 34,
-            padding: "4px 8px",
-            borderRadius: 6,
-            border: "1px solid var(--border)",
-            color: "var(--text)",
-            background: "var(--bg)",
-          }}
-        >
-          {settings ? (
-            SELECTABLE_TOOL_PRESETS.map((preset) => (
-              <option key={preset} value={preset}>
-                {labels[preset]}
-              </option>
-            ))
-          ) : (
-            <option value="">{t("loading", "Loading…")}</option>
-          )}
-        </select>
+          onChange={(value) => void save(value as SelectableToolPreset)}
+          style={{ minWidth: 145 }}
+          options={
+            settings
+              ? SELECTABLE_TOOL_PRESETS.map((preset) => ({ value: preset, label: labels[preset] }))
+              : [{ value: "", label: t("loading", "Loading…") }]
+          }
+        />
       </div>
       <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5 }}>
         {t(

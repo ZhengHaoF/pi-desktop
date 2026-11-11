@@ -20,6 +20,9 @@ import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/i18n";
 import { RemoteControlCard } from "./RemoteControlCard";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { SecretTextInput } from "@/components/ui/SecretTextInput";
+import { Select } from "@/components/ui/Select";
 
 const EMPTY: ChannelsSnapshot = { accounts: [], statuses: [], pairings: [], bindings: [], activities: [] };
 const TELEGRAM_BASE_URL = "https://api.telegram.org";
@@ -37,17 +40,6 @@ export const FEISHU_PERMISSION_IMPORT_JSON = JSON.stringify(
   null,
   2,
 );
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  border: "1px solid var(--border)",
-  borderRadius: 6,
-  background: "var(--bg)",
-  color: "var(--text)",
-  minHeight: 36,
-  fontSize: 13,
-  padding: "8px 9px",
-};
 
 function statusFor(snapshot: ChannelsSnapshot, accountId: string): ChannelStatus | undefined {
   return snapshot.statuses.find((status) => status.accountId === accountId);
@@ -740,31 +732,27 @@ export function AccountCard({
         style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 10, marginTop: 14 }}
       >
         <Field label={t("channelName", "Name")}>
-          <input
+          <Input
             aria-label={t("channelName", "Name")}
-            style={inputStyle}
             value={draft.name}
             onChange={(event) => setDraft({ ...draft, name: event.target.value })}
           />
         </Field>
         <Field label={t("dmAccess", "Direct-message access")}>
-          <select
+          <Select
             aria-label={t("dmAccess", "Direct-message access")}
-            style={inputStyle}
             value={draft.dmPolicy}
-            onChange={(event) =>
-              setDraft({ ...draft, dmPolicy: event.target.value as ChannelAccountConfig["dmPolicy"] })
-            }
-          >
-            <option value="pairing">{t("policyPairing", "Pairing")}</option>
-            <option value="allowlist">{t("policyAllowlistOnly", "Allowlist only")}</option>
-            <option value="open">{t("policyOpenUnsafe", "Open (unsafe)")}</option>
-          </select>
+            onChange={(value) => setDraft({ ...draft, dmPolicy: value as ChannelAccountConfig["dmPolicy"] })}
+            options={[
+              { value: "pairing", label: t("policyPairing", "Pairing") },
+              { value: "allowlist", label: t("policyAllowlistOnly", "Allowlist only") },
+              { value: "open", label: t("policyOpenUnsafe", "Open (unsafe)") },
+            ]}
+          />
         </Field>
         <Field label={t("allowedUserIds", "Allowed user IDs")}>
-          <input
+          <Input
             aria-label={t("allowedUserIds", "Allowed user IDs")}
-            style={inputStyle}
             value={draft.allowFrom.join(", ")}
             onChange={(event) =>
               setDraft({
@@ -778,23 +766,20 @@ export function AccountCard({
           />
         </Field>
         <Field label={t("groupAccess", "Group access")}>
-          <select
+          <Select
             aria-label={t("groupAccess", "Group access")}
-            style={inputStyle}
             value={draft.groupPolicy}
-            onChange={(event) =>
-              setDraft({ ...draft, groupPolicy: event.target.value as ChannelAccountConfig["groupPolicy"] })
-            }
-          >
-            <option value="disabled">{t("policyDisabledRecommended", "Disabled (recommended)")}</option>
-            <option value="allowlist">{t("policyAllowlist", "Allowlist")}</option>
-            <option value="open">{t("policyOpenUnsafe", "Open (unsafe)")}</option>
-          </select>
+            onChange={(value) => setDraft({ ...draft, groupPolicy: value as ChannelAccountConfig["groupPolicy"] })}
+            options={[
+              { value: "disabled", label: t("policyDisabledRecommended", "Disabled (recommended)") },
+              { value: "allowlist", label: t("policyAllowlist", "Allowlist") },
+              { value: "open", label: t("policyOpenUnsafe", "Open (unsafe)") },
+            ]}
+          />
         </Field>
         <Field label={t("allowedGroupIds", "Allowed group IDs")}>
-          <input
+          <Input
             aria-label={t("allowedGroupIds", "Allowed group IDs")}
-            style={inputStyle}
             value={draft.groupIds.join(", ")}
             onChange={(event) =>
               setDraft({
@@ -808,9 +793,8 @@ export function AccountCard({
           />
         </Field>
         <Field label={t("allowedGroupSenderIds", "Allowed group sender IDs")}>
-          <input
+          <Input
             aria-label={t("allowedGroupSenderIds", "Allowed group sender IDs")}
-            style={inputStyle}
             value={draft.groupAllowFrom.join(", ")}
             onChange={(event) =>
               setDraft({
@@ -854,9 +838,8 @@ export function AccountCard({
         </Field>
         <Field label={t("defaultProjectDirectory", "Default project directory")}>
           <div style={{ display: "flex", gap: 6 }}>
-            <input
+            <Input
               aria-label={t("defaultProjectDirectory", "Default project directory")}
-              style={inputStyle}
               readOnly
               value={draft.defaultCwd ?? t("isolatedChannelWorkspace", "Isolated channel workspace")}
             />
@@ -882,12 +865,9 @@ export function AccountCard({
               gap: 7,
             }}
           >
-            <input
-              type="password"
-              autoComplete="off"
-              style={inputStyle}
+            <SecretTextInput
               value={telegramToken}
-              onChange={(event) => setTelegramToken(event.target.value)}
+              onChange={setTelegramToken}
               placeholder={t("newTelegramBotToken", "New BotFather token")}
             />
             <Button
@@ -918,26 +898,22 @@ export function AccountCard({
             marginTop: 12,
           }}
         >
-          <input
-            style={inputStyle}
+          <Input
             value={draft.appId ?? ""}
             onChange={(event) => setDraft({ ...draft, appId: event.target.value })}
             placeholder={t("feishuAppId", "App ID (cli_…)")}
           />
-          <select
-            style={inputStyle}
+          <Select
             value={draft.domain === "lark" ? "lark" : "feishu"}
-            onChange={(event) => setDraft({ ...draft, domain: event.target.value as FeishuDomain })}
-          >
-            <option value="feishu">{t("feishuChina", "Feishu (China)")}</option>
-            <option value="lark">Lark</option>
-          </select>
-          <input
-            type="password"
-            autoComplete="off"
-            style={inputStyle}
+            onChange={(value) => setDraft({ ...draft, domain: value as FeishuDomain })}
+            options={[
+              { value: "feishu", label: t("feishuChina", "Feishu (China)") },
+              { value: "lark", label: "Lark" },
+            ]}
+          />
+          <SecretTextInput
             value={feishuAppSecret}
-            onChange={(event) => setFeishuAppSecret(event.target.value)}
+            onChange={setFeishuAppSecret}
             placeholder={t("newFeishuAppSecret", "New App Secret")}
           />
           <Button
@@ -1049,8 +1025,7 @@ export function AccountCard({
           marginTop: 12,
         }}
       >
-        <input
-          style={inputStyle}
+        <Input
           value={testPeer}
           onChange={(event) => setTestPeer(event.target.value)}
           placeholder={
@@ -1061,7 +1036,7 @@ export function AccountCard({
                 : t("testSendUserId", "User ID for test-send")
           }
         />
-        <input style={inputStyle} value={testMessage} onChange={(event) => setTestMessage(event.target.value)} />
+        <Input value={testMessage} onChange={(event) => setTestMessage(event.target.value)} />
         <Button
           type="button"
           disabled={busy || !testPeer.trim() || !testMessage.trim()}
@@ -1196,14 +1171,18 @@ function BindingRow({
         {channelLabel(binding.channel, t)} · {binding.peerId}
         {binding.threadId ? ` · ${t("topic", "topic")} ${binding.threadId}` : ""}
       </div>
-      <select style={inputStyle} value={sessionId} onChange={(event) => setSessionId(event.target.value)}>
-        <option value="">{t("dedicatedImSession", "Dedicated IM session")}</option>
-        {sessions.map((session) => (
-          <option key={session.id} value={session.id}>
-            {session.name || session.firstMessage || session.id}
-          </option>
-        ))}
-      </select>
+      <Select
+        value={sessionId}
+        onChange={setSessionId}
+        placeholder={t("dedicatedImSession", "Dedicated IM session")}
+        options={[
+          { value: "", label: t("dedicatedImSession", "Dedicated IM session") },
+          ...sessions.map((session) => ({
+            value: session.id,
+            label: session.name || session.firstMessage || session.id,
+          })),
+        ]}
+      />
       <div style={{ display: "flex", gap: 5 }}>
         <Button
           disabled={busy}
@@ -1372,13 +1351,10 @@ export function TelegramTokenDialog({
             "Create a bot with @BotFather, paste its token here, then Pi Desktop will verify it with getMe and store it using OS encryption.",
           )}
         </p>
-        <input
+        <SecretTextInput
           autoFocus
-          type="password"
-          autoComplete="off"
-          style={inputStyle}
           value={token}
-          onChange={(event) => setToken(event.target.value)}
+          onChange={setToken}
           placeholder={t("telegramBotToken", "BotFather token")}
         />
         {error && (
@@ -1498,15 +1474,15 @@ export function FeishuCredentialDialog({
           <div data-testid="feishu-scan-create" style={{ marginTop: 14 }}>
             <label style={{ display: "grid", gap: 6, color: "var(--text-muted)", fontSize: 11 }}>
               {t("feishuTenantRegion", "Account region")}
-              <select
+              <Select
                 autoFocus
-                style={inputStyle}
                 value={domain}
-                onChange={(event) => setDomain(event.target.value as FeishuDomain)}
-              >
-                <option value="feishu">{t("feishuChina", "Feishu (China)")}</option>
-                <option value="lark">Lark</option>
-              </select>
+                onChange={(value) => setDomain(value as FeishuDomain)}
+                options={[
+                  { value: "feishu", label: t("feishuChina", "Feishu (China)") },
+                  { value: "lark", label: "Lark" },
+                ]}
+              />
             </label>
             <div
               style={{
@@ -1610,25 +1586,26 @@ function FeishuManualForm({
   return (
     <div data-testid="feishu-existing-app" style={{ marginTop: 14 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 150px", gap: 8 }}>
-        <input
+        <Input
           autoFocus
           autoComplete="off"
-          style={inputStyle}
           value={appId}
           onChange={(event) => setAppId(event.target.value)}
           placeholder={t("feishuAppId", "App ID (cli_…)")}
         />
-        <select style={inputStyle} value={domain} onChange={(event) => setDomain(event.target.value as FeishuDomain)}>
-          <option value="feishu">{t("feishuChina", "Feishu (China)")}</option>
-          <option value="lark">Lark</option>
-        </select>
+        <Select
+          value={domain}
+          onChange={(value) => setDomain(value as FeishuDomain)}
+          options={[
+            { value: "feishu", label: t("feishuChina", "Feishu (China)") },
+            { value: "lark", label: "Lark" },
+          ]}
+        />
       </div>
-      <input
-        type="password"
-        autoComplete="off"
-        style={{ ...inputStyle, marginTop: 8 }}
+      <SecretTextInput
+        style={{ marginTop: 8 }}
         value={appSecret}
-        onChange={(event) => setAppSecret(event.target.value)}
+        onChange={setAppSecret}
         placeholder={t("feishuAppSecret", "App Secret")}
       />
 
@@ -1829,9 +1806,8 @@ export function LoginDialog({
         </p>
         {event.phase === "verification_required" && (
           <div style={{ display: "flex", gap: 7, marginTop: 12 }}>
-            <input
+            <Input
               autoFocus
-              style={inputStyle}
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
               placeholder={t("verificationNumber", "Verification number")}

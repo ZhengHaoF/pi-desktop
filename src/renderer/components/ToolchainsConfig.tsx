@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Select } from "@/components/ui/Select";
 import type {
   ManagedComponentId,
   PublicCapabilityState,
@@ -714,36 +715,22 @@ function ToolDetail({
           <label htmlFor={`tool-preference-${capability}`} style={{ fontSize: 12, color: "var(--text-dim)" }}>
             {t("toolPreference", "Preference")}
           </label>
-          <select
+          <Select
             id={`tool-preference-${capability}`}
             aria-label={`${CAPABILITY_LABELS[capability]} preference`}
             value={state?.preference ?? "auto"}
             disabled={disabled}
-            onChange={(event) =>
-              onAction?.({ action: "set-preference", capability, preference: event.target.value as ToolPreference })
+            onChange={(value) =>
+              onAction?.({ action: "set-preference", capability, preference: value as ToolPreference })
             }
-            style={{
-              minHeight: 32,
-              padding: "4px 8px",
-              border: "1px solid var(--border)",
-              borderRadius: 5,
-              background: "var(--bg-panel)",
-              color: "var(--text)",
-              fontSize: 11,
-            }}
-          >
-            {TOOL_PREFERENCES.map((preference) => (
-              <option
-                key={preference}
-                value={preference}
-                disabled={
-                  preference === "custom" && !state?.candidates.some((candidate) => candidate.provider === "custom")
-                }
-              >
-                {preferenceLabel(preference, t)}
-              </option>
-            ))}
-          </select>
+            style={{ fontSize: 11 }}
+            options={TOOL_PREFERENCES.map((preference) => ({
+              value: preference,
+              label: preferenceLabel(preference, t),
+              disabled:
+                preference === "custom" && !state?.candidates.some((candidate) => candidate.provider === "custom"),
+            }))}
+          />
           <ActionButton disabled={disabled} onClick={() => onAction?.({ action: "choose-custom-tool", capability })}>
             {t("chooseCustomTool", "Choose…")}
           </ActionButton>

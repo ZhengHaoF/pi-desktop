@@ -5,6 +5,7 @@ import {
   formatBytes,
   updateDetailStyle,
 } from "@/lib/update-display";
+import { Select } from "@/components/ui/Select";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -33,7 +34,7 @@ import {
 import appIconUrl from "../../../build/icon.png";
 import { isAutoSessionTitleEnabled, setAutoSessionTitleEnabled } from "../lib/auto-session-title";
 import { HerdrSettings } from "./herdr/HerdrSettings";
-import { SettingRow, selectStyle } from "./settings/settings-controls";
+import { SettingRow } from "./settings/settings-controls";
 import { CacheWarmingSettings } from "./settings/CacheWarmingSettings";
 import { DefaultThinkingLevelSettings } from "./settings/DefaultThinkingLevelSettings";
 import { SessionListSettings } from "./settings/SessionListSettings";
@@ -1078,16 +1079,16 @@ function GeneralSettings({
           {t("interfaceLanguageDescription", "Choose the language used by the app. Changes take effect immediately.")}
         </p>
         <SettingRow label={t("language", "Language")} controlId={languageControlId}>
-          <select
+          <Select
             id={languageControlId}
             value={language}
-            onChange={(event) => onLanguageChange(event.target.value as AppLanguage)}
-            style={selectStyle}
-          >
-            <option value="en-US">English</option>
-            <option value="zh-CN">简体中文</option>
-            <option value="zh-TW">繁體中文</option>
-          </select>
+            onChange={(value) => onLanguageChange(value as AppLanguage)}
+            options={[
+              { value: "en-US", label: "English" },
+              { value: "zh-CN", label: "简体中文" },
+              { value: "zh-TW", label: "繁體中文" },
+            ]}
+          />
         </SettingRow>
       </section>
 
@@ -1253,57 +1254,60 @@ function GeneralSettings({
           <CacheWarmingSettings />
           <DefaultThinkingLevelSettings />
           <SettingRow label={t("chatFontSize", "Chat text size")} controlId={chatFontSizeControlId}>
-            <select
+            <Select
               id={chatFontSizeControlId}
               value={chatAppearance.fontSize}
               disabled={chatAppearanceSaving}
-              onChange={(event) => {
+              onChange={(value) => {
                 void saveChatAppearance({
                   ...chatAppearance,
-                  fontSize: event.target.value as ChatFontSize,
+                  fontSize: value as ChatFontSize,
                 });
               }}
-              style={{ ...selectStyle, cursor: chatAppearanceSaving ? "wait" : "pointer" }}
-            >
-              <option value="small">{t("chatFontSizeSmall", "Small")}</option>
-              <option value="standard">{t("chatFontSizeStandard", "Standard")}</option>
-              <option value="large">{t("chatFontSizeLarge", "Large")}</option>
-              <option value="extra-large">{t("chatFontSizeExtraLarge", "Extra large")}</option>
-            </select>
+              style={chatAppearanceSaving ? { cursor: "wait" } : undefined}
+              options={[
+                { value: "small", label: t("chatFontSizeSmall", "Small") },
+                { value: "standard", label: t("chatFontSizeStandard", "Standard") },
+                { value: "large", label: t("chatFontSizeLarge", "Large") },
+                { value: "extra-large", label: t("chatFontSizeExtraLarge", "Extra large") },
+              ]}
+            />
           </SettingRow>
           <SettingRow label={t("chatLayout", "Conversation width")} controlId={chatLayoutControlId}>
-            <select
+            <Select
               id={chatLayoutControlId}
               value={chatAppearance.layout}
               disabled={chatAppearanceSaving}
-              onChange={(event) => {
+              onChange={(value) => {
                 void saveChatAppearance({
                   ...chatAppearance,
-                  layout: event.target.value as ChatLayout,
+                  layout: value as ChatLayout,
                 });
               }}
-              style={{ ...selectStyle, cursor: chatAppearanceSaving ? "wait" : "pointer" }}
-            >
-              <option value="fixed">{t("chatLayoutFixed", "Comfortable width")}</option>
-              <option value="wide">{t("chatLayoutWide", "Expanded width")}</option>
-            </select>
+              style={chatAppearanceSaving ? { cursor: "wait" } : undefined}
+              options={[
+                { value: "fixed", label: t("chatLayoutFixed", "Comfortable width") },
+                { value: "wide", label: t("chatLayoutWide", "Expanded width") },
+              ]}
+            />
           </SettingRow>
           <SettingRow label={t("chatAssistantWidth", "Model reply width")} controlId={chatAssistantWidthControlId}>
-            <select
+            <Select
               id={chatAssistantWidthControlId}
               value={chatAppearance.assistantWidth ?? "comfortable"}
               disabled={chatAppearanceSaving}
-              onChange={(event) => {
+              onChange={(value) => {
                 void saveChatAppearance({
                   ...chatAppearance,
-                  assistantWidth: event.target.value as ChatAssistantWidth,
+                  assistantWidth: value as ChatAssistantWidth,
                 });
               }}
-              style={{ ...selectStyle, cursor: chatAppearanceSaving ? "wait" : "pointer" }}
-            >
-              <option value="comfortable">{t("chatAssistantWidthComfortable", "Comfortable width")}</option>
-              <option value="full">{t("chatAssistantWidthFull", "Fill conversation column")}</option>
-            </select>
+              style={chatAppearanceSaving ? { cursor: "wait" } : undefined}
+              options={[
+                { value: "comfortable", label: t("chatAssistantWidthComfortable", "Comfortable width") },
+                { value: "full", label: t("chatAssistantWidthFull", "Fill conversation column") },
+              ]}
+            />
           </SettingRow>
         </div>
         {chatAppearanceError && (
@@ -1321,15 +1325,15 @@ function GeneralSettings({
           {t("appearanceDescription", "Choose the color mode used by the app.")}
         </p>
         <SettingRow label={t("theme", "Theme")} controlId={themeControlId}>
-          <select
+          <Select
             id={themeControlId}
             value={isDark ? "dark" : "light"}
-            onChange={(event) => onThemeChange(event.target.value === "dark")}
-            style={selectStyle}
-          >
-            <option value="light">{t("light", "Light")}</option>
-            <option value="dark">{t("dark", "Dark")}</option>
-          </select>
+            onChange={(value) => onThemeChange(value === "dark")}
+            options={[
+              { value: "light", label: t("light", "Light") },
+              { value: "dark", label: t("dark", "Dark") },
+            ]}
+          />
         </SettingRow>
       </section>
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { Input } from "@/components/ui/Input";
 import { call, subscribe } from "@/lib/api-client";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/i18n";
@@ -11,6 +12,7 @@ import {
 } from "@contract/herdr";
 import { herdrErrorLabel, herdrRuntimeStatusLabel, publicHerdrErrorLabel } from "./herdr-ui-copy";
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 
 export function HerdrSettings() {
   const { t } = useI18n();
@@ -173,18 +175,18 @@ export function HerdrSettings() {
 
         <section style={cardStyle}>
           <Field label={t("herdrMode", "Mode")}>
-            <select
-              style={selectStyle}
+            <Select
               value={settings.mode}
               disabled={loading || saving}
-              onChange={(event) => update("mode", event.currentTarget.value as "attach" | "managed")}
-            >
-              <option value="attach">{t("herdrAttach", "Attach (user-started server)")}</option>
-              <option value="managed">{t("herdrManaged", "Managed (automatic server)")}</option>
-            </select>
+              onChange={(value) => update("mode", value as "attach" | "managed")}
+              options={[
+                { value: "attach", label: t("herdrAttach", "Attach (user-started server)") },
+                { value: "managed", label: t("herdrManaged", "Managed (automatic server)") },
+              ]}
+            />
           </Field>
           <Field label={t("herdrSession", "Session name")}>
-            <input
+            <Input
               style={inputStyle}
               value={settings.sessionName}
               maxLength={64}
@@ -311,7 +313,6 @@ export function HerdrSettings() {
                     title={cli.errorCode}
                     style={{
                       padding: "3px 7px",
-                      border: "1px solid var(--border)",
                       borderRadius: 999,
                       color: cli.available ? "#16a34a" : "var(--text-dim)",
                       fontSize: 11,
@@ -339,7 +340,6 @@ export function HerdrSettings() {
                     padding: 12,
                     overflow: "auto",
                     borderRadius: 6,
-                    background: "var(--bg)",
                     color: "var(--text-muted)",
                     fontFamily: "var(--font-mono)",
                     fontSize: 10,
@@ -411,7 +411,6 @@ const cardStyle: React.CSSProperties = {
   display: "grid",
   gap: 16,
   padding: 18,
-  border: "1px solid var(--border)",
   borderRadius: 9,
   background: "var(--bg-panel)",
 };
@@ -421,13 +420,11 @@ const toggleLabelStyle: React.CSSProperties = {
   justifyContent: "space-between",
   alignItems: "center",
   gap: 18,
-  color: "var(--text)",
   fontSize: 13,
 };
 
 const pageHeadingStyle: React.CSSProperties = {
   margin: 0,
-  color: "var(--text)",
   fontSize: 14,
 };
 
@@ -458,16 +455,8 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
   minHeight: 36,
   padding: "7px 10px",
-  border: "1px solid var(--border)",
   borderRadius: 6,
-  background: "var(--bg)",
   color: "var(--text)",
   fontFamily: "inherit",
   fontSize: 13,
-};
-
-const selectStyle: React.CSSProperties = {
-  ...inputStyle,
-  padding: "7px 30px 7px 10px",
-  cursor: "pointer",
 };
