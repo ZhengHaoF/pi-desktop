@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import type { McpServerConfig, McpExposure } from "@contract/mcp";
 import { useI18n } from "@/i18n";
+import { Button } from "@/components/ui/Button";
 import { canonicalMcpExposure } from "@shared/mcp-exposure";
 
 export function McpServerEditor({
@@ -223,12 +224,12 @@ export function McpServerEditor({
         </p>
       )}
       <div className="mcp-actions mcp-editor-footer">
-        <button className="mcp-primary" disabled={busy} onClick={submit}>
+        <Button variant="primary" disabled={busy} onClick={submit}>
           {t("mcpSave", "Save configuration")}
-        </button>
-        <button disabled={busy} onClick={onCancel}>
+        </Button>
+        <Button disabled={busy} onClick={onCancel}>
           {t("mcpCancel", "Cancel")}
-        </button>
+        </Button>
       </div>
     </section>
   );

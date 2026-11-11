@@ -1,5 +1,6 @@
 import type { McpConfigEntry, McpPanelSnapshot } from "@contract/mcp";
 import { useI18n } from "@/i18n";
+import { Button } from "@/components/ui/Button";
 import { mcpStateLabel } from "@/lib/mcp-state-label";
 
 export function McpServerSidebar({
@@ -20,7 +21,7 @@ export function McpServerSidebar({
         const live = panel?.instances.find((instance) => instance.name === entry.name);
         const state = entry.config.enabled === false ? "disabled" : (live?.state ?? "not-started");
         return (
-          <button
+          <Button
             key={`${entry.scope}:${entry.name}`}
             type="button"
             className={`mcp-server-item${selected === entry.name ? " is-selected" : ""}`}
@@ -34,7 +35,7 @@ export function McpServerSidebar({
                 {mcpStateLabel(state, t)} · {entry.config.url ? "HTTP" : "stdio"}
               </span>
             </span>
-          </button>
+          </Button>
         );
       })}
       {!entries.length && <p className="mcp-list-empty">{t("mcpNoServers", "No MCP servers configured.")}</p>}

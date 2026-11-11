@@ -16,6 +16,7 @@ import { LatestRequestGate } from "@/lib/latest-request-gate";
 import { McpServerEditor } from "./McpServerEditor";
 import { McpProjectOverrideEditor } from "./McpProjectOverrideEditor";
 import { McpToolsPanel } from "./McpToolsPanel";
+import { Button } from "@/components/ui/Button";
 import { McpServerSidebar } from "./McpServerSidebar";
 
 export interface McpConfigHandle {
@@ -274,7 +275,7 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
             }
           />
           <div className="mcp-sidebar-actions">
-            <button
+            <Button
               disabled={busy}
               onClick={() =>
                 leave(() => {
@@ -290,8 +291,8 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
               }
             >
               {t("mcpAdd", "Add server")}
-            </button>
-            <button
+            </Button>
+            <Button
               disabled={busy}
               onClick={() =>
                 leave(() => {
@@ -303,7 +304,7 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
               }
             >
               {t("mcpImport", "Import JSON")}
-            </button>
+            </Button>
           </div>
         </aside>
         <main className="mcp-detail-pane">
@@ -340,12 +341,12 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
             </p>
           )}
           {sessionId && !panel?.adapterActive && (
-            <button
+            <Button
               disabled={busy}
               onClick={() => void run(() => invoke("agent.command", { sessionId, command: { type: "get_tools" } }))}
             >
               {t("mcpApplySession", "Apply MCP to this session")}
-            </button>
+            </Button>
           )}
           {snapshot?.entries
             .filter((entry) => entry.name === selectedName && editing?.name !== "" && importText === undefined)
@@ -394,7 +395,7 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                     </p>
                   )}
                   <div className="mcp-actions">
-                    <button
+                    <Button
                       disabled={busy}
                       onClick={() =>
                         leave(() => {
@@ -409,30 +410,30 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                       }
                     >
                       {t("mcpEdit", "Edit")}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       disabled={busy || entry.config.enabled === false}
                       onClick={() => void probeServer(entry.name)}
                     >
                       {t("mcpTest", "Test connection")}
-                    </button>
+                    </Button>
                     {sessionId && ownLive && (
-                      <button
+                      <Button
                         disabled={busy || entry.config.enabled === false}
                         onClick={() => void run(() => invoke("mcp.reconnect", { sessionId, name: entry.name }))}
                       >
                         {t("mcpReconnect", "Reconnect session")}
-                      </button>
+                      </Button>
                     )}
                     {mcpAuthenticationMode(entry.config) === "oauth" && (
-                      <button disabled={busy} onClick={() => void startLogin(entry.name)}>
+                      <Button disabled={busy} onClick={() => void startLogin(entry.name)}>
                         {t("mcpSignIn", "Sign in")}
-                      </button>
+                      </Button>
                     )}
                     <details className="mcp-more-actions">
                       <summary>{t("mcpMoreActions", "More actions")}</summary>
                       <div>
-                        <button
+                        <Button
                           disabled={busy || !snapshot || snapshot.revision === "invalid"}
                           onClick={() =>
                             void run(async () => {
@@ -451,8 +452,8 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                           }
                         >
                           {entry.config.enabled === false ? t("mcpEnable", "Enable") : t("mcpDisable", "Disable")}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           disabled={busy || (entry.projectOverride !== undefined && !entry.projectOverride.exists)}
                           onClick={() =>
                             leave(() => {
@@ -472,18 +473,18 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                           {entry.projectOverride
                             ? t("mcpRestoreGlobal", "Restore global settings")
                             : t("mcpRemove", "Remove")}
-                        </button>
+                        </Button>
                         {mcpAuthenticationMode(entry.config) === "oauth" && (
                           <>
-                            <button
+                            <Button
                               disabled={busy}
                               onClick={() => void run(() => invoke("mcp.oauth.logout", target(entry.name)))}
                             >
                               {t("mcpSignOut", "Sign out of this server")}
-                            </button>
+                            </Button>
                           </>
                         )}
-                        <button
+                        <Button
                           disabled={busy || entry.config.enabled === false}
                           onClick={() =>
                             void run(async () => {
@@ -493,7 +494,7 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                           }
                         >
                           {t("mcpResources", "Resources")}
-                        </button>
+                        </Button>
                       </div>
                     </details>
                   </div>
@@ -516,7 +517,7 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                   <div key={entry.name} className="mcp-server-row">
                     <strong>{entry.name}</strong>
                     <p>{entry.source}</p>
-                    <button
+                    <Button
                       disabled={busy}
                       onClick={() =>
                         leave(() => {
@@ -531,14 +532,14 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                       }
                     >
                       {t("mcpEdit", "Edit")}
-                    </button>
+                    </Button>
                     {sessionId && (
-                      <button
+                      <Button
                         disabled={busy}
                         onClick={() => void run(() => invoke("mcp.reconnect", { sessionId, name: entry.name }))}
                       >
                         {t("mcpReconnect", "Reconnect session")}
-                      </button>
+                      </Button>
                     )}
                     <p>{t("mcpExtensionTemporary", "Changes to extension servers apply only to this session.")}</p>
                   </div>
@@ -546,9 +547,9 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
             </section>
           )}
           {probeId && (
-            <button onClick={() => void invoke("mcp.probe.cancel", { requestId: probeId })}>
+            <Button onClick={() => void invoke("mcp.probe.cancel", { requestId: probeId })}>
               {t("mcpCancelProbe", "Cancel connection test")}
-            </button>
+            </Button>
           )}
           {probe && (
             <details>
@@ -604,7 +605,7 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                   }}
                 />
               </label>
-              <button
+              <Button
                 disabled={busy}
                 onClick={() =>
                   void run(async () =>
@@ -615,11 +616,11 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                 }
               >
                 {t("mcpPreviewImport", "Preview import")}
-              </button>
+              </Button>
               {importPreview && (
                 <>
                   <pre>{JSON.stringify(importPreview, null, 2)}</pre>
-                  <button
+                  <Button
                     disabled={busy}
                     onClick={() =>
                       void run(async () => {
@@ -636,10 +637,10 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                     }
                   >
                     {t("mcpApplyImport", "Apply import")}
-                  </button>
+                  </Button>
                 </>
               )}
-              <button onClick={() => leave(() => setImportText(undefined))}>{t("mcpCancel", "Cancel")}</button>
+              <Button onClick={() => leave(() => setImportText(undefined))}>{t("mcpCancel", "Cancel")}</Button>
             </section>
           )}
           {login && (
@@ -652,7 +653,7 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                     {t("mcpCallbackUrl", "Paste callback URL")}
                     <input value={callbackUrl} onChange={(event) => setCallbackUrl(event.target.value)} />
                   </label>
-                  <button
+                  <Button
                     disabled={busy || !callbackUrl}
                     onClick={() =>
                       void run(async () => {
@@ -662,8 +663,8 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                     }
                   >
                     {t("mcpSubmitCallback", "Submit callback")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() =>
                       void run(async () => {
                         setLogin(await invoke("mcp.oauth.cancel", { requestId: login.requestId }));
@@ -672,7 +673,7 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                     }
                   >
                     {t("mcpCancelLogin", "Cancel sign-in")}
-                  </button>
+                  </Button>
                 </>
               )}
             </section>
@@ -683,16 +684,16 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
               {[...resources.page.resources, ...resources.page.templates].map((resource) => (
                 <div key={resource.uri}>
                   <code>{resource.uri}</code>
-                  <button
+                  <Button
                     disabled={busy || Boolean(resource.uriTemplate)}
                     onClick={() => void previewResource(resources.target, resource.uri)}
                   >
                     {t("mcpReadResource", "Read resource")}
-                  </button>
+                  </Button>
                 </div>
               ))}
               {(resources.page.nextCursor || resources.page.nextTemplateCursor) && (
-                <button
+                <Button
                   disabled={busy}
                   onClick={() =>
                     void run(async () =>
@@ -708,11 +709,11 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                   }
                 >
                   {t("mcpMoreResources", "Next resource page")}
-                </button>
+                </Button>
               )}
               {resourceText && <pre>{resourceText}</pre>}
               {resourceRef && (
-                <button
+                <Button
                   disabled={busy}
                   onClick={() =>
                     void run(async () => {
@@ -727,7 +728,7 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                   }
                 >
                   {t("mcpMoreContent", "Read content page")}
-                </button>
+                </Button>
               )}
             </section>
           )}
@@ -737,7 +738,7 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
           {pendingLeave && (
             <div role="alertdialog" aria-label={t("mcpUnsaved", "Unsaved MCP changes")}>
               <p>{t("mcpDiscardQuestion", "Discard the unsaved MCP edit?")}</p>
-              <button
+              <Button
                 onClick={() => {
                   const action = pendingLeave;
                   setPendingLeave(undefined);
@@ -748,8 +749,8 @@ export const McpConfig = forwardRef<McpConfigHandle, { cwd: string | null; sessi
                 }}
               >
                 {t("mcpDiscard", "Discard changes")}
-              </button>
-              <button onClick={() => setPendingLeave(undefined)}>{t("mcpKeepEditing", "Keep editing")}</button>
+              </Button>
+              <Button onClick={() => setPendingLeave(undefined)}>{t("mcpKeepEditing", "Keep editing")}</Button>
             </div>
           )}
         </main>
