@@ -647,6 +647,9 @@ body {
   background: var(--bg);
   color: var(--text-muted);
   cursor: pointer;
+  /* Buttons are inline-flex and may sit in squeezed flex rows; without this
+     the label wraps to two lines instead of holding min-content width. */
+  white-space: nowrap;
   transition:
     background-color 0.15s ease,
     border-color 0.15s ease,

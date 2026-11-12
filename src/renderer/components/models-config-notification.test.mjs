@@ -163,6 +163,7 @@ async function mount(t, options = {}) {
         // Select anchors need a viewport rect for the portal to render.
         return {
           getBoundingClientRect: () => ({ top: 100, left: 40, width: 180, bottom: 136 }),
+          closest: () => null,
           contains: () => false,
           scrollIntoView: () => {},
           focus: () => {},

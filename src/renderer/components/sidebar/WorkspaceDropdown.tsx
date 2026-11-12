@@ -67,6 +67,10 @@ export function AnimatedDropdown({
   return (
     <div
       style={{
+        // Opaque surface by default: drop shadows alone leave the panel
+        // transparent over the content underneath.
+        background: "var(--bg)",
+        border: "1px solid var(--border)",
         ...style,
         opacity: visible ? 1 : 0,
         transform: visible ? "translateY(0) scale(1)" : "translateY(-8px) scale(0.96)",

@@ -41,6 +41,7 @@ test("settings persist one default preset, explain the new-session scope and ret
     renderer = create(createElement(DefaultToolPresetSetting), {
       createNodeMock: () => ({
         getBoundingClientRect: () => ({ top: 100, left: 40, width: 180, bottom: 136 }),
+        closest: () => null,
         contains: () => false,
         scrollIntoView: () => {},
         focus: () => {},

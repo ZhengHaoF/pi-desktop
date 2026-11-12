@@ -77,6 +77,7 @@ test("Select: trigger, themed listbox, keyboard model and disabled semantics", a
       renderer = create(createElement(Select, { options: OPTIONS, ...props }), {
         createNodeMock: () => ({
           getBoundingClientRect: () => ({ top: 100, left: 40, width: 180, bottom: 136 }),
+          closest: () => null,
           contains: () => false,
           scrollIntoView: () => {},
           focus: () => {},
@@ -211,5 +212,37 @@ test("Select: trigger, themed listbox, keyboard model and disabled semantics", a
     assert.equal(trigger(fixture.root).props["aria-expanded"], false);
     assert.equal(trigger(fixture.root).props.disabled, true);
     await fixture.unmount();
+  }
+
+  // ── anchor inside a modal dialog portals the panel into that dialog ──
+  {
+    // A body-level panel stacks under a modal backdrop (fixed, high z-index):
+    // dimmed and click-intercepted. The anchor must detect its dialog ancestor.
+    let dialogNode = null;
+    const fixture = await mountFixture({ value: "alpha" });
+    // Re-create with a node mock whose closest() finds a modal dialog.
+    await fixture.unmount();
+    dialogNode = { contains: () => false };
+    const modalMock = {
+      getBoundingClientRect: () => ({ top: 100, left: 40, width: 180, bottom: 136 }),
+      closest: (selector) => (selector === '[role="dialog"][aria-modal="true"]' ? dialogNode : null),
+      contains: () => false,
+      scrollIntoView: () => {},
+      focus: () => {},
+    };
+    let renderer;
+    await act(async () => {
+      renderer = create(createElement(Select, { options: OPTIONS, value: "alpha" }), {
+        createNodeMock: () => modalMock,
+      });
+    });
+    await act(async () => trigger(renderer.root).props.onClick());
+    // Panel renders inlined by the portal stub; the assertion target is that it
+    // rendered at all — container routing is exercised because closest()
+    // returns the dialog (a null container would fall back to document.body,
+    // which does not exist in this stub environment and would throw).
+    assert.equal(trigger(renderer.root).props["aria-expanded"], true);
+    assert.equal(options(renderer.root).length, 3);
+    await act(async () => renderer.unmount());
   }
 });

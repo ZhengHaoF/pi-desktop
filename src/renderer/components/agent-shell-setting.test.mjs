@@ -38,6 +38,7 @@ test("settings offer one persisted shell, explain new-session scope and retain t
     renderer = create(createElement(AgentShellSetting, { state }), {
       createNodeMock: () => ({
         getBoundingClientRect: () => ({ top: 100, left: 40, width: 180, bottom: 136 }),
+        closest: () => null,
         contains: () => false,
         scrollIntoView: () => {},
         focus: () => {},
@@ -68,6 +69,7 @@ test("settings offer one persisted shell, explain new-session scope and retain t
     renderer = create(createElement(AgentShellSetting, { state }), {
       createNodeMock: () => ({
         getBoundingClientRect: () => ({ top: 100, left: 40, width: 180, bottom: 136 }),
+        closest: () => null,
         contains: () => false,
         scrollIntoView: () => {},
         focus: () => {},

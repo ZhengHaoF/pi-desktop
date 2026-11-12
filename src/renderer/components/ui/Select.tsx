@@ -80,6 +80,11 @@ export function Select({
   const panelRef = useRef<HTMLDivElement | null>(null);
   const { anchorRef, rect, update } = usePopoverAnchor<HTMLButtonElement>(open);
   const listId = useId();
+  // Portaled panels must render inside the nearest modal dialog: body-level
+  // portals stack below a modal backdrop (fixed, high z-index) and become both
+  // dimmed and click-intercepted. Detected once per open since dialogs mount
+  // before their content can be interacted with.
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
 
   const normalized = normalize(options);
   const selected = normalized.find((o) => o.value === value);
@@ -87,13 +92,15 @@ export function Select({
 
   const openList = useCallback(() => {
     if (disabled) return;
+    const anchor = anchorRef.current;
+    setPortalContainer((anchor?.closest('[role="dialog"][aria-modal="true"]') as HTMLElement | null) ?? document.body);
     const index = normalized.findIndex((o) => o.value === value);
     const start = index >= 0 ? index : 0;
     setActiveIndex(start);
     activeIndexRef.current = start;
     update();
     setOpen(true);
-  }, [disabled, normalized, value, update]);
+  }, [disabled, normalized, value, update, anchorRef]);
 
   const commit = useCallback(
     (option: SelectOption) => {
@@ -308,7 +315,7 @@ export function Select({
               </div>
             ))}
           </div>,
-          document.body,
+          portalContainer ?? document.body,
         )}
     </>
   );

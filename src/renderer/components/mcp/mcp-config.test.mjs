@@ -37,6 +37,7 @@ async function render(t, element) {
     renderer = create(element, {
       createNodeMock: () => ({
         getBoundingClientRect: () => ({ top: 100, left: 40, width: 180, bottom: 136 }),
+        closest: () => null,
         contains: () => false,
         scrollIntoView: () => {},
         focus: () => {},
