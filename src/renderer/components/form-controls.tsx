@@ -8,6 +8,7 @@ import { createContext, useContext, useId, type ReactNode } from "react";
 import { Input } from "@/components/ui/Input";
 import { SecretTextInput as UiSecretTextInput } from "@/components/ui/SecretTextInput";
 import { Select as UiSelect } from "@/components/ui/Select";
+import { Checkbox } from "@/components/ui/Checkbox";
 
 const FieldControlIdContext = createContext<string | undefined>(undefined);
 
@@ -162,26 +163,9 @@ export function Check({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        minHeight: 36,
-        padding: "4px 0",
-        cursor: "pointer",
-        fontSize: 13,
-        color: "var(--text-muted)",
-      }}
-    >
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        style={{ width: 18, height: 18, margin: 0, accentColor: "var(--accent)", cursor: "pointer" }}
-      />
-      {label}
-    </label>
+    <div style={{ minHeight: 36, padding: "4px 0", fontSize: 13, color: "var(--text-muted)" }}>
+      <Checkbox checked={checked} onChange={onChange} label={label} />
+    </div>
   );
 }
 

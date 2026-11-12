@@ -71,6 +71,7 @@ export default tseslint.config(
       "src/renderer/components/ui/Button.tsx",
       "src/renderer/components/ui/Input.tsx",
       "src/renderer/components/ui/Textarea.tsx",
+      "src/renderer/components/ui/Checkbox.tsx",
       // The composer textarea owns autosize and IME composition handling.
       "src/renderer/components/ChatInput.tsx",
     ],
@@ -78,8 +79,9 @@ export default tseslint.config(
       // Button colors live in the shared .pi-btn classes; compose them through
       // <Button> instead of re-typing the class names at call sites. Raw
       // <button> elements are reserved to the Button component itself. Text
-      // inputs, textareas and selects route through ui/Input, ui/Textarea and
-      // ui/Select; checkboxes stay native until a Checkbox component exists.
+      // inputs, textareas, selects and checkboxes route through ui/Input,
+      // ui/Textarea, ui/Select and ui/Checkbox. Radios and file inputs stay
+      // native until dedicated components exist.
       "no-restricted-syntax": [
         "error",
         {
@@ -100,8 +102,8 @@ export default tseslint.config(
         },
         {
           selector:
-            'JSXOpeningElement[name.name="input"] JSXAttribute[name.name="type"][value.value=/^(text|password|number|search)$/] , JSXOpeningElement[name.name="input"]:not(:has(JSXAttribute[name.name="type"]))',
-          message: "Use <Input> from components/ui/Input instead of raw text-like <input> elements.",
+            'JSXOpeningElement[name.name="input"] JSXAttribute[name.name="type"][value.value=/^(text|password|number|search|checkbox)$/] , JSXOpeningElement[name.name="input"]:not(:has(JSXAttribute[name.name="type"]))',
+          message: "Use <Input> or <Checkbox> from components/ui instead of raw text-like <input> elements.",
         },
       ],
     },

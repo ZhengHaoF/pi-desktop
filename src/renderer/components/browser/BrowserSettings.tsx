@@ -13,6 +13,7 @@ import type {
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { Checkbox } from "@/components/ui/Checkbox";
 
 export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
   const { language, t } = useI18n();
@@ -848,15 +849,12 @@ function HeaderRulesSection({
               borderRadius: 6,
             }}
           >
-            <input
-              type="checkbox"
+            <Checkbox
               checked={rule.enabled}
               disabled={disabled || !directionEnabled}
-              onChange={(event) =>
+              onChange={(checked) =>
                 void save(
-                  rules.map((candidate) =>
-                    candidate.id === rule.id ? { ...candidate, enabled: event.target.checked } : candidate,
-                  ),
+                  rules.map((candidate) => (candidate.id === rule.id ? { ...candidate, enabled: checked } : candidate)),
                 )
               }
               aria-label={formatMessage(t("browserEnableRule", "Enable {header} rule"), { header: rule.header })}
@@ -1389,12 +1387,7 @@ function Toggle({
       }}
     >
       <span>{label}</span>
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-      />
+      <Checkbox checked={checked} disabled={disabled} onChange={onChange} />
     </label>
   );
 }

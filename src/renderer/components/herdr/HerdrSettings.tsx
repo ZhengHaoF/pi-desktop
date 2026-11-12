@@ -13,6 +13,7 @@ import {
 import { herdrErrorLabel, herdrRuntimeStatusLabel, publicHerdrErrorLabel } from "./herdr-ui-copy";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
+import { Checkbox } from "@/components/ui/Checkbox";
 
 export function HerdrSettings() {
   const { t } = useI18n();
@@ -163,12 +164,11 @@ export function HerdrSettings() {
                 )}
               </small>
             </span>
-            <input
+            <Checkbox
               id={enabledId}
-              type="checkbox"
               checked={settings.enabled}
               disabled={loading || saving}
-              onChange={(event) => update("enabled", event.currentTarget.checked)}
+              onChange={(checked) => update("enabled", checked)}
             />
           </label>
         </section>
@@ -202,12 +202,11 @@ export function HerdrSettings() {
                 {t("herdrAutoConnectDescription", "Reconnect after the Agent Host restarts or the socket returns.")}
               </small>
             </span>
-            <input
+            <Checkbox
               id={autoConnectId}
-              type="checkbox"
               checked={settings.autoConnect}
               disabled={loading || saving}
-              onChange={(event) => update("autoConnect", event.currentTarget.checked)}
+              onChange={(checked) => update("autoConnect", checked)}
             />
           </label>
           <label htmlFor={releaseId} style={toggleLabelStyle}>
@@ -222,12 +221,11 @@ export function HerdrSettings() {
                 )}
               </small>
             </span>
-            <input
+            <Checkbox
               id={releaseId}
-              type="checkbox"
               checked={settings.releaseControlOnViewClose}
               disabled={loading || saving}
-              onChange={(event) => update("releaseControlOnViewClose", event.currentTarget.checked)}
+              onChange={(checked) => update("releaseControlOnViewClose", checked)}
             />
           </label>
         </section>

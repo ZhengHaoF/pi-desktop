@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { useI18n } from "@/i18n";
@@ -156,13 +157,11 @@ export function WebSearchSettings() {
             htmlFor={controlId}
             style={{ width: 36, height: 36, display: "grid", placeItems: "center", cursor: busy ? "wait" : "pointer" }}
           >
-            <input
+            <Checkbox
               id={controlId}
-              type="checkbox"
               checked={snapshot?.settings.enabled === true}
               disabled={busy}
-              onChange={(event) => void save({ enabled: event.target.checked })}
-              style={{ width: 18, height: 18, margin: 0, accentColor: "var(--accent)" }}
+              onChange={(checked) => void save({ enabled: checked })}
             />
           </label>
         </SettingRow>

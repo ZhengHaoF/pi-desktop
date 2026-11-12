@@ -3,6 +3,7 @@ import { call } from "@/lib/api-client";
 import { mergeDiscoveredModels, type ProviderEntry } from "@/lib/models-config-state";
 import { useI18n } from "@/i18n";
 import { Input } from "@/components/ui/Input";
+import { Checkbox } from "@/components/ui/Checkbox";
 import type { DiscoveredModel } from "@contract/types";
 import { Button } from "@/components/ui/Button";
 
@@ -212,12 +213,11 @@ export function ProviderModelDiscovery({
                 flexShrink: 0,
               }}
             >
-              <input
-                type="checkbox"
+              <Checkbox
+                size="sm"
                 checked={allVisibleSelected}
                 disabled={selectableVisible.length === 0}
-                onChange={(event) => selectAllVisible(event.target.checked)}
-                style={{ width: 15, height: 15, margin: 0, accentColor: "var(--accent)" }}
+                onChange={selectAllVisible}
               />
               {t("modelImportSelectAll", "Select all results")}
             </label>
@@ -266,19 +266,12 @@ export function ProviderModelDiscovery({
                     cursor: added ? "default" : "pointer",
                   }}
                 >
-                  <input
-                    type="checkbox"
+                  <Checkbox
+                    size="sm"
                     checked={added || selected.has(model.id)}
                     disabled={added}
-                    onChange={(event) => toggle(model.id, event.target.checked)}
-                    style={{
-                      width: 15,
-                      height: 15,
-                      margin: 0,
-                      accentColor: "var(--accent)",
-                      flexShrink: 0,
-                      cursor: added ? "default" : "pointer",
-                    }}
+                    onChange={(checked) => toggle(model.id, checked)}
+                    style={{ cursor: added ? "default" : "pointer" }}
                   />
                   <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text)", overflowWrap: "anywhere" }}>
                     {model.name && model.name !== model.id ? model.name : model.id}

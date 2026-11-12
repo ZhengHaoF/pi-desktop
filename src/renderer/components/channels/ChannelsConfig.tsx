@@ -22,6 +22,7 @@ import { RemoteControlCard } from "./RemoteControlCard";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { SecretTextInput } from "@/components/ui/SecretTextInput";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { Select } from "@/components/ui/Select";
 
 const EMPTY: ChannelsSnapshot = { accounts: [], statuses: [], pairings: [], bindings: [], activities: [] };
@@ -713,15 +714,12 @@ export function AccountCard({
             </div>
           </div>
         </div>
-        <label style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 6 }}>
-          <input
-            type="checkbox"
-            checked={draft.enabled}
-            onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })}
-            style={{ width: 18, height: 18, margin: 0, accentColor: "var(--accent)", cursor: "pointer" }}
-          />{" "}
-          {t("enabled", "Enabled")}
-        </label>
+        <Checkbox
+          checked={draft.enabled}
+          onChange={(enabled) => setDraft({ ...draft, enabled })}
+          label={t("enabled", "Enabled")}
+          style={{ width: 18, height: 18 }}
+        />
       </div>
 
       {status?.lastError && (
@@ -808,26 +806,20 @@ export function AccountCard({
           />
         </Field>
         <Field label={t("groupMentionRequired", "Group mention required")}>
-          <label style={{ display: "flex", alignItems: "center", gap: 7, minHeight: 34, color: "var(--text-muted)" }}>
-            <input
-              type="checkbox"
-              checked={draft.requireMention}
-              onChange={(event) => setDraft({ ...draft, requireMention: event.target.checked })}
-              style={{ width: 18, height: 18, margin: 0, accentColor: "var(--accent)", cursor: "pointer" }}
-            />
-            {t("requireMention", "Require @mention")}
-          </label>
+          <Checkbox
+            checked={draft.requireMention}
+            onChange={(checked) => setDraft({ ...draft, requireMention: checked })}
+            label={t("requireMention", "Require @mention")}
+            style={{ minHeight: 34 }}
+          />
         </Field>
         <Field label={t("imCommands", "IM commands")}>
-          <label style={{ display: "flex", alignItems: "center", gap: 7, minHeight: 34, color: "var(--text-muted)" }}>
-            <input
-              type="checkbox"
-              checked={draft.commandsEnabled === true}
-              onChange={(event) => setDraft({ ...draft, commandsEnabled: event.target.checked })}
-              style={{ width: 18, height: 18, margin: 0, accentColor: "var(--accent)", cursor: "pointer" }}
-            />
-            {t("enableImCommands", "Enable /help, /status, /new, /compact, and /reload")}
-          </label>
+          <Checkbox
+            checked={draft.commandsEnabled === true}
+            onChange={(checked) => setDraft({ ...draft, commandsEnabled: checked })}
+            label={t("enableImCommands", "Enable /help, /status, /new, /compact, and /reload")}
+            style={{ minHeight: 34 }}
+          />
         </Field>
         <Field label={t("defaultTools", "Default tools")}>
           <ChannelToolSelection

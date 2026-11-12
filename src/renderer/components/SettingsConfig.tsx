@@ -6,6 +6,7 @@ import {
   updateDetailStyle,
 } from "@/lib/update-display";
 import { Select } from "@/components/ui/Select";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -718,14 +719,12 @@ function SoftwareUpdate({ onClose }: { onClose: () => void }) {
               {t("automaticUpdateChecksDescription", "Checks periodically without downloading updates automatically.")}
             </div>
           </div>
-          <input
+          <Checkbox
             id={automaticChecksControlId}
-            type="checkbox"
             aria-describedby={automaticChecksDescriptionId}
             checked={state?.automaticChecksEnabled ?? false}
             disabled={!state || phase === "disabled" || isBusy}
-            onChange={(event) => {
-              const enabled = event.target.checked;
+            onChange={(enabled) => {
               void performAction("automatic", async () => {
                 const nextState = await window.piBridge.setAutomaticUpdateChecks(enabled);
                 setState(nextState);
@@ -1121,18 +1120,11 @@ function GeneralSettings({
               cursor: managedProcessesUnavailable ? "not-allowed" : "pointer",
             }}
           >
-            <input
+            <Checkbox
               id={managedProcessesControlId}
-              type="checkbox"
               checked={managedProcessesEnabled}
               disabled={managedProcessesUnavailable || managedProcessesLoading || managedProcessesSaving}
-              onChange={(event) => void saveManagedProcesses(event.target.checked)}
-              style={{
-                width: 18,
-                height: 18,
-                margin: 0,
-                accentColor: "var(--accent)",
-              }}
+              onChange={saveManagedProcesses}
             />
           </label>
         </SettingRow>
@@ -1182,20 +1174,12 @@ function GeneralSettings({
               cursor: "pointer",
             }}
           >
-            <input
+            <Checkbox
               id={backgroundModeControlId}
-              type="checkbox"
               checked={backgroundMode}
               disabled={backgroundModeLoading || backgroundModeSaving}
-              onChange={(event) => {
-                void saveBackgroundMode(event.target.checked);
-              }}
-              style={{
-                width: 18,
-                height: 18,
-                margin: 0,
-                accentColor: "var(--accent)",
-                cursor: backgroundModeLoading || backgroundModeSaving ? "not-allowed" : "pointer",
+              onChange={(checked) => {
+                void saveBackgroundMode(checked);
               }}
             />
           </label>
@@ -1232,21 +1216,12 @@ function GeneralSettings({
                 cursor: "pointer",
               }}
             >
-              <input
+              <Checkbox
                 id={autoSessionTitleControlId}
-                type="checkbox"
                 checked={autoSessionTitle}
-                onChange={(event) => {
-                  const next = event.target.checked;
+                onChange={(next) => {
                   setAutoSessionTitle(next);
                   setAutoSessionTitleEnabled(next);
-                }}
-                style={{
-                  width: 18,
-                  height: 18,
-                  margin: 0,
-                  accentColor: "var(--accent)",
-                  cursor: "pointer",
                 }}
               />
             </label>

@@ -12,6 +12,7 @@
 | `Textarea` | 多行文本（JSON 配置、说明文） | `<textarea>` |
 | `SecretTextInput` | 密钥 / token 类输入（带显隐切换） | 手写 password + 眼睛按钮 |
 | `Select` | 下拉单选（主题化弹层） | `<select>` |
+| `Checkbox` | 勾选框（原生 + accent-color） | `<input type="checkbox">` |
 | `usePopoverAnchor` | portal 弹层贴附触发器的定位 hook | 手写 getBoundingClientRect 逻辑 |
 
 尚未组件化（当前允许裸写）：`checkbox` / `radio` / `file` 输入。计划中的组件见文末。
@@ -24,6 +25,7 @@ import { Input, InputSize } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { SecretTextInput } from "@/components/ui/SecretTextInput";
 import { Select, SelectOption } from "@/components/ui/Select";
+import { Checkbox } from "@/components/ui/Checkbox";
 ```
 
 ## Button
@@ -100,6 +102,22 @@ class 承担；组件只提供布局默认值。**需要微调布局时传 `styl
   Enter 提交、Escape/Tab 关闭、点击外部关闭
 - **不要**再写 `<option>` 子元素形式——`options` 数组即数据
 
+## Checkbox
+
+```tsx
+<Checkbox checked={enabled} onChange={setEnabled} label="启用" />
+<Checkbox size="sm" checked={allSelected} onChange={selectAll} />
+<Checkbox id={controlId} checked={x} onChange={setX} aria-describedby={descId} />
+```
+
+- **size**：`md`（默认 18px）｜ `sm`（15px，紧凑列表行）
+- **label**：可选。传入时组件内置 `<label>` 包裹（隐式关联，label 文本在框后）；
+  不传则为裸控件，用于显式关联（`id` + 外部 `htmlFor`、`aria-label`）
+- **onChange** 收布尔而非 event；内部仍是原生 `<input type="checkbox">`，
+  `indeterminate` 等原生属性透传
+- 样式走 `.pi-checkbox`（accent-color var(--accent)）；自绘勾选框是禁手——
+  原生控件的暗色正确性与无障碍行为是白拿的
+
 ## 通用约定
 
 1. **ref 是普通 prop**（React 19）：`<Input ref={inputRef} />`，不要用 forwardRef
@@ -118,9 +136,9 @@ class 承担；组件只提供布局默认值。**需要微调布局时传 `styl
 
 - `pi-btn` 字符串字面量 / `className` 里拼 pi-btn → 用 `<Button variant>`
 - 裸 `<button>`、`<select>`、`<textarea>` → 用对应组件
-- 带 `type="text|password|number|search"` 的裸 `<input>`，以及**未标注 type** 的
-  `<input>`（默认即文本框）→ 用 `<Input>`
-- `checkbox` / `radio` / `file` 暂时放行（组件化后收紧）
+- 带 `type="text|password|number|search|checkbox"` 的裸 `<input>`，以及**未标注
+  type** 的 `<input>`（默认即文本框）→ 用 `<Input>` 或 `<Checkbox>`
+- `radio` / `file` 暂时放行（组件化后收紧）
 
 个别确需绕过的地方：`// eslint-disable-next-line no-restricted-syntax -- 原因`
 （本仓库强制 disable 必须带说明）。ChatInput 的 composer textarea 因自动增高
@@ -155,7 +173,6 @@ class 承担；组件只提供布局默认值。**需要微调布局时传 `styl
 
 ## 计划中
 
-- `Checkbox`（22 处裸 checkbox 待收编；完成后守卫封禁全部裸 `<input>`）
 - `Toggle`（合并 PluginsConfig / SkillsConfig / BrowserSettings 三份本地实现，
   `.pi-switch` CSS 已就绪）
 - `StatusDot`（32 处状态点）

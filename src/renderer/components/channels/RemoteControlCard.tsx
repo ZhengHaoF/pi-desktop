@@ -5,6 +5,7 @@ import { useI18n } from "@/i18n";
 import type { LanAddress, RemoteControlConfig, RemoteControlStatus, RelayServiceStatus } from "@contract/desktop";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Checkbox } from "@/components/ui/Checkbox";
 
 const DEFAULT_PORT = 8788;
 const DEFAULT_RELAY_URL = `ws://127.0.0.1:${DEFAULT_PORT}/ws`;
@@ -303,15 +304,13 @@ export function RemoteControlCard() {
               {reconnecting ? t("remoteReconnecting", "Reconnecting…") : t("remoteReconnect", "Reconnect")}
             </Button>
           )}
-          <label style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={draft.enabled}
-              disabled={saving}
-              onChange={(e) => void save({ ...draft, enabled: e.target.checked })}
-            />
-            <span style={{ fontSize: 12 }}>{t("remoteEnable", "Enable remote control")}</span>
-          </label>
+          <Checkbox
+            checked={draft.enabled}
+            disabled={saving}
+            onChange={(enabled) => void save({ ...draft, enabled })}
+            label={t("remoteEnable", "Enable remote control")}
+            style={{ marginLeft: "auto", fontSize: 12 }}
+          />
         </div>
 
         <div style={{ display: "flex", gap: 16, alignItems: "center", fontSize: 12 }}>

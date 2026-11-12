@@ -4,6 +4,7 @@ import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { Select } from "@/components/ui/Select";
 import { canonicalMcpExposure } from "@shared/mcp-exposure";
 
@@ -79,16 +80,15 @@ export function McpServerEditor({
         />
         <label className="mcp-json-mode">
           {t("mcpAdvanced", "Advanced JSON")}{" "}
-          <input
-            type="checkbox"
+          <Checkbox
             checked={advanced}
-            onChange={(event) => {
+            onChange={(checked) => {
               try {
                 const value: McpServerConfig = advanced ? JSON.parse(advancedText) : { ...config };
                 if (!advanced) for (const [key, raw] of Object.entries(jsonFields)) value[key] = JSON.parse(raw);
                 setConfig(value);
                 setJsonFields({});
-                setAdvanced(event.target.checked);
+                setAdvanced(checked);
                 setAdvancedText(JSON.stringify(value, null, 2));
                 setError(undefined);
               } catch (e) {
@@ -203,11 +203,7 @@ export function McpServerEditor({
                 />
               </label>
               <label>
-                <input
-                  type="checkbox"
-                  checked={config.enabled !== false}
-                  onChange={(event) => change({ enabled: event.target.checked })}
-                />
+                <Checkbox checked={config.enabled !== false} onChange={(checked) => change({ enabled: checked })} />
                 {t("mcpEnabled", "Enabled")}
               </label>
               <p>

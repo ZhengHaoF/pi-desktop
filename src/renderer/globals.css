@@ -625,6 +625,19 @@ body {
   border-color: var(--danger-border);
 }
 
+/* Shared checkbox states. The box is a native input styled with accent-color;
+   layout (size) stays inline via the component. */
+.pi-checkbox {
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.pi-checkbox:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* Shared button color states. Inline styles cannot express :hover, so
    components keep only layout (padding/size/radius) inline and take colors
    from these classes. */

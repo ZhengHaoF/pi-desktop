@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Checkbox } from "@/components/ui/Checkbox";
 import type { McpPanelSnapshot } from "@contract/mcp";
 import { call } from "@/lib/api-client";
 import { useI18n } from "@/i18n";
@@ -49,16 +50,15 @@ export function McpToolsPanel({
         <summary>{t("mcpEntryPoints", "Model entry points")}</summary>
         {panel?.entryTools?.map((name) => (
           <label key={name}>
-            <input
-              type="checkbox"
+            <Checkbox
               checked={panel.declaredEntries?.includes(name) ?? false}
               disabled={busy || panel.emptyTools}
-              onChange={(event) => {
+              onChange={(checked) => {
                 const declarations = new Set([
                   ...(panel.declaredEntries ?? []),
                   ...panel.tools.filter((tool) => tool.active).map((tool) => tool.name),
                 ]);
-                if (event.target.checked) declarations.add(name);
+                if (checked) declarations.add(name);
                 else declarations.delete(name);
                 setBusy(true);
                 void call("mcp.declarations", { sessionId, toolNames: [...declarations] })
@@ -84,11 +84,10 @@ export function McpToolsPanel({
             .map((tool) => (
               <div key={tool.name} className="mcp-tool-row">
                 <label>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={tool.executionAllowed}
                     disabled={busy || !tool.callable || panel?.emptyTools}
-                    onChange={(event) => void toggle(tool.name, event.target.checked)}
+                    onChange={(checked) => void toggle(tool.name, checked)}
                   />
                   {tool.resource ? t("mcpReadResource", "Read resource") : tool.originalName}
                 </label>

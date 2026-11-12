@@ -6,6 +6,7 @@ import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Checkbox } from "@/components/ui/Checkbox";
 
 type Props = {
   onActiveCountChange?: (count: number) => void;
@@ -493,13 +494,12 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                   key={stream}
                   style={{ fontSize: 10, color: "var(--text-muted)", display: "flex", gap: 3, alignItems: "center" }}
                 >
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={streams.has(stream)}
-                    onChange={(event) =>
+                    onChange={(checked) =>
                       setStreams((current) => {
                         const next = new Set(current);
-                        if (event.target.checked) next.add(stream);
+                        if (checked) next.add(stream);
                         else next.delete(stream);
                         return next;
                       })
