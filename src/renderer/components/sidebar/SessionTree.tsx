@@ -713,7 +713,9 @@ function SessionItem({
                   zIndex: 50,
                   minWidth: 132,
                   padding: 4,
+                  border: "1px solid var(--border)",
                   borderRadius: 8,
+                  background: "var(--bg)",
                   boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
                 }}
               >
