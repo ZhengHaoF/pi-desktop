@@ -256,7 +256,7 @@
 .mcp-config .mcp-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast);
   font-weight: 600;
   min-width: 92px;
 }
@@ -480,29 +480,32 @@
   --chat-content-max-width: 760px;
 }
 
+/* Dark theme: neutral charcoal ramp sampled from the reference screenshot
+   (#161616 bg / #2b2b2b surface / #414141 border+selected) with a restrained
+   #ff8a30 orange accent. Status colors stay on the shared Tailwind-400 set. */
 html.dark {
-  --bg: #141210;
-  --bg-panel: #1c1a17;
-  --bg-hover: #26231f;
-  --bg-selected: #3a2a1f;
-  --border: #33302a;
-  --text: #faf9f7;
-  --text-muted: #a19d92;
-  --text-dim: #8f8a81;
-  --accent: #f97316;
-  --accent-hover: #fb923c;
-  --accent-contrast: #1c1a17;
-  --user-bg: #2a2620;
-  --user-fg: #faf9f7;
-  --assistant-bg: #1c1a17;
-  --tool-bg: #0f0e0c;
-  --tool-fg: #c9c5bb;
-  --tool-border: #33302a;
+  --bg: #161616;
+  --bg-panel: #2b2b2b;
+  --bg-hover: #333333;
+  --bg-selected: #414141;
+  --border: #414141;
+  --text: #d4d4d4;
+  --text-muted: #969696;
+  --text-dim: #858585;
+  --accent: #ff8a30;
+  --accent-hover: #ffa65c;
+  --accent-contrast: #1a1a1a;
+  --user-bg: #2b2b2b;
+  --user-fg: #d4d4d4;
+  --assistant-bg: #1e1e1e;
+  --tool-bg: #1d1d1d;
+  --tool-fg: #c0c0c0;
+  --tool-border: #414141;
   --bg-subtle: rgba(255, 255, 255, 0.04);
-  --accent-soft: rgba(234, 88, 12, 0.16);
-  --accent-soft-border: rgba(234, 88, 12, 0.38);
-  --accent-chip-bg: rgba(234, 88, 12, 0.18);
-  --accent-chip-fg: #e8b07a;
+  --accent-soft: rgba(255, 138, 48, 0.16);
+  --accent-soft-border: rgba(255, 138, 48, 0.38);
+  --accent-chip-bg: rgba(255, 138, 48, 0.18);
+  --accent-chip-fg: #ffb673;
   --success: #4ade80;
   --success-soft: rgba(74, 222, 128, 0.1);
   --success-border: rgba(74, 222, 128, 0.34);
@@ -516,10 +519,10 @@ html.dark {
   --info-soft: rgba(56, 189, 248, 0.1);
   --info-border: rgba(56, 189, 248, 0.34);
   --on-accent: var(--accent-contrast);
-  --grid-line: #2a2620;
-  --selection: rgba(234, 88, 12, 0.38);
-  --thinking-bg: #1a1815;
-  --thinking-border: #4a453c;
+  --grid-line: #2a2a2a;
+  --selection: rgba(255, 138, 48, 0.38);
+  --thinking-bg: #1a1a1a;
+  --thinking-border: #4d4d4d;
 }
 
 .chat-appearance-scope {
@@ -884,7 +887,7 @@ body {
   border-radius: 4px;
 }
 html.dark ::-webkit-scrollbar-thumb {
-  background: #4a453c;
+  background: #414141;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-dim);

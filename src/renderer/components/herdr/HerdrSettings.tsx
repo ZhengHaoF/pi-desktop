@@ -239,7 +239,7 @@ export function HerdrSettings() {
               <div
                 style={{
                   marginTop: 5,
-                  color: runtime?.status === "ready" ? "#16a34a" : "var(--text-muted)",
+                  color: runtime?.status === "ready" ? "var(--success)" : "var(--text-muted)",
                   fontSize: 12,
                 }}
               >
@@ -254,7 +254,7 @@ export function HerdrSettings() {
             </span>
           </div>
           {(runtimeError || error) && (
-            <div role="alert" style={{ marginTop: 12, color: "#dc2626", fontSize: 12, lineHeight: 1.5 }}>
+            <div role="alert" style={{ marginTop: 12, color: "var(--danger)", fontSize: 12, lineHeight: 1.5 }}>
               {error ?? runtimeError}
             </div>
           )}
@@ -312,7 +312,7 @@ export function HerdrSettings() {
                     style={{
                       padding: "3px 7px",
                       borderRadius: 999,
-                      color: cli.available ? "#16a34a" : "var(--text-dim)",
+                      color: cli.available ? "var(--success)" : "var(--text-dim)",
                       fontSize: 11,
                     }}
                   >

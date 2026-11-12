@@ -534,7 +534,7 @@ export function ModelsConfig({
           {configIssues.length > 0 && (
             <ConfigIssueList
               role="alert"
-              color="var(--error, #f87171)"
+              color="var(--danger)"
               intro={t(
                 "modelConfigInvalidInSettings",
                 "The saved models.json is invalid. All custom providers and overrides are inactive. Correct the editable fields here; for other fields, edit models.json manually and reload the disk version. Reload the session after repairing the configuration.",
@@ -769,7 +769,7 @@ export function ModelsConfig({
                       : t("modelDraftSaved", "Connection and model definitions are saved")}
                   </span>
                 )}
-              {saveError && <span style={{ fontSize: 12, color: "#f87171", flex: 1 }}>{saveError}</span>}
+              {saveError && <span style={{ fontSize: 12, color: "var(--danger)", flex: 1 }}>{saveError}</span>}
               {!saveError && nameError && !preparedNames.ok && (
                 <span role="alert" style={{ color: "var(--danger)", fontSize: 12, flex: 1 }}>
                   {preparedNames.provider + ": " + nameError}

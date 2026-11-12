@@ -23,6 +23,6 @@ test("DOCX previews inject readable light and dark theme tokens with shared font
   }
 
   assert.match(light, /--bg:#fcfbf9;--text:#1c1a17/);
-  assert.match(dark, /--bg:#1c1a17;--text:#faf9f7/);
+  assert.match(dark, /--bg:#1e1e1e;--text:#d4d4d4/);
   assert.notEqual(light, dark);
 });

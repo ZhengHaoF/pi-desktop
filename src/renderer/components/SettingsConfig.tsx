@@ -551,7 +551,7 @@ function SoftwareUpdate({ onClose }: { onClose: () => void }) {
 
           {state?.phase === "error" && state.error && (
             <div role="alert" aria-atomic="true" style={{ marginTop: 12 }}>
-              <p style={{ margin: 0, fontSize: 12, lineHeight: 1.55, color: "#f87171" }}>
+              <p style={{ margin: 0, fontSize: 12, lineHeight: 1.55, color: "var(--danger)" }}>
                 {getUpdateErrorMessage(state.error, t)}
               </p>
               <code style={{ display: "block", marginTop: 5, fontSize: 10, color: "var(--text-dim)" }}>
@@ -561,7 +561,7 @@ function SoftwareUpdate({ onClose }: { onClose: () => void }) {
           )}
 
           {actionFailed && (
-            <p role="alert" style={{ margin: "12px 0 0", fontSize: 12, lineHeight: 1.55, color: "#f87171" }}>
+            <p role="alert" style={{ margin: "12px 0 0", fontSize: 12, lineHeight: 1.55, color: "var(--danger)" }}>
               {t("updateActionFailed", "The update action could not be completed. Try again or open the logs.")}
             </p>
           )}
@@ -1083,7 +1083,7 @@ function GeneralSettings({
             </p>
           )}
         {managedProcessesError && (
-          <p role="alert" style={{ margin: "8px 0 0", fontSize: 12, lineHeight: 1.55, color: "#f87171" }}>
+          <p role="alert" style={{ margin: "8px 0 0", fontSize: 12, lineHeight: 1.55, color: "var(--danger)" }}>
             {managedProcessesError === "save"
               ? t(
                   "managedProcessesSaveFailed",
@@ -1127,7 +1127,7 @@ function GeneralSettings({
           </label>
         </SettingRow>
         {backgroundModeError && (
-          <p role="alert" style={{ margin: "8px 0 0", fontSize: 12, lineHeight: 1.55, color: "#f87171" }}>
+          <p role="alert" style={{ margin: "8px 0 0", fontSize: 12, lineHeight: 1.55, color: "var(--danger)" }}>
             {backgroundModeError === "save"
               ? t("backgroundModeSaveFailed", "Background mode could not be saved. The previous setting was restored.")
               : t("backgroundModeLoadFailed", "Background mode could not be loaded. The default remains selected.")}

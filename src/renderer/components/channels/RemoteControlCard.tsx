@@ -32,14 +32,14 @@ function statusColor(state: string | undefined): string {
   switch (state) {
     case "running":
     case "ready":
-      return "#07c160";
+      return "var(--success)";
     case "starting":
     case "connecting":
-      return "#e6a23c";
+      return "var(--warning)";
     case "port-conflict":
     case "crashed":
     case "stopped":
-      return "#f56c6c";
+      return "var(--danger)";
     default:
       return "var(--text-dim)";
   }
@@ -365,7 +365,7 @@ export function RemoteControlCard() {
                 {t("relayRefreshAddresses", "Refresh addresses")}
               </Button>
               {relayStatus?.state === "port-conflict" && (
-                <span style={{ fontSize: 11, color: "#f56c6c" }}>
+                <span style={{ fontSize: 11, color: "var(--danger)" }}>
                   {t("relayPortConflictHint", "Port already in use — pick another one.")}
                 </span>
               )}
@@ -433,7 +433,7 @@ export function RemoteControlCard() {
 
             <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.7 }}>
               {relayStatus?.detail && relayStatus.state !== "running" ? (
-                <div style={{ color: "#f56c6c" }}>{relayStatus.detail}</div>
+                <div style={{ color: "var(--danger)" }}>{relayStatus.detail}</div>
               ) : null}
               {t(
                 "relayLanWarning",
@@ -501,7 +501,7 @@ export function RemoteControlCard() {
           </Button>
         </div>
 
-        {error && <div style={{ fontSize: 12, color: "#f56c6c" }}>{error}</div>}
+        {error && <div style={{ fontSize: 12, color: "var(--danger)" }}>{error}</div>}
 
         <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, display: "grid", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -573,7 +573,7 @@ export function RemoteControlCard() {
                       height: 7,
                       borderRadius: 999,
                       flex: "none",
-                      background: device.online ? "#07c160" : "var(--text-dim)",
+                      background: device.online ? "var(--success)" : "var(--text-dim)",
                     }}
                   />
                   <span style={{ flex: 1, color: "var(--text)" }}>
@@ -598,7 +598,7 @@ export function RemoteControlCard() {
               {t("remotePairingEmpty", "No paired devices yet")}
             </span>
           )}
-          {pairingError && <div style={{ fontSize: 11, color: "#f56c6c" }}>{pairingError}</div>}
+          {pairingError && <div style={{ fontSize: 11, color: "var(--danger)" }}>{pairingError}</div>}
         </div>
       </div>
     </section>

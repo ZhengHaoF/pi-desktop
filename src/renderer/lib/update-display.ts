@@ -3,9 +3,9 @@ import type { DesktopUpdateState } from "../../contract/desktop";
 import type { AppLanguage } from "../../shared/app-language";
 
 export function updateStatusColor(phase: DesktopUpdateState["phase"] | undefined): string {
-  if (phase === "error") return "#f87171";
+  if (phase === "error") return "var(--danger)";
   if (phase === "available" || phase === "downloaded") return "var(--accent)";
-  if (phase === "up-to-date") return "#4ade80";
+  if (phase === "up-to-date") return "var(--success)";
   return "var(--text-dim)";
 }
 

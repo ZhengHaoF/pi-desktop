@@ -165,7 +165,7 @@ const SkillDetail = forwardRef<
               : t("hiddenSkillFromModelPrompt", "Hidden from model prompt — click to enable")
           }
         />
-        {saveError && <span style={{ fontSize: 12, color: "#f87171", flexShrink: 0 }}>{saveError}</span>}
+        {saveError && <span style={{ fontSize: 12, color: "var(--danger)", flexShrink: 0 }}>{saveError}</span>}
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -229,7 +229,7 @@ const SkillDetail = forwardRef<
             }}
           />
         )}
-        {contentError && <span style={{ fontSize: 11, color: "#f87171" }}>{contentError}</span>}
+        {contentError && <span style={{ fontSize: 11, color: "var(--danger)" }}>{contentError}</span>}
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -411,7 +411,7 @@ function AddSkillPanel({ cwd, onInstalled }: { cwd: string; onInstalled: () => v
         </div>
 
         {/* Errors */}
-        {searchError && <div style={{ fontSize: 12, color: "#f87171" }}>{searchError}</div>}
+        {searchError && <div style={{ fontSize: 12, color: "var(--danger)" }}>{searchError}</div>}
         {capabilityIssue && pendingInstallPackage && (
           <CapabilityRequired
             issue={capabilityIssue}
@@ -423,7 +423,9 @@ function AddSkillPanel({ cwd, onInstalled }: { cwd: string; onInstalled: () => v
             }}
           />
         )}
-        {installError && <div style={{ fontSize: 12, color: "#f87171", wordBreak: "break-word" }}>{installError}</div>}
+        {installError && (
+          <div style={{ fontSize: 12, color: "var(--danger)", wordBreak: "break-word" }}>{installError}</div>
+        )}
       </div>
 
       {/* ── Results list ── */}
@@ -516,8 +518,8 @@ function AddSkillPanel({ cwd, onInstalled }: { cwd: string; onInstalled: () => v
                     fontSize: 12,
                     fontWeight: 500,
                     borderRadius: 5,
-                    background: isInstalled ? "rgba(34,197,94,0.1)" : undefined,
-                    color: isInstalled ? "#16a34a" : isInstalling ? "var(--accent)" : undefined,
+                    background: isInstalled ? "var(--success-soft)" : undefined,
+                    color: isInstalled ? "var(--success)" : isInstalling ? "var(--accent)" : undefined,
                   }}
                 >
                   {isInstalled
@@ -804,7 +806,7 @@ export const SkillsConfig = forwardRef<
                   style={{
                     padding: "10px 8px",
                     fontSize: 11,
-                    color: "#f87171",
+                    color: "var(--danger)",
                   }}
                 >
                   {error}

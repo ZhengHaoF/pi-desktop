@@ -799,7 +799,7 @@ export function ModelDetail({
         </Button>
         {fillStatus}
         {fillState.phase === "error" && (
-          <span style={{ fontSize: 11, color: "#f87171", lineHeight: 1.5, overflowWrap: "anywhere" }}>
+          <span style={{ fontSize: 11, color: "var(--danger)", lineHeight: 1.5, overflowWrap: "anywhere" }}>
             {fillState.message}
           </span>
         )}
@@ -870,7 +870,7 @@ export function ModelDetail({
               )}
             </div>
             {thinkingLevelState.phase === "error" && (
-              <span style={{ fontSize: 11, color: "#f87171", lineHeight: 1.5, overflowWrap: "anywhere" }}>
+              <span style={{ fontSize: 11, color: "var(--danger)", lineHeight: 1.5, overflowWrap: "anywhere" }}>
                 {thinkingLevelState.message ||
                   t("modelDefaultThinkingLevelFailed", "Failed to set the default thinking level.")}
               </span>

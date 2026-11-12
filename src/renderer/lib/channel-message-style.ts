@@ -18,7 +18,7 @@ export const USER_BUBBLE_COLORS: Record<MessageTheme, Record<MessageSource, stri
     feishu: "#c2410c",
   },
   dark: {
-    local: "#3f3a33",
+    local: "#333333",
     weixin: "#0f6840",
     telegram: "#176689",
     feishu: "#a13d13",

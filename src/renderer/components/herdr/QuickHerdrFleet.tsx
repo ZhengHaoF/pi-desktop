@@ -214,7 +214,9 @@ export function QuickHerdrFleet({
         >
           <StatusDot
             size="sm"
-            color={ready ? statusColor(triggerState) : runtime?.status === "error" ? "#dc2626" : "#6b7280"}
+            color={
+              ready ? statusColor(triggerState) : runtime?.status === "error" ? "var(--danger)" : "var(--text-dim)"
+            }
             boxShadow={ready && triggerState === "working" ? "0 0 0 2px rgba(37,99,235,.16)" : "none"}
           />
           <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{triggerLabel}</span>
@@ -426,11 +428,11 @@ export function QuickHerdrFleet({
 }
 
 function statusColor(state?: HerdrAgentState): string {
-  if (state === "working") return "#2563eb";
-  if (state === "blocked") return "#dc2626";
-  if (state === "done") return "#16a34a";
-  if (state === "idle") return "#ca8a04";
-  return "#6b7280";
+  if (state === "working") return "var(--info)";
+  if (state === "blocked") return "var(--danger)";
+  if (state === "done") return "var(--success)";
+  if (state === "idle") return "var(--warning)";
+  return "var(--text-dim)";
 }
 
 const buttonStyle: React.CSSProperties = {

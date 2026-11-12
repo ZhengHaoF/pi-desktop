@@ -305,7 +305,7 @@ export function BrowserDock({ visible, ownerSessionId }: { visible: boolean; own
               height: 29,
               boxSizing: "border-box",
               padding: "0 9px",
-              border: `1px solid ${activeTab?.url.startsWith("http:") ? "#d9872f" : "var(--border)"}`,
+              border: `1px solid ${activeTab?.url.startsWith("http:") ? "var(--warning)" : "var(--border)"}`,
               borderRadius: 6,
               fontSize: 11,
               outline: "none",
@@ -474,8 +474,8 @@ function Badge({ children, danger }: { children: string; danger?: boolean }) {
       style={{
         padding: "1px 3px",
         borderRadius: 3,
-        color: danger ? "var(--danger)" : "#b87924",
-        border: `1px solid ${danger ? "var(--danger)" : "#b87924"}`,
+        color: danger ? "var(--danger)" : "var(--warning)",
+        border: `1px solid ${danger ? "var(--danger)" : "var(--warning)"}`,
         fontSize: 7,
         fontWeight: 700,
       }}

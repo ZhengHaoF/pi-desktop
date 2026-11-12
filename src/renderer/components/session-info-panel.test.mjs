@@ -161,7 +161,7 @@ test("context usage renders as a ring whose arc encodes the used percentage", as
   await fixture.setContextUsage({ percent: 150, contextWindow: 1_000_000, tokens: 150_000 });
   assert.equal(arc().props.strokeDashoffset, 0);
 
-  // High usage switches the arc and the text to the shared warning color.
+  // High usage switches the arc and the text to the shared danger color.
   await fixture.setContextUsage({ percent: 95, contextWindow: 1_000_000, tokens: 950_000 });
-  assert.equal(contextSpan().props.style.color, "#ef4444");
+  assert.equal(contextSpan().props.style.color, "var(--danger)");
 });

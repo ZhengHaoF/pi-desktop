@@ -132,8 +132,8 @@ export function ApiKeyDetail({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <SectionTitle>{t("modelApiKey", "API Key")}</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <StatusDot color={provider.configured ? "#4ade80" : "border"} />
-          <span style={{ fontSize: 11, color: provider.configured ? "#4ade80" : "var(--text-dim)" }}>
+          <StatusDot color={provider.configured ? "var(--success)" : "border"} />
+          <span style={{ fontSize: 11, color: provider.configured ? "var(--success)" : "var(--text-dim)" }}>
             {provider.storedAuthType === "oauth"
               ? t("modelOAuthActive", "Account login active")
               : provider.configured
@@ -236,8 +236,8 @@ export function ApiKeyDetail({
         </div>
       </Field>
 
-      {error && <p style={{ margin: 0, fontSize: 12, color: "#f87171" }}>{error}</p>}
-      {warning && <p style={{ margin: 0, fontSize: 12, color: "#d97706" }}>{warning}</p>}
+      {error && <p style={{ margin: 0, fontSize: 12, color: "var(--danger)" }}>{error}</p>}
+      {warning && <p style={{ margin: 0, fontSize: 12, color: "var(--warning)" }}>{warning}</p>}
 
       <AuxiliaryModels providerId={provider.id} models={provider.auxiliaryModels ?? []} />
 

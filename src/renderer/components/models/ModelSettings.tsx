@@ -84,7 +84,7 @@ function SettingsActions({
   return (
     <>
       {error && (
-        <p role="alert" style={{ color: "#ef4444", overflowWrap: "anywhere" }}>
+        <p role="alert" style={{ color: "var(--danger)", overflowWrap: "anywhere" }}>
           {error}
         </p>
       )}

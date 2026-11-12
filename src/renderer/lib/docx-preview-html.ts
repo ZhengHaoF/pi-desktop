@@ -12,12 +12,12 @@ const DOCX_THEME = {
     link: "#9a3412",
   },
   dark: {
-    bg: "#1c1a17",
-    text: "#faf9f7",
-    muted: "#a19d92",
-    border: "#4a453c",
-    codeBg: "#0f0e0c",
-    link: "#fb923c",
+    bg: "#1e1e1e",
+    text: "#d4d4d4",
+    muted: "#969696",
+    border: "#414141",
+    codeBg: "#161616",
+    link: "#ffa65c",
   },
 } satisfies Record<DocxPreviewTheme, Record<string, string>>;
 

@@ -290,8 +290,8 @@ export function OAuthDetail({
             : t("modelGuidedLogin", "Guided API key setup")}
         </SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <StatusDot color={provider.loggedIn ? "#4ade80" : "border"} />
-          <span style={{ fontSize: 11, color: provider.loggedIn ? "#4ade80" : "var(--text-dim)" }}>
+          <StatusDot color={provider.loggedIn ? "var(--success)" : "border"} />
+          <span style={{ fontSize: 11, color: provider.loggedIn ? "var(--success)" : "var(--text-dim)" }}>
             {authType === "api_key"
               ? provider.loggedIn
                 ? t("modelCredentialsSaved", "Credentials saved")
@@ -446,7 +446,7 @@ export function OAuthDetail({
           <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{loginState.message}</p>
         )}
         {loginState.phase === "success" && (
-          <p style={{ margin: 0, fontSize: 12, color: loginState.warning ? "#d97706" : "#4ade80" }}>
+          <p style={{ margin: 0, fontSize: 12, color: loginState.warning ? "var(--warning)" : "var(--success)" }}>
             {loginState.message ??
               (authType === "api_key"
                 ? t("modelCredentialsSaved", "Credentials saved")
@@ -454,7 +454,7 @@ export function OAuthDetail({
           </p>
         )}
         {loginState.phase === "error" && (
-          <p style={{ margin: 0, fontSize: 12, color: "#f87171" }}>{loginState.message}</p>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--danger)" }}>{loginState.message}</p>
         )}
       </div>
 

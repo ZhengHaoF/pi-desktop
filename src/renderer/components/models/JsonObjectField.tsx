@@ -66,7 +66,7 @@ export function JsonObjectField({
         }}
       />
       {error && (
-        <span role="alert" style={{ color: "#ef4444" }}>
+        <span role="alert" style={{ color: "var(--danger)" }}>
           {t("modelJsonObjectRequired", "Enter a valid JSON object, or leave empty to use defaults.")}
         </span>
       )}

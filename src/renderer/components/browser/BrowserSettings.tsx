@@ -1351,7 +1351,7 @@ function Toggle({
         alignItems: "center",
         justifyContent: "space-between",
         gap: 12,
-        color: danger ? "#d45" : warning ? "#b87924" : "var(--text-muted)",
+        color: danger ? "var(--danger)" : warning ? "var(--warning)" : "var(--text-muted)",
         fontSize: 12,
       }}
     >
@@ -1468,8 +1468,16 @@ const noticeStyle = {
 };
 const warningStyle = {
   ...noticeStyle,
-  color: "#b87924",
-  border: "1px solid color-mix(in srgb, #b87924 35%, transparent)",
+  color: "var(--warning)",
+  border: "1px solid color-mix(in srgb, var(--warning) 35%, transparent)",
 };
-const dangerStyle = { ...noticeStyle, color: "#d45", border: "1px solid color-mix(in srgb, #d45 45%, transparent)" };
-const errorStyle = { ...noticeStyle, color: "#d45", border: "1px solid color-mix(in srgb, #d45 35%, transparent)" };
+const dangerStyle = {
+  ...noticeStyle,
+  color: "var(--danger)",
+  border: "1px solid color-mix(in srgb, var(--danger) 45%, transparent)",
+};
+const errorStyle = {
+  ...noticeStyle,
+  color: "var(--danger)",
+  border: "1px solid color-mix(in srgb, var(--danger) 35%, transparent)",
+};
