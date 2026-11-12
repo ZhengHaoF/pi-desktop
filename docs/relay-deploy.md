@@ -77,6 +77,38 @@ curl -m 8 http://82.156.168.149:8788/healthz   # 从任意外网机器测
 
 `cipherRequired:true` 确认强制 E2EE 生效；未设任何 `RELAY_ALLOW_PLAINTEXT_PUBLIC` 时配置为 fail-closed（config.ts 强制校验）。
 
+## 排障日志（RELAY_DEBUG_LOG）
+
+配对失败时（手机提示「配对失败…（pairing token rejected）」，或卡在 `pairing required`），先看这份 JSONL 日志：
+
+```bash
+# 桌面局域网 relay：默认已开启，文件在 app 的 userData 下
+#   Windows: %APPDATA%\<app>\relay-debug.log
+# VPS/自建 relay：显式指定路径才开启
+export RELAY_DEBUG_LOG=/home/ubuntu/pi-relay/data/relay-debug.log
+```
+
+记录的是**判定结果**，不是内容：不含 token/secret 明文（只有 10 位 SHA-256 摘要，可用来把 `pair.create` 与 `device.hello` 对上），不含任何会话数据。
+
+| event | 关键字段 | 用途 |
+| --- | --- | --- |
+| `relay.start` | `bindingsLoaded`, `statePath` | relay 启动时加载了几条绑定（0 = 状态文件不在/路径变了） |
+| `host.hello` | `hostId`, `declaredHostId` | PC 的 gateway 实际用了哪个 hostId 上线 |
+| `pair.create` | `hostId`, `tokenDigest` | 二维码里的 token 是谁签发的 |
+| `device.hello` | `hasPairingToken`, `tokenVerdict`, `credentialVerdict`（`ok` / `no-binding` / `secret-mismatch`）, `bindingHostIds`, `onlineHostIds` | 一次失败的完整归因 |
+| `hello.reject` | `code`, `reason` | 被拒的关闭码与原因 |
+| `pair.unbind` / `pair.revoke` | `deviceId`, `hostId`, `removed`/`revoked` | 谁解绑/撤销了什么 |
+
+判读速查：
+
+- `tokenVerdict: "unknown pairing token"` → 这个 token 不是**当前这个 relay 进程**签发的（换过 relay、端口/机器不同，或 relay 重启过——待配对 token 只在内存里，只有设备绑定会落盘）。
+- `tokenVerdict: "pairing consumed"` → 手机在重放一个已经用掉的一次性 token；同一个 `pairingTokenDigest` 能在 `pair.create` 里找到就是这种情况。
+- `credentialVerdict: "no-binding"` + `bindingHostIds: []` → relay 侧没有这台设备的绑定（`statePath` 不对/被清）；`bindingHostIds` 里有别的 hostId → 手机寻址的 PC 身份变了（多 PC 或重装后 hostId 重新生成）。
+- `credentialVerdict: "secret-mismatch"` → 绑定存在但凭证不对（手机端 `remote.deviceSecret.*` 与本 relay 的 secret 不是同一份）。
+- `onlineHostIds: []` + `device.hello` 被拒 → 顺带说明 PC 的 gateway 根本没连上这个 relay，光修配对也拉不到数据。
+
+日志写入是 best-effort：超过 4 MB 轮转成 `relay-debug.log.1`，任何 I/O 错误都会让它自我禁用，绝不影响 relay 服务。
+
 ## 客户端接入
 
 1. 桌面：设置 → 消息渠道 → 自建托管 → 切「自定义 Relay」→ `ws://82.156.168.149:8788/ws`

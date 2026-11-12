@@ -7,6 +7,15 @@ import { importTestBundle } from "#test-bundle";
 import { RpcError } from "../../contract/types.ts";
 
 const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+const unwrappedAct = async (cb, ...rest) => {
+  try {
+    return await act(cb, ...rest);
+  } catch (error) {
+    if (error instanceof AggregateError && error.errors?.length) throw error.errors[0];
+    throw error;
+  }
+};
+
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 after(() => {
   if (previousActEnvironment === undefined) delete globalThis.IS_REACT_ACT_ENVIRONMENT;
@@ -16,13 +25,40 @@ after(() => {
 const { SkillsConfig, PluginsConfig, testApi } = await importTestBundle("resource-config-rpc", {
   stdin: {
     contents:
-      'export {SkillsConfig} from "./SkillsConfig.tsx"; export {PluginsConfig} from "./PluginsConfig.tsx"; export * as testApi from "@/lib/api-client";',
+      'import "dom-stub"; export {SkillsConfig} from "./SkillsConfig.tsx"; export {PluginsConfig} from "./PluginsConfig.tsx"; export * as testApi from "@/lib/api-client";',
     resolveDir: import.meta.dirname,
     loader: "ts",
   },
   tsconfig: path.join(import.meta.dirname, "../../../tsconfig.renderer.json"),
-  external: ["react", "react-dom", "react-dom/*"],
+  external: ["react"],
   plugins: [
+    {
+      name: "dom-stub",
+      setup(build) {
+        build.onResolve({ filter: /^dom-stub$/ }, () => ({ path: "dom-stub", namespace: "dom-stub" }));
+        build.onLoad({ filter: /.*/, namespace: "dom-stub" }, () => ({
+          contents: [
+            "globalThis.document = {",
+            "  body: { style: { set overflow(v) { this._ov = v; }, get overflow() { return this._ov ?? ''; } } },",
+            "  createElement: () => ({ style: {}, focus() {} }),",
+            "  activeElement: null,",
+            "  querySelectorAll: () => [],",
+            "  addEventListener() {},",
+            "  removeEventListener() {},",
+            "};",
+          ].join("\n"),
+        }));
+      },
+    },
+    {
+      name: "dialog-portal-stub",
+      setup(build) {
+        build.onResolve({ filter: /^react-dom$/ }, () => ({ path: "react-dom-stub", namespace: "dialog-stub" }));
+        build.onLoad({ filter: /.*/, namespace: "dialog-stub" }, () => ({
+          contents: "export const createPortal = (children) => children;",
+        }));
+      },
+    },
     {
       name: "resource-rpc-fixture",
       setup(build) {
@@ -108,11 +144,11 @@ async function mount(t, kind, patch = {}) {
   let props = { cwd: "/one", sessionId: "session-one", embedded: true, onClose() {}, ...patch };
   let renderer;
   t.after(async () => {
-    await act(async () => renderer.unmount());
+    await unwrappedAct(async () => renderer.unmount());
     if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
     else delete globalThis.window;
   });
-  await act(async () => {
+  await unwrappedAct(async () => {
     renderer = create(createElement(Component, { ...props, ...(kind === "skills" ? { ref } : {}) }));
   });
   return {
@@ -130,18 +166,18 @@ async function mount(t, kind, patch = {}) {
     async reply(method, data) {
       const request = this.next(method);
       request.settled = true;
-      await act(async () => request.resolve(data));
+      await unwrappedAct(async () => request.resolve(data));
       return request;
     },
     async reject(method, error) {
       const request = this.next(method);
       request.settled = true;
-      await act(async () => request.reject(error));
+      await unwrappedAct(async () => request.reject(error));
       return request;
     },
     async update(patch) {
       props = { ...props, ...patch };
-      await act(async () =>
+      await unwrappedAct(async () =>
         renderer.update(createElement(Component, { ...props, ...(kind === "skills" ? { ref } : {}) })),
       );
     },
@@ -152,7 +188,7 @@ async function mount(t, kind, patch = {}) {
           typeof node.props.onClick === "function" &&
           (node.props["aria-label"] === label || text(node) === label),
       );
-      await act(async () => {
+      await unwrappedAct(async () => {
         void button.props.onClick();
       });
     },
@@ -168,7 +204,7 @@ test("skills RPC listing ignores late success and errors after switching project
   assert.deepEqual(fixture.next("skills.list").params, { cwd: "/two" });
   await fixture.reply("skills.list", { skills: [skill("current", "/two")] });
   await fixture.reply("skills.getContent", { content: "CURRENT CONTENT" });
-  await act(async () => old.resolve({ skills: [skill("old")] }));
+  await unwrappedAct(async () => old.resolve({ skills: [skill("old")] }));
   assert.doesNotMatch(fixture.text(), /old description/);
   assert.match(fixture.text(), /current description/);
   await fixture.update({ cwd: "/three" });
@@ -177,7 +213,7 @@ test("skills RPC listing ignores late success and errors after switching project
   await fixture.update({ cwd: "/four" });
   await fixture.reply("skills.list", { skills: [skill("latest", "/four")] });
   await fixture.reply("skills.getContent", { content: "LATEST CONTENT" });
-  await act(async () => failed.reject(new RpcError({ code: "CLOSED", message: "Old connection" })));
+  await unwrappedAct(async () => failed.reject(new RpcError({ code: "CLOSED", message: "Old connection" })));
   assert.match(fixture.text(), /latest description/);
   assert.doesNotMatch(fixture.text(), /Old connection|current description/);
 });
@@ -193,7 +229,7 @@ test("skill navigation exposes native buttons and preserves unsaved-change guard
   assert.equal(first.props.type, "button");
   assert.equal(first.props["aria-current"], "true");
   assert.ok(buttons().find((node) => text(node) === "Add skill"));
-  await act(async () =>
+  await unwrappedAct(async () =>
     fixture.renderer.root.findByType("textarea").props.onChange({ target: { value: "unsaved first" } }),
   );
   await fixture.click("second");
@@ -236,9 +272,9 @@ test("a failed skill save preserves the draft and blocks leaving until a typed r
   await fixture.reply("skills.list", { skills: [item] });
   await fixture.reply("skills.getContent", { content: "original" });
   const editor = () => fixture.renderer.root.find((node) => node.type === "textarea");
-  await act(async () => editor().props.onChange({ target: { value: "edited skill" } }));
+  await unwrappedAct(async () => editor().props.onChange({ target: { value: "edited skill" } }));
   let left = 0;
-  await act(async () => fixture.ref.current.requestLeave(() => left++));
+  await unwrappedAct(async () => fixture.ref.current.requestLeave(() => left++));
   const dialog = () => fixture.renderer.root.find((node) => node.props.role === "dialog");
   await fixture.click("Save", dialog());
   assert.deepEqual(fixture.next("skills.set").params, {
@@ -263,7 +299,7 @@ test("skill install capability recovery retries the same package, scope and cwd 
   const search = fixture.renderer.root.find(
     (node) => node.type === "input" && node.props["aria-label"] === "Search skills",
   );
-  await act(async () => search.props.onChange({ target: { value: "  fixture  " } }));
+  await unwrappedAct(async () => search.props.onChange({ target: { value: "  fixture  " } }));
   await fixture.click("Search");
   assert.deepEqual(fixture.next("skills.search").params, { query: "fixture" });
   await fixture.reply("skills.search", { results: [{ package: "owner/repo@fixture", installs: 1, url: "" }] });
@@ -322,7 +358,7 @@ test("plugin installation passes the trimmed source and selected scope without a
   const input = fixture.renderer.root.find(
     (node) => node.type === "input" && node.props.placeholder === "npm:@scope/package",
   );
-  await act(async () => input.props.onChange({ target: { value: "  npm:@fixture/plugin@1.0.0  " } }));
+  await unwrappedAct(async () => input.props.onChange({ target: { value: "  npm:@fixture/plugin@1.0.0  " } }));
   await fixture.click("project");
   await fixture.click("Install");
   assert.deepEqual(fixture.next("plugins.set").params, {

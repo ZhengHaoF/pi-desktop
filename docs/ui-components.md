@@ -14,6 +14,7 @@
 | `Select` | 下拉单选（主题化弹层） | `<select>` |
 | `Checkbox` | 勾选框（原生 + accent-color） | `<input type="checkbox">` |
 | `Switch` | 轨道开关（on/off 状态） | 手写 track+knob 开关 |
+| `Dialog` | 居中模态（backdrop/卡片/焦点圈禁/滚动锁） | 手写 fixed 覆盖层 |
 | `StatusDot` | 状态小圆点（语义色 + pulse） | 手写 50% 圆角 span |
 | `usePopoverAnchor` | portal 弹层贴附触发器的定位 hook | 手写 getBoundingClientRect 逻辑 |
 
@@ -30,6 +31,7 @@ import { Select, SelectOption } from "@/components/ui/Select";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { Switch } from "@/components/ui/Switch";
+import { Dialog } from "@/components/ui/Dialog";
 ```
 
 ## Button
@@ -140,6 +142,26 @@ class 承担；组件只提供布局默认值。**需要微调布局时传 `styl
 - 无障碍用 `role="switch"` + `aria-checked`（不是 pressed toggle）
 - 二态"行标签 + 勾选框"的设置行用 `Checkbox`；只有真正的开/关状态用 `Switch`
 
+## Dialog
+
+```tsx
+<Dialog open={open} onClose={close} ariaLabel="确认" width={480}>
+  <h2 id="confirm-title">确认操作？</h2>
+  <Button onClick={confirm}>确定</Button>
+</Dialog>
+```
+
+- **壳职责**：backdrop + 居中卡片 + 真·焦点圈禁（Tab 循环不出卡片）+
+  Escape 关闭 + backdrop 点击关闭 + body 滚动锁；portal 到 body
+- **closeOnEscape={false}**：Escape 有专属语义的对话框（如授权框 deny 流程）
+- **closeOnBackdrop={false}**：带保存状态门控的确认框
+- **width**：默认 480；设置外壳这类大卡传 960 并用 style 覆盖高度/overflow
+- 卡片样式（bg-panel/边框/阴影/圆角 9）已内置，内容、按钮、表单处理全部
+  留在调用方
+- **锚定弹出层**（跟随触发器的 popover，如 herdr 舰队面板、渠道快绑、
+  Select 下拉）**不用 Dialog**——它们走 usePopoverAnchor 定位
+- ImageLightbox（整屏画布预览）保持独立实现，非卡片形态
+
 ## StatusDot
 
 ```tsx
@@ -212,5 +234,4 @@ class 承担；组件只提供布局默认值。**需要微调布局时传 `styl
 
 ## 计划中
 
-- `Dialog`（统一焦点圈禁 / Escape / backdrop，弥补 aria-modal 短板）
 - `Menu`（复用 usePopoverAnchor）

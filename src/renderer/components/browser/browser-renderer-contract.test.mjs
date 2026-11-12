@@ -53,9 +53,11 @@ test("Browser access is demand-prompted and AppShell never eagerly grants a sele
   assert.doesNotMatch(appShell, /browserGrantSession/);
   assert.match(appShell, /agent-authorization-request/);
   assert.match(appShell, /browserRespondAgentAuthorization/);
-  assert.match(browserAuthorization, /role="dialog"/);
-  assert.match(browserAuthorization, /denyRef/);
-  assert.match(browserAuthorization, /event\.key === "Escape"/);
+  // The authorization dialog delegates the shell to the shared Dialog
+  // component; the deny flow stays caller-owned (Escape is not wired).
+  assert.match(browserAuthorization, /from "@\/components\/ui\/Dialog"/);
+  assert.match(browserAuthorization, /closeOnEscape=\{false\}/);
+  assert.match(browserAuthorization, /onRespond\("deny"\)/);
 });
 
 test("Browser Settings is reachable and shows the current session permission", () => {
@@ -105,5 +107,6 @@ test("Browser Settings uses an in-app text prompt instead of Electron's unsuppor
   assert.match(browserSettings, /function TextPromptDialog/);
   assert.match(browserSettings, /requiredValue: "ENABLE ADVANCED BROWSER"/);
   assert.doesNotMatch(browserSettings, /requiredValue: "ENABLE UNSAFE BROWSER"/);
-  assert.match(browserSettings, /role="dialog"/);
+  // The prompt delegates the shell to the shared Dialog component.
+  assert.match(browserSettings, /from "@\/components\/ui\/Dialog"/);
 });

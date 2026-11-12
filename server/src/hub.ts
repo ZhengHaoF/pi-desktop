@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 import { ConnectionRegistry, type PeerMeta } from "./registry.ts";
 import { PairingService } from "./pairing.ts";
 import { AuditLog } from "./audit.ts";
+import { RelayDiagLog } from "./diag-log.ts";
 import { loadConfig, type RelayConfig } from "./config.ts";
 
 interface EnvelopeLike {
@@ -51,6 +52,8 @@ export class RelayHub {
   readonly registry: ConnectionRegistry;
   readonly pairing: PairingService;
   readonly audit: AuditLog;
+  /** Opt-in forensic log (RELAY_DEBUG_LOG). Disabled unless a path is configured. */
+  readonly diag: RelayDiagLog;
   private readonly config: RelayConfig;
   /** Known hosts for the multi-PC device selector: label + last disconnect. */
   private readonly hostDirectory = new Map<string, { label?: string; lastSeenAt: number; e2eePub?: string }>();
@@ -61,6 +64,15 @@ export class RelayHub {
     this.pairing = new PairingService(config, this.audit);
     this.registry = new ConnectionRegistry(config, this.audit);
     this.wss = new WebSocketServer({ noServer: true });
+    this.diag = new RelayDiagLog(config.debugLogPath);
+    this.diag.record("relay.start", {
+      port: config.port,
+      cipherRequired: config.cipherRequired,
+      pairingRequired: config.pairingRequired,
+      statePath: config.statePath ?? null,
+      pairingTtlMs: config.pairingTtlMs,
+      bindingsLoaded: this.pairing.bindingCount,
+    });
   }
   /** HTTP upgrade entry. */
   handleUpgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
@@ -129,6 +141,7 @@ export class RelayHub {
       outcome: "denied",
       traceId,
     });
+    this.diag.record("hello.reject", { actor, code, reason, action });
     ws.close(code, reason);
   }
 
@@ -205,24 +218,54 @@ export class RelayHub {
       const targetHostId = declaredHostId || this.registry.onlineHosts()[0]?.id || "";
       deviceTargetHostId = targetHostId;
       let paired = false;
+      /** Diagnostic verdicts: why the token / credential did or did not bind. */
+      let tokenVerdict: string | undefined;
+      let credentialVerdict: string | undefined;
       // A fresh scan token wins over a stale credential. Re-pairing only
       // replaces the binding for the scanned host, other PCs stay paired.
       if (pairingToken) {
         const submitted = this.pairing.submit(pairingToken, declaredHostId, id, e2eePub ?? "");
+        tokenVerdict = submitted.ok ? "accepted" : submitted.reason;
         if (submitted.ok) {
           this.pairing.approve(pairingToken);
           this.pairing.consume(pairingToken);
           issuedDeviceSecret = this.pairing.pairDevice(declaredHostId, id, label, e2eePub).secret;
+          tokenVerdict = "paired";
           paired = true;
         }
       }
       if (!paired && deviceSecret) {
-        paired = this.pairing.verifyDevice(id, deviceSecret, targetHostId) !== undefined;
+        credentialVerdict = this.pairing.verifyReason(id, deviceSecret, targetHostId);
+        paired = credentialVerdict === "ok";
       }
+      // Forensics: the single most useful record in this file — what the phone
+      // presented, what the relay holds, and how each check was decided.
+      this.diag.record("device.hello", {
+        deviceId: id,
+        label: label ?? null,
+        declaredHostId: declaredHostId || null,
+        targetHostId: targetHostId || null,
+        onlineHostIds: this.registry.onlineHosts().map((peer) => peer.id),
+        knownHostIds: [...this.hostDirectory.keys()],
+        pairingRequired: this.config.pairingRequired,
+        hasPairingToken: Boolean(pairingToken),
+        pairingTokenDigest: RelayDiagLog.digest(pairingToken),
+        tokenVerdict: tokenVerdict ?? null,
+        hasDeviceSecret: Boolean(deviceSecret),
+        deviceSecretDigest: RelayDiagLog.digest(deviceSecret),
+        credentialVerdict: credentialVerdict ?? null,
+        // Hosts this deviceId is bound to — an empty array with a secret
+        // present means the relay lost/moved its state file or the phone kept
+        // a credential from another relay instance.
+        bindingHostIds: this.pairing.bindingHostIds(id),
+        bindingCount: this.pairing.bindingCount,
+        paired,
+      });
       if (!paired && pairingToken) {
         // The token was present but did not produce a binding: reject with the
-        // submit reason instead of the generic "pairing required".
-        this.fail(ws, 4003, "pairing token rejected", id, "pair.reject", "pair");
+        // submit reason instead of the generic "pairing required", so the
+        // phone can surface it ("unknown pairing token" vs "pairing consumed").
+        this.fail(ws, 4003, `pairing token rejected: ${tokenVerdict ?? "unknown"}`, id, "pair.reject", "pair");
         return undefined;
       }
       if (this.config.pairingRequired && !paired) {
@@ -249,6 +292,21 @@ export class RelayHub {
         label,
         lastSeenAt: previous?.lastSeenAt ?? Date.now(),
         e2eePub: e2eePub ?? previous?.e2eePub,
+      });
+      // A device rejection is usually "the PC I want is not here" or "the QR
+      // advertised another hostId": record which id the PC actually took.
+      this.diag.record("host.hello", {
+        hostId: id,
+        label: label ?? null,
+        declaredHostId: declaredHostId || null,
+        hasE2eePub: Boolean(e2eePub),
+        appVersion: typeof payload.appVersion === "string" ? payload.appVersion : null,
+      });
+    } else {
+      this.diag.record("device.accept", {
+        deviceId: id,
+        addressedHostId: deviceTargetHostId || null,
+        issuedSecret: Boolean(issuedDeviceSecret),
       });
     }
     this.registry.register(peer);
@@ -302,6 +360,7 @@ export class RelayHub {
 
   private recordHostOffline(hostId: string, label?: string, e2eePub?: string): void {
     this.hostDirectory.set(hostId, { label, lastSeenAt: Date.now(), e2eePub });
+    this.diag.record("host.offline", { hostId, label: label ?? null });
   }
 
   private routeEnvelope(from: PeerMeta, raw: Buffer): void {
@@ -355,6 +414,11 @@ export class RelayHub {
         return;
       }
       const created = this.pairing.create(from.id);
+      this.diag.record("pair.create", {
+        hostId: from.id,
+        tokenDigest: RelayDiagLog.digest(created.token),
+        expiresAt: new Date(created.expiresAt).toISOString(),
+      });
       from.send(
         JSON.stringify({
           v: 1,
@@ -374,6 +438,7 @@ export class RelayHub {
       }
       const deviceId = typeof envelope.deviceId === "string" ? envelope.deviceId : "";
       const revoked = this.pairing.revokeDevice(from.id, deviceId);
+      this.diag.record("pair.revoke", { hostId: from.id, deviceId, revoked });
       // Revocation is immediate: drop the live device connection if online.
       if (revoked) this.registry.get(deviceId)?.close(4003, "device revoked");
       from.send(
@@ -403,6 +468,7 @@ export class RelayHub {
             ? envelope.hostId
             : "";
       const removed = hostId ? this.pairing.unbindDevice(from.id, hostId) : false;
+      this.diag.record("pair.unbind", { deviceId: from.id, hostId: hostId || null, removed });
       from.send(
         JSON.stringify({
           v: 1,

@@ -69,7 +69,7 @@ Future<void> startKeepAlive() async {
   }
   await FlutterForegroundTask.startService(
     serviceTypes: [ForegroundServiceTypes.connectedDevice],
-    notificationTitle: 'Pi Remote 连接中',
+    notificationTitle: 'Pi Go 连接中',
     notificationText: '保持与电脑的连接，息屏不中断',
     callback: keepAliveCallback,
   );

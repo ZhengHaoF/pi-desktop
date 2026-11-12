@@ -245,6 +245,30 @@ export class PairingService {
     return binding;
   }
 
+  /**
+   * Diagnostic-only variant of verifyDevice: tells "no binding for this host"
+   * apart from "binding exists but the secret is wrong" — the two cases need
+   * completely different fixes (re-pair vs. relay state was reset/moved).
+   * Never exposes the secret or its hash.
+   */
+  verifyReason(deviceId: string, secret: string, hostId: string): "ok" | "no-binding" | "secret-mismatch" {
+    const binding = this.devices.get(this.bindingKey(deviceId, hostId));
+    if (!binding) return "no-binding";
+    return PairingService.verifyToken(secret, binding.secretHash) ? "ok" : "secret-mismatch";
+  }
+
+  /** Hosts this device holds a binding for (diagnostics: spot hostId mismatches). */
+  bindingHostIds(deviceId: string): string[] {
+    return [...this.devices.values()]
+      .filter((binding) => binding.deviceId === deviceId)
+      .map((binding) => binding.hostId);
+  }
+
+  /** Total persisted bindings, across all devices and hosts. */
+  get bindingCount(): number {
+    return this.devices.size;
+  }
+
   /** Host-initiated revocation of one (device, host) binding. */
   revokeDevice(hostId: string, deviceId: string): boolean {
     const key = this.bindingKey(deviceId, hostId);

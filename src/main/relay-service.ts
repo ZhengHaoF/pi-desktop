@@ -141,6 +141,9 @@ export class RelayService {
       RELAY_PAIRING_REQUIRED: process.env.RELAY_PAIRING_REQUIRED ?? "true",
       // Device bindings survive relay restarts (every app launch restarts it).
       RELAY_STATE_PATH: process.env.RELAY_STATE_PATH ?? path.join(app.getPath("userData"), "relay-pairings.json"),
+      // Forensics for "手机扫码后仍提示配对失败": hello/pairing verdicts land
+      // here as JSONL (no tokens/secrets, only short digests).
+      RELAY_DEBUG_LOG: process.env.RELAY_DEBUG_LOG ?? path.join(app.getPath("userData"), "relay-debug.log"),
     };
     if (env.RELAY_CIPHER_REQUIRED === "false" || env.RELAY_PAIRING_REQUIRED === "false") {
       env.RELAY_ALLOW_PLAINTEXT_PUBLIC = process.env.RELAY_ALLOW_PLAINTEXT_PUBLIC ?? "diagnostic";

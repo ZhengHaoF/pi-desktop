@@ -70,7 +70,7 @@ class _ConnectPageState extends State<ConnectPage> {
     final connection = RemoteConnection(
       relayUrl: _urlController.text.trim(),
       deviceId: _deviceController.text.trim(),
-      deviceLabel: 'Pi Remote (Android)',
+      deviceLabel: 'Pi Go (Android)',
       pairingToken: _pairingToken,
       targetHostId: _targetHostId,
     );
@@ -103,7 +103,7 @@ class _ConnectPageState extends State<ConnectPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Pi Remote — 连接')),
+      appBar: AppBar(title: const Text('Pi Go — 连接')),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(

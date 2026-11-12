@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { Dialog } from "@/components/ui/Dialog";
 
 export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
   const { language, t } = useI18n();
@@ -1208,7 +1209,6 @@ function TextPromptDialog({
 }) {
   const [value, setValue] = useState(prompt.defaultValue ?? "");
   const inputRef = useRef<HTMLInputElement>(null);
-  const dialogRef = useRef<HTMLFormElement>(null);
   const canSubmit = value.trim().length > 0 && (!prompt.requiredValue || value === prompt.requiredValue);
 
   useEffect(() => {
@@ -1217,48 +1217,17 @@ function TextPromptDialog({
   }, []);
 
   return (
-    <div
-      role="presentation"
-      style={promptBackdropStyle}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onRespond(null);
-      }}
+    <Dialog
+      open
+      onClose={() => onRespond(null)}
+      width={480}
+      ariaLabelledBy="browser-text-prompt-title"
+      style={{ display: "grid", gap: 13 }}
     >
       <form
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="browser-text-prompt-title"
-        style={promptDialogStyle}
         onSubmit={(event) => {
           event.preventDefault();
           if (canSubmit) onRespond(value);
-        }}
-        onKeyDown={(event) => {
-          event.stopPropagation();
-          if (event.key === "Escape") {
-            event.preventDefault();
-            onRespond(null);
-            return;
-          }
-          if (event.key !== "Tab") return;
-          const dialog = dialogRef.current;
-          if (!dialog) return;
-          const focusable = Array.from(
-            dialog.querySelectorAll<HTMLElement>(
-              'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
-            ),
-          );
-          const first = focusable[0];
-          const last = focusable[focusable.length - 1];
-          if (!first || !last) return;
-          if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-          } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-          }
         }}
       >
         <div id="browser-text-prompt-title" style={{ color: "var(--text)", fontSize: 14, fontWeight: 650 }}>
@@ -1283,7 +1252,7 @@ function TextPromptDialog({
           </Button>
         </div>
       </form>
-    </div>
+    </Dialog>
   );
 }
 
@@ -1478,26 +1447,6 @@ function formatBytes(value: number): string {
 const headingStyle = { margin: 0, color: "var(--text)", fontSize: 18 };
 const descriptionStyle = { margin: "6px 0 0", color: "var(--text-dim)", fontSize: 12, lineHeight: 1.6 };
 const emptyStyle = { margin: "auto", color: "var(--text-muted)", fontSize: 12 };
-const promptBackdropStyle = {
-  position: "fixed" as const,
-  inset: 0,
-  zIndex: 1100,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: 20,
-  background: "rgba(0,0,0,0.38)",
-};
-const promptDialogStyle = {
-  width: "min(480px, 100%)",
-  display: "grid",
-  gap: 13,
-  padding: 18,
-  border: "1px solid var(--border)",
-  borderRadius: 9,
-  background: "var(--bg-panel)",
-  boxShadow: "0 20px 60px rgba(0,0,0,0.28)",
-};
 const confirmationPhraseStyle = {
   display: "block",
   width: "fit-content",

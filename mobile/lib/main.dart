@@ -1,4 +1,4 @@
-/// Pi Remote — mobile companion for Pi Agent Desktop.
+/// Pi Go — mobile companion for Pi Agent Desktop.
 ///
 /// ConnectPage (relay address + device id) → HomePage (PC 任务/空间, real
 /// sessions.list grouped by project) → ProjectPage (per-project sessions +
@@ -23,7 +23,7 @@ class PiRemoteApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Pi Remote',
+      title: 'Pi Go',
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF534AB7)),

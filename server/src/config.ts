@@ -18,6 +18,8 @@ export interface RelayConfig {
   pairingMaxAttempts: number;
   /** JSON file for device-binding persistence (unset: in-memory only). */
   statePath?: string;
+  /** JSONL diagnostic log for hello/pairing forensics (unset: disabled). */
+  debugLogPath?: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayConfig {
@@ -49,5 +51,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayConfig {
     pairingTtlMs: num("RELAY_PAIRING_TTL_MS", 10 * 60_000, 10_000),
     pairingMaxAttempts: num("RELAY_PAIRING_MAX_ATTEMPTS", 5, 1),
     ...(env.RELAY_STATE_PATH ? { statePath: env.RELAY_STATE_PATH } : {}),
+    ...(env.RELAY_DEBUG_LOG ? { debugLogPath: env.RELAY_DEBUG_LOG } : {}),
   };
 }

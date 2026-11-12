@@ -30,8 +30,10 @@ test("the unsaved prompt offers save, discard, and cancel", () => {
 
 test("Settings routes every close and tab transition through SkillsConfig", () => {
   assert.match(settingsSource, /skillsConfigRef\.current\.requestLeave\(action\)/);
-  assert.match(settingsSource, /event\.target === event\.currentTarget\) requestSettingsTransition\(onClose\)/);
-  assert.match(settingsSource, /event\.key === "Escape"[\s\S]*?requestSettingsTransition\(onClose\)/);
+  // Backdrop and Escape closes are delegated to the shared Dialog shell
+  // (onClose = requestSettingsTransition(onClose)); the close button and tab
+  // clicks remain explicit here.
+  assert.match(settingsSource, /onClose=\{\(\) => requestSettingsTransition\(onClose\)\}/);
   assert.match(settingsSource, /onClick=\{\(\) => requestSettingsTransition\(onClose\)\}/);
   assert.match(settingsSource, /if \(!active\) requestSettingsTransition\(\(\) => setActiveTab\(tab\.id\)\)/);
   assert.match(settingsSource, /<SkillsConfig ref=\{skillsConfigRef\}/);

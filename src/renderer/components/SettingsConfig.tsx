@@ -7,6 +7,7 @@ import {
 } from "@/lib/update-display";
 import { Select } from "@/components/ui/Select";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { Dialog } from "@/components/ui/Dialog";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
@@ -83,7 +84,6 @@ export function SettingsConfig({
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const activeTabRef = useRef(activeTab);
   activeTabRef.current = activeTab;
-  const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const skillsConfigRef = useRef<SkillsConfigHandle>(null);
   const mcpConfigRef = useRef<McpConfigHandle>(null);
@@ -121,7 +121,7 @@ export function SettingsConfig({
   }, []);
 
   useEffect(() => {
-    const dialog = dialogRef.current;
+    const dialog = document.querySelector('[role="dialog"][aria-modal="true"]');
     if (dialog && !dialog.contains(document.activeElement)) {
       document.getElementById(`settings-tab-${activeTab}`)?.focus();
     }
@@ -142,228 +142,180 @@ export function SettingsConfig({
   ];
 
   return (
-    <div
-      role="presentation"
+    <Dialog
+      open
+      onClose={() => requestSettingsTransition(onClose)}
+      ariaLabel={t("settings", "Settings")}
+      width={isMobile ? "calc(100vw - 16px)" : 960}
       style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1000,
-        background: "rgba(0,0,0,0.35)",
+        width: isMobile ? "calc(100vw - 16px)" : 960,
+        maxWidth: "calc(100vw - 16px)",
+        height: isMobile ? "calc(100dvh - 16px)" : "82vh",
+        maxHeight: "calc(100dvh - 16px)",
+        background: "var(--bg)",
+        border: "1px solid var(--border)",
+        borderRadius: 10,
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) requestSettingsTransition(onClose);
+        flexDirection: "column",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+        overflow: "hidden",
       }}
     >
       <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={t("settings", "Settings")}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            requestSettingsTransition(onClose);
-            return;
-          }
-          if (event.key !== "Tab") return;
-
-          const dialog = dialogRef.current;
-          if (!dialog) return;
-          const focusable = Array.from(
-            dialog.querySelectorAll<HTMLElement>(
-              'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-            ),
-          ).filter((element) => element.getClientRects().length > 0);
-          if (focusable.length === 0) {
-            event.preventDefault();
-            dialog.focus();
-            return;
-          }
-
-          const first = focusable[0];
-          const last = focusable[focusable.length - 1];
-          if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
-            event.preventDefault();
-            last.focus();
-          } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-          }
-        }}
-        tabIndex={-1}
         style={{
-          width: isMobile ? "calc(100vw - 16px)" : 960,
-          maxWidth: "calc(100vw - 16px)",
-          height: isMobile ? "calc(100dvh - 16px)" : "82vh",
-          maxHeight: "calc(100dvh - 16px)",
-          background: "var(--bg)",
-          border: "1px solid var(--border)",
-          borderRadius: 10,
           display: "flex",
-          flexDirection: "column",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
-          overflow: "hidden",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          padding: "13px 18px",
+          borderBottom: "1px solid var(--border)",
+          flexShrink: 0,
         }}
       >
-        <div
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{t("settings", "Settings")}</div>
+          {!isMobile && (
+            <div style={{ marginTop: 2, fontSize: 11, color: "var(--text-dim)" }}>
+              {t("settingsDescription", "Manage app preferences, models, skills, and plugins.")}
+            </div>
+          )}
+        </div>
+        <Button
+          ref={closeButtonRef}
+          type="button"
+          onClick={() => requestSettingsTransition(onClose)}
+          aria-label={t("close", "Close")}
+          variant="ghost"
           style={{
+            fontSize: 20,
+            lineHeight: 1,
+            width: 36,
+            height: 36,
+            padding: 0,
+            borderRadius: 7,
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            padding: "13px 18px",
-            borderBottom: "1px solid var(--border)",
-            flexShrink: 0,
+            justifyContent: "center",
           }}
         >
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{t("settings", "Settings")}</div>
-            {!isMobile && (
-              <div style={{ marginTop: 2, fontSize: 11, color: "var(--text-dim)" }}>
-                {t("settingsDescription", "Manage app preferences, models, skills, and plugins.")}
-              </div>
-            )}
-          </div>
-          <Button
-            ref={closeButtonRef}
-            type="button"
-            onClick={() => requestSettingsTransition(onClose)}
-            aria-label={t("close", "Close")}
-            variant="ghost"
-            style={{
-              fontSize: 20,
-              lineHeight: 1,
-              width: 36,
-              height: 36,
-              padding: 0,
-              borderRadius: 7,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            ×
-          </Button>
+          ×
+        </Button>
+      </div>
+
+      <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex", overflow: "hidden" }}>
+        <div
+          role="tablist"
+          aria-label={t("settings", "Settings")}
+          aria-orientation="vertical"
+          style={{
+            width: isMobile ? 112 : 168,
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+            padding: isMobile ? "10px 8px" : "12px 10px",
+            borderRight: "1px solid var(--border)",
+            overflowY: "auto",
+            flexShrink: 0,
+            background: "var(--bg-panel)",
+          }}
+        >
+          {tabs.map((tab) => {
+            const active = tab.id === activeTab;
+            return (
+              <Button
+                key={tab.id}
+                id={`settings-tab-${tab.id}`}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                aria-controls="settings-tabpanel"
+                tabIndex={active ? 0 : -1}
+                onClick={() => {
+                  if (!active) requestSettingsTransition(() => setActiveTab(tab.id));
+                }}
+                onKeyDown={(event) => {
+                  const currentIndex = tabs.findIndex((item) => item.id === tab.id);
+                  let nextIndex: number | undefined;
+                  if (event.key === "ArrowDown") nextIndex = (currentIndex + 1) % tabs.length;
+                  if (event.key === "ArrowUp") nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+                  if (event.key === "Home") nextIndex = 0;
+                  if (event.key === "End") nextIndex = tabs.length - 1;
+                  if (nextIndex === undefined) return;
+                  event.preventDefault();
+                  const nextTab = tabs[nextIndex];
+                  requestSettingsTransition(() => {
+                    setActiveTab(nextTab.id);
+                    document.getElementById(`settings-tab-${nextTab.id}`)?.focus();
+                  });
+                }}
+                className="pi-settings-tab"
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  minHeight: 40,
+                  padding: isMobile ? "8px 10px" : "8px 12px",
+                  fontSize: 12,
+                  lineHeight: 1.35,
+                  textAlign: "left",
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {tab.label}
+              </Button>
+            );
+          })}
         </div>
 
-        <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex", overflow: "hidden" }}>
-          <div
-            role="tablist"
-            aria-label={t("settings", "Settings")}
-            aria-orientation="vertical"
-            style={{
-              width: isMobile ? 112 : 168,
-              display: "flex",
-              flexDirection: "column",
-              gap: 4,
-              padding: isMobile ? "10px 8px" : "12px 10px",
-              borderRight: "1px solid var(--border)",
-              overflowY: "auto",
-              flexShrink: 0,
-              background: "var(--bg-panel)",
-            }}
-          >
-            {tabs.map((tab) => {
-              const active = tab.id === activeTab;
-              return (
-                <Button
-                  key={tab.id}
-                  id={`settings-tab-${tab.id}`}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  aria-controls="settings-tabpanel"
-                  tabIndex={active ? 0 : -1}
-                  onClick={() => {
-                    if (!active) requestSettingsTransition(() => setActiveTab(tab.id));
-                  }}
-                  onKeyDown={(event) => {
-                    const currentIndex = tabs.findIndex((item) => item.id === tab.id);
-                    let nextIndex: number | undefined;
-                    if (event.key === "ArrowDown") nextIndex = (currentIndex + 1) % tabs.length;
-                    if (event.key === "ArrowUp") nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
-                    if (event.key === "Home") nextIndex = 0;
-                    if (event.key === "End") nextIndex = tabs.length - 1;
-                    if (nextIndex === undefined) return;
-                    event.preventDefault();
-                    const nextTab = tabs[nextIndex];
-                    requestSettingsTransition(() => {
-                      setActiveTab(nextTab.id);
-                      document.getElementById(`settings-tab-${nextTab.id}`)?.focus();
-                    });
-                  }}
-                  className="pi-settings-tab"
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                    minHeight: 40,
-                    padding: isMobile ? "8px 10px" : "8px 12px",
-                    fontSize: 12,
-                    lineHeight: 1.35,
-                    textAlign: "left",
-                    overflowWrap: "anywhere",
-                  }}
-                >
-                  {tab.label}
-                </Button>
-              );
-            })}
-          </div>
-
-          <div
-            id="settings-tabpanel"
-            role="tabpanel"
-            aria-labelledby={`settings-tab-${activeTab}`}
-            style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: "hidden", display: "flex" }}
-          >
-            {activeTab === "general" && (
-              <GeneralSettings
-                language={language}
-                onLanguageChange={setLanguage}
-                isDark={isDark}
-                onThemeChange={(nextDark) => {
-                  if (nextDark !== isDark) toggleTheme();
-                }}
-                chatAppearance={chatAppearance}
-                chatAppearanceSaving={chatAppearanceSaving}
-                onChatAppearanceChange={onChatAppearanceChange}
+        <div
+          id="settings-tabpanel"
+          role="tabpanel"
+          aria-labelledby={`settings-tab-${activeTab}`}
+          style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: "hidden", display: "flex" }}
+        >
+          {activeTab === "general" && (
+            <GeneralSettings
+              language={language}
+              onLanguageChange={setLanguage}
+              isDark={isDark}
+              onThemeChange={(nextDark) => {
+                if (nextDark !== isDark) toggleTheme();
+              }}
+              chatAppearance={chatAppearance}
+              chatAppearanceSaving={chatAppearanceSaving}
+              onChatAppearanceChange={onChatAppearanceChange}
+            />
+          )}
+          {activeTab === "browser" && <BrowserSettings sessionId={sessionId} />}
+          {activeTab === "search" && <WebSearchSettings />}
+          {activeTab === "mcp" && <McpConfig ref={mcpConfigRef} cwd={cwd} sessionId={sessionId} />}
+          {activeTab === "herdr" && <HerdrSettings />}
+          {activeTab === "models" && (
+            <ModelsConfig embedded cwd={cwd} onClose={() => undefined} onChanged={onModelsChanged} />
+          )}
+          {activeTab === "tools" && <ToolchainsConfig cwd={cwd} />}
+          {activeTab === "channels" && <ChannelsConfig onSnapshotChange={onChannelsChanged} />}
+          {activeTab === "skills" &&
+            (cwd ? (
+              <SkillsConfig ref={skillsConfigRef} embedded cwd={cwd} onClose={() => undefined} />
+            ) : (
+              <ProjectRequired />
+            ))}
+          {activeTab === "plugins" &&
+            (cwd ? (
+              <PluginsConfig
+                embedded
+                cwd={cwd}
+                sessionId={sessionId}
+                onClose={() => undefined}
+                onReloaded={onPluginsReloaded}
               />
-            )}
-            {activeTab === "browser" && <BrowserSettings sessionId={sessionId} />}
-            {activeTab === "search" && <WebSearchSettings />}
-            {activeTab === "mcp" && <McpConfig ref={mcpConfigRef} cwd={cwd} sessionId={sessionId} />}
-            {activeTab === "herdr" && <HerdrSettings />}
-            {activeTab === "models" && (
-              <ModelsConfig embedded cwd={cwd} onClose={() => undefined} onChanged={onModelsChanged} />
-            )}
-            {activeTab === "tools" && <ToolchainsConfig cwd={cwd} />}
-            {activeTab === "channels" && <ChannelsConfig onSnapshotChange={onChannelsChanged} />}
-            {activeTab === "skills" &&
-              (cwd ? (
-                <SkillsConfig ref={skillsConfigRef} embedded cwd={cwd} onClose={() => undefined} />
-              ) : (
-                <ProjectRequired />
-              ))}
-            {activeTab === "plugins" &&
-              (cwd ? (
-                <PluginsConfig
-                  embedded
-                  cwd={cwd}
-                  sessionId={sessionId}
-                  onClose={() => undefined}
-                  onReloaded={onPluginsReloaded}
-                />
-              ) : (
-                <ProjectRequired />
-              ))}
-            {activeTab === "about" && <AboutSettings onClose={onClose} />}
-          </div>
+            ) : (
+              <ProjectRequired />
+            ))}
+          {activeTab === "about" && <AboutSettings onClose={onClose} />}
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
 

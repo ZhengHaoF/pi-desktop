@@ -1,4 +1,4 @@
-# pi_remote
+# Pi Go
 
 A new Flutter project.
 

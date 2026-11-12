@@ -1,6 +1,7 @@
 import { call } from "@/lib/api-client";
 import { Input } from "@/components/ui/Input";
 import { Switch } from "@/components/ui/Switch";
+import { Dialog } from "@/components/ui/Dialog";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { Textarea } from "@/components/ui/Textarea";
 import { forwardRef, useState, useEffect, useCallback, useImperativeHandle, useRef } from "react";
@@ -1005,77 +1006,49 @@ export const SkillsConfig = forwardRef<
         )}
       </div>
       {pendingTransition && (
-        <div
-          role="presentation"
-          style={{
-            position: "absolute",
-            inset: 0,
-            zIndex: 2,
-            display: "grid",
-            placeItems: "center",
-            padding: 16,
-            background: "rgba(0,0,0,0.35)",
+        <Dialog
+          open={pendingTransition !== null}
+          onClose={() => {
+            if (!transitionSaving) setPendingTransition(null);
           }}
-          onClick={(event) => {
-            if (event.target === event.currentTarget && !transitionSaving) setPendingTransition(null);
-          }}
+          width={420}
+          ariaLabelledBy="unsaved-skill-title"
+          style={{ padding: 18, background: "var(--bg)", boxShadow: "0 16px 48px rgba(0,0,0,0.3)" }}
         >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="unsaved-skill-title"
-            onKeyDown={(event) => {
-              if (event.key === "Escape" && !transitionSaving) {
-                event.preventDefault();
-                event.stopPropagation();
-                setPendingTransition(null);
-              }
-            }}
-            style={{
-              width: 420,
-              maxWidth: "100%",
-              padding: 18,
-              border: "1px solid var(--border)",
-              borderRadius: 9,
-              background: "var(--bg)",
-              boxShadow: "0 16px 48px rgba(0,0,0,0.3)",
-            }}
-          >
-            <h3 id="unsaved-skill-title" style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>
-              {t("unsavedSkillChanges", "Unsaved skill changes")}
-            </h3>
-            <p style={{ margin: "8px 0 16px", fontSize: 12, lineHeight: 1.55, color: "var(--text-muted)" }}>
-              {t("unsavedSkillChangesDescription", "Save your SKILL.md changes before leaving this editor?")}
-            </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <Button
-                type="button"
-                disabled={transitionSaving}
-                onClick={discardAndContinue}
-                style={leavePromptButtonLayout}
-              >
-                {t("discard", "Discard")}
-              </Button>
-              <Button
-                type="button"
-                disabled={transitionSaving}
-                onClick={() => setPendingTransition(null)}
-                style={leavePromptButtonLayout}
-              >
-                {t("cancel", "Cancel")}
-              </Button>
-              <Button
-                type="button"
-                disabled={transitionSaving}
-                onClick={() => void saveAndContinue()}
-                variant="primary"
-                style={leavePromptButtonLayout}
-              >
-                {transitionSaving ? t("saving", "Saving…") : t("save", "Save")}
-              </Button>
-            </div>
+          <h3 id="unsaved-skill-title" style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>
+            {t("unsavedSkillChanges", "Unsaved skill changes")}
+          </h3>
+          <p style={{ margin: "8px 0 16px", fontSize: 12, lineHeight: 1.55, color: "var(--text-muted)" }}>
+            {t("unsavedSkillChangesDescription", "Save your SKILL.md changes before leaving this editor?")}
+          </p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <Button
+              type="button"
+              disabled={transitionSaving}
+              onClick={discardAndContinue}
+              style={leavePromptButtonLayout}
+            >
+              {t("discard", "Discard")}
+            </Button>
+            <Button
+              type="button"
+              disabled={transitionSaving}
+              onClick={() => setPendingTransition(null)}
+              style={leavePromptButtonLayout}
+            >
+              {t("cancel", "Cancel")}
+            </Button>
+            <Button
+              type="button"
+              disabled={transitionSaving}
+              onClick={() => void saveAndContinue()}
+              variant="primary"
+              style={leavePromptButtonLayout}
+            >
+              {transitionSaving ? t("saving", "Saving…") : t("save", "Save")}
+            </Button>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );
