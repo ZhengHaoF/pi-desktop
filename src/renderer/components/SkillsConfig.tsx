@@ -1013,7 +1013,7 @@ export const SkillsConfig = forwardRef<
           }}
           width={420}
           ariaLabelledBy="unsaved-skill-title"
-          style={{ padding: 18, background: "var(--bg)", boxShadow: "0 16px 48px rgba(0,0,0,0.3)" }}
+          style={{ padding: 18, gap: 13, background: "var(--bg)", boxShadow: "0 16px 48px rgba(0,0,0,0.3)" }}
         >
           <h3 id="unsaved-skill-title" style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>
             {t("unsavedSkillChanges", "Unsaved skill changes")}

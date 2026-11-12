@@ -148,7 +148,6 @@ export function SettingsConfig({
       ariaLabel={t("settings", "Settings")}
       width={isMobile ? "calc(100vw - 16px)" : 960}
       style={{
-        width: isMobile ? "calc(100vw - 16px)" : 960,
         maxWidth: "calc(100vw - 16px)",
         height: isMobile ? "calc(100dvh - 16px)" : "82vh",
         maxHeight: "calc(100dvh - 16px)",

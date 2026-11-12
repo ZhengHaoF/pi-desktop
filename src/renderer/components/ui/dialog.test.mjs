@@ -80,6 +80,10 @@ test("renders backdrop and card with aria wiring when open, nothing when closed"
   const dialog = card(renderer.root);
   assert.equal(dialog.props["aria-modal"], "true");
   assert.equal(dialog.props["aria-label"], "Confirm");
+  // The card is layout-neutral: padding/gap stay absent so shell callers run
+  // flush; confirmation dialogs pass their own density.
+  assert.equal(dialog.props.style.padding, undefined);
+  assert.equal(dialog.props.style.gap, undefined);
   // Body scroll lock active while open.
   assert.equal(bodyOverflow, "hidden");
   await act(async () => renderer.update(createElement(Dialog, { open: false, onClose: () => closed++ }, "Body")));

@@ -124,9 +124,10 @@ export function Dialog({
         className={className}
         style={{
           width: typeof width === "number" ? `min(${width}px, 100%)` : width,
+          // Layout-neutral card: density (padding/gap) belongs to callers —
+          // confirmation dialogs pass their own, shells (the settings window)
+          // run flush so their internal chrome reaches the card edges.
           display: "grid",
-          gap: 13,
-          padding: 18,
           border: "1px solid var(--border)",
           borderRadius: 9,
           background: "var(--bg-panel)",

@@ -156,8 +156,10 @@ class 承担；组件只提供布局默认值。**需要微调布局时传 `styl
 - **closeOnEscape={false}**：Escape 有专属语义的对话框（如授权框 deny 流程）
 - **closeOnBackdrop={false}**：带保存状态门控的确认框
 - **width**：默认 480；设置外壳这类大卡传 960 并用 style 覆盖高度/overflow
-- 卡片样式（bg-panel/边框/阴影/圆角 9）已内置，内容、按钮、表单处理全部
-  留在调用方
+- 卡片**布局中性**：只内置边框/圆角/阴影/bg-panel；`padding`/`gap` 由调用方
+  显式传（确认框如 `padding: 18, gap: 13`；壳形态如设置窗口不传，让内部
+  chrome 贴边）——不传就没有，不会默认塞进来
+- 内容、按钮、表单处理全部留在调用方
 - **锚定弹出层**（跟随触发器的 popover，如 herdr 舰队面板、渠道快绑、
   Select 下拉）**不用 Dialog**——它们走 usePopoverAnchor 定位
 - ImageLightbox（整屏画布预览）保持独立实现，非卡片形态

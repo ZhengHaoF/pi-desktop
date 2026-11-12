@@ -1222,7 +1222,7 @@ function TextPromptDialog({
       onClose={() => onRespond(null)}
       width={480}
       ariaLabelledBy="browser-text-prompt-title"
-      style={{ display: "grid", gap: 13 }}
+      style={{ display: "grid", gap: 13, padding: 18 }}
     >
       <form
         onSubmit={(event) => {
