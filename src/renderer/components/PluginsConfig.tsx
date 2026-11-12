@@ -9,6 +9,7 @@ import { formatNumber } from "@/lib/locale-format";
 import { pluginResourceSummary, pluginStatusLabel, pluginVersionSummary } from "@/lib/plugin-presentation";
 import { Button } from "@/components/ui/Button";
 import { StatusDot } from "@/components/ui/StatusDot";
+import { Switch } from "@/components/ui/Switch";
 import { Input } from "@/components/ui/Input";
 
 type Translate = (key: string, fallback: string) => string;
@@ -164,57 +165,6 @@ function ScopeTag({ scope }: { scope: PluginScope }) {
     >
       {pluginScopeLabel(scope, t)}
     </span>
-  );
-}
-
-function Toggle({
-  enabled,
-  loading,
-  onToggle,
-  label,
-}: {
-  enabled: boolean;
-  loading: boolean;
-  onToggle: () => void;
-  label: string;
-}) {
-  return (
-    <Button
-      type="button"
-      onClick={onToggle}
-      disabled={loading}
-      title={label}
-      aria-label={label}
-      aria-pressed={enabled}
-      className="pi-switch"
-      style={{
-        flexShrink: 0,
-        width: 40,
-        height: 22,
-        borderRadius: 11,
-        border: "none",
-        padding: 0,
-        cursor: loading ? "wait" : "pointer",
-        background: enabled ? "var(--accent)" : "var(--border)",
-        position: "relative",
-        outline: "none",
-        opacity: loading ? 0.65 : 1,
-      }}
-    >
-      <span
-        style={{
-          position: "absolute",
-          top: 3,
-          left: enabled ? 21 : 3,
-          width: 16,
-          height: 16,
-          borderRadius: "50%",
-          background: "var(--bg)",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.22)",
-          transition: "left 0.18s cubic-bezier(.4,0,.2,1)",
-        }}
-      />
-    </Button>
   );
 }
 
@@ -375,7 +325,6 @@ function PackageDetail({
   const key = packageKey(pkg);
   const busy = busyKey?.endsWith(key) ?? false;
   const reloadBusy = busyKey === "reload";
-  const enabled = !pkg.disabled;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 680 }}>
@@ -390,11 +339,11 @@ function PackageDetail({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 180, flex: 1 }}>
-          <Toggle
-            enabled={enabled}
+          <Switch
+            checked={!pkg.disabled}
             loading={busy || reloadBusy}
-            onToggle={() => onAction(pkg.disabled ? "enable" : "disable", pkg)}
-            label={
+            onChange={(checked) => onAction(checked ? "enable" : "disable", pkg)}
+            aria-label={
               pkg.disabled ? t("pluginEnablePackage", "Enable package") : t("pluginDisablePackage", "Disable package")
             }
           />

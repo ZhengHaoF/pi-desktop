@@ -13,6 +13,7 @@
 | `SecretTextInput` | 密钥 / token 类输入（带显隐切换） | 手写 password + 眼睛按钮 |
 | `Select` | 下拉单选（主题化弹层） | `<select>` |
 | `Checkbox` | 勾选框（原生 + accent-color） | `<input type="checkbox">` |
+| `Switch` | 轨道开关（on/off 状态） | 手写 track+knob 开关 |
 | `StatusDot` | 状态小圆点（语义色 + pulse） | 手写 50% 圆角 span |
 | `usePopoverAnchor` | portal 弹层贴附触发器的定位 hook | 手写 getBoundingClientRect 逻辑 |
 
@@ -28,6 +29,7 @@ import { SecretTextInput } from "@/components/ui/SecretTextInput";
 import { Select, SelectOption } from "@/components/ui/Select";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { StatusDot } from "@/components/ui/StatusDot";
+import { Switch } from "@/components/ui/Switch";
 ```
 
 ## Button
@@ -120,6 +122,24 @@ class 承担；组件只提供布局默认值。**需要微调布局时传 `styl
 - 样式走 `.pi-checkbox`（accent-color var(--accent)）；自绘勾选框是禁手——
   原生控件的暗色正确性与无障碍行为是白拿的
 
+## Switch
+
+```tsx
+<Switch
+  checked={enabled}
+  loading={saving}
+  onChange={(next) => setEnabled(next)}
+  aria-label="启用此插件"
+/>
+```
+
+- **必须传 `aria-label`**：控件没有可见文字（轨道 + 滑块），无障碍名全靠它；
+  动态文案按状态切换（如 "禁用技能" / "启用技能"）
+- **onChange(checked)** 收目标布尔；轨道/滑块样式走 `.pi-switch` + 内置 knob，
+  开态强调色、loading 态 busy 光标 + 半透明
+- 无障碍用 `role="switch"` + `aria-checked`（不是 pressed toggle）
+- 二态"行标签 + 勾选框"的设置行用 `Checkbox`；只有真正的开/关状态用 `Switch`
+
 ## StatusDot
 
 ```tsx
@@ -192,7 +212,5 @@ class 承担；组件只提供布局默认值。**需要微调布局时传 `styl
 
 ## 计划中
 
-- `Toggle`（合并 PluginsConfig / SkillsConfig / BrowserSettings 三份本地实现，
-  `.pi-switch` CSS 已就绪）
 - `Dialog`（统一焦点圈禁 / Escape / backdrop，弥补 aria-modal 短板）
 - `Menu`（复用 usePopoverAnchor）

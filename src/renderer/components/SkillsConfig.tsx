@@ -1,5 +1,6 @@
 import { call } from "@/lib/api-client";
 import { Input } from "@/components/ui/Input";
+import { Switch } from "@/components/ui/Switch";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { Textarea } from "@/components/ui/Textarea";
 import { forwardRef, useState, useEffect, useCallback, useImperativeHandle, useRef } from "react";
@@ -30,56 +31,6 @@ function sourceLabelText(label: string, t: Translate): string {
   if (label === "global") return t("skillScopeGlobal", "global");
   if (label === "project") return t("skillScopeProject", "project");
   return t("skillScopePath", "path");
-}
-
-function Toggle({ enabled, loading, onToggle }: { enabled: boolean; loading: boolean; onToggle: () => void }) {
-  const { t } = useI18n();
-  return (
-    <Button
-      type="button"
-      role="switch"
-      aria-checked={enabled}
-      aria-label={
-        enabled
-          ? t("disableSkillInModelPrompt", "Disable skill in model prompt")
-          : t("enableSkillInModelPrompt", "Enable skill in model prompt")
-      }
-      onClick={onToggle}
-      disabled={loading}
-      className="pi-switch"
-      title={
-        enabled
-          ? t("visibleSkillInModelPrompt", "Visible in model prompt — click to disable")
-          : t("hiddenSkillFromModelPrompt", "Hidden from model prompt — click to enable")
-      }
-      style={{
-        flexShrink: 0,
-        width: 48,
-        height: 32,
-        borderRadius: 16,
-        border: "none",
-        padding: 0,
-        cursor: loading ? "wait" : "pointer",
-        background: enabled ? "var(--accent)" : "var(--border)",
-        position: "relative",
-        outline: "none",
-      }}
-    >
-      <span
-        style={{
-          position: "absolute",
-          top: 6,
-          left: enabled ? 25 : 5,
-          width: 20,
-          height: 20,
-          borderRadius: "50%",
-          background: "var(--bg)",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.22)",
-          transition: "left 0.18s cubic-bezier(.4,0,.2,1)",
-        }}
-      />
-    </Button>
-  );
 }
 
 interface SkillDetailHandle {
@@ -198,7 +149,21 @@ const SkillDetail = forwardRef<
         >
           {displayPath(skill.filePath)}
         </span>
-        <Toggle enabled={enabled} loading={toggling} onToggle={() => onToggle(skill)} />
+        <Switch
+          checked={enabled}
+          loading={toggling}
+          onChange={() => onToggle(skill)}
+          aria-label={
+            enabled
+              ? t("disableSkillInModelPrompt", "Disable skill in model prompt")
+              : t("enableSkillInModelPrompt", "Enable skill in model prompt")
+          }
+          title={
+            enabled
+              ? t("visibleSkillInModelPrompt", "Visible in model prompt — click to disable")
+              : t("hiddenSkillFromModelPrompt", "Hidden from model prompt — click to enable")
+          }
+        />
         {saveError && <span style={{ fontSize: 12, color: "#f87171", flexShrink: 0 }}>{saveError}</span>}
       </div>
 
