@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Select } from "@/components/ui/Select";
+import { StatusDot } from "@/components/ui/StatusDot";
 import type {
   ManagedComponentId,
   PublicCapabilityState,
@@ -216,16 +217,7 @@ export function ToolchainStateView({
                         textAlign: "left",
                       }}
                     >
-                      <span
-                        aria-hidden="true"
-                        style={{
-                          flexShrink: 0,
-                          width: 7,
-                          height: 7,
-                          borderRadius: "50%",
-                          background: healthColor(itemState?.health ?? "missing"),
-                        }}
-                      />
+                      <StatusDot size="sm" color={healthColor(itemState?.health ?? "missing")} />
                       <span
                         style={{
                           minWidth: 0,
@@ -286,16 +278,7 @@ export function ToolchainStateView({
                 textAlign: "left",
               }}
             >
-              <span
-                aria-hidden="true"
-                style={{
-                  flexShrink: 0,
-                  width: 7,
-                  height: 7,
-                  borderRadius: "50%",
-                  background: healthColor(state?.components.herdr?.health ?? "missing"),
-                }}
-              />
+              <StatusDot size="sm" color={healthColor(state?.components.herdr?.health ?? "missing")} />
               <span
                 style={{
                   minWidth: 0,
@@ -320,16 +303,7 @@ export function ToolchainStateView({
             aria-live="polite"
             style={{ display: "flex", alignItems: "center", gap: 7, padding: "0 2px 7px", minWidth: 0 }}
           >
-            <span
-              aria-hidden="true"
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                background: !state ? "var(--warning)" : state.coreReady ? "var(--success)" : "var(--warning)",
-                flexShrink: 0,
-              }}
-            />
+            <StatusDot size="sm" color={!state ? "warning" : state.coreReady ? "success" : "warning"} />
             <span
               title={
                 state?.lastScanAt
@@ -452,10 +426,7 @@ function HerdrComponentDetail({
             color: healthColor(health),
           }}
         >
-          <span
-            aria-hidden="true"
-            style={{ width: 7, height: 7, borderRadius: "50%", background: healthColor(health) }}
-          />
+          <StatusDot size="sm" color={healthColor(health)} />
           {healthLabel(health, t)}
         </span>
       </div>
@@ -659,10 +630,7 @@ function ToolDetail({
             color: healthColor(health),
           }}
         >
-          <span
-            aria-hidden="true"
-            style={{ width: 7, height: 7, borderRadius: "50%", background: healthColor(health) }}
-          />
+          <StatusDot size="sm" color={healthColor(health)} />
           {healthLabel(health, t)}
         </span>
       </div>
@@ -752,16 +720,7 @@ function ToolDetail({
                   background: "var(--bg-panel)",
                 }}
               >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: "50%",
-                    background: healthColor(candidate.health),
-                    flexShrink: 0,
-                  }}
-                />
+                <StatusDot size="sm" color={healthColor(candidate.health)} />
                 <span style={{ fontSize: 11, color: "var(--text-muted)", flexShrink: 0 }}>
                   {providerLabel(candidate.provider, t)}
                 </span>

@@ -9,6 +9,7 @@ import {
   type BranchTreeRow,
 } from "@/lib/branch-navigator-model";
 import { useI18n } from "@/i18n";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { formatNumber } from "@/lib/locale-format";
 import { Button } from "@/components/ui/Button";
 
@@ -123,15 +124,13 @@ function BranchTreeRowView({ row, activePathIds, onSelect }: BranchTreeRowProps)
       </div>
 
       {/* Node dot */}
-      <div
+      <StatusDot
+        size="sm"
+        color={isActive ? "accent" : isOnPath ? "muted" : "border"}
         style={{
-          width: 7,
-          height: 7,
-          borderRadius: "50%",
-          flexShrink: 0,
-          background: isActive ? "var(--accent)" : isOnPath ? "var(--text-muted)" : "var(--border)",
-          border: isActive ? "none" : "1px solid var(--text-dim)",
           marginRight: 6,
+          // Inactive nodes read as outlined circles against the row.
+          border: isActive ? "none" : "1px solid var(--text-dim)",
           transition: "background 0.12s",
         }}
       />

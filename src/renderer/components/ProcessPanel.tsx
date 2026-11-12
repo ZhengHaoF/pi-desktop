@@ -7,6 +7,7 @@ import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { StatusDot } from "@/components/ui/StatusDot";
 
 type Props = {
   onActiveCountChange?: (count: number) => void;
@@ -245,9 +246,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                 }}
               >
                 <div style={{ display: "flex", gap: 7, alignItems: "center", minWidth: 0 }}>
-                  <span
-                    style={{ width: 7, height: 7, borderRadius: "50%", background: stateColor(process), flexShrink: 0 }}
-                  />
+                  <StatusDot size="sm" color={stateColor(process)} style={{ width: 7, height: 7 }} />
                   <span
                     style={{
                       fontSize: 12,

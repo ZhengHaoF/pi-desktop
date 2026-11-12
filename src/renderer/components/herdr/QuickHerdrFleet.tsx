@@ -13,6 +13,7 @@ import { countHerdrAgents, herdrPaneMatchesFilter } from "./fleet-selectors";
 import { getFleetPresentation, getFleetTriggerSpacing } from "./fleet-presentation";
 import { herdrErrorLabel, herdrRuntimeStatusLabel, publicHerdrErrorLabel } from "./herdr-ui-copy";
 import { Button } from "@/components/ui/Button";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { Select } from "@/components/ui/Select";
 
 const FILTER_STATES: Array<HerdrAgentState | "all"> = ["all", "working", "blocked", "idle", "done", "unknown"];
@@ -211,16 +212,10 @@ export function QuickHerdrFleet({
             overflow: "hidden",
           }}
         >
-          <span
-            aria-hidden="true"
-            style={{
-              width: 7,
-              height: 7,
-              flexShrink: 0,
-              borderRadius: "50%",
-              background: ready ? statusColor(triggerState) : runtime?.status === "error" ? "#dc2626" : "#6b7280",
-              boxShadow: ready && triggerState === "working" ? "0 0 0 2px rgba(37,99,235,.16)" : "none",
-            }}
+          <StatusDot
+            size="sm"
+            color={ready ? statusColor(triggerState) : runtime?.status === "error" ? "#dc2626" : "#6b7280"}
+            boxShadow={ready && triggerState === "working" ? "0 0 0 2px rgba(37,99,235,.16)" : "none"}
           />
           <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{triggerLabel}</span>
           <span aria-hidden="true" style={{ fontSize: 9, opacity: 0.7 }}>
@@ -391,10 +386,7 @@ export function QuickHerdrFleet({
                                   opacity: fleet.stale ? 0.65 : 1,
                                 }}
                               >
-                                <span
-                                  aria-hidden="true"
-                                  style={{ ...statusDotStyle, background: statusColor(state) }}
-                                />
+                                <StatusDot size="sm" color={statusColor(state)} />
                                 <span style={{ minWidth: 0 }}>
                                   <span
                                     style={{
@@ -456,7 +448,6 @@ const workspaceHeaderStyle: React.CSSProperties = {
   color: "var(--text)",
   fontSize: 11,
 };
-const statusDotStyle: React.CSSProperties = { width: 7, height: 7, borderRadius: "50%" };
 const hintStyle: React.CSSProperties = {
   border: "1px dashed var(--border)",
   borderRadius: 8,

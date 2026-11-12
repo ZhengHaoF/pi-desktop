@@ -1,5 +1,6 @@
 import { call } from "@/lib/api-client";
 import { Input } from "@/components/ui/Input";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { Textarea } from "@/components/ui/Textarea";
 import { forwardRef, useState, useEffect, useCallback, useImperativeHandle, useRef } from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -902,16 +903,10 @@ export const SkillsConfig = forwardRef<
                               borderRadius: 5,
                             }}
                           >
-                            <span
-                              style={{
-                                flexShrink: 0,
-                                width: 7,
-                                height: 7,
-                                borderRadius: "50%",
-                                background: disabled ? "var(--border)" : "var(--accent)",
-                                boxShadow: disabled ? "none" : "0 0 4px var(--accent)",
-                                transition: "background 0.15s, box-shadow 0.15s",
-                              }}
+                            <StatusDot
+                              color={disabled ? "border" : "accent"}
+                              boxShadow={disabled ? "none" : "0 0 4px var(--accent)"}
+                              style={{ transition: "background 0.15s, box-shadow 0.15s" }}
                             />
                             <span
                               style={{

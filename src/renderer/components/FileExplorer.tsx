@@ -4,6 +4,7 @@ import { getRelativeFilePath } from "@/lib/file-paths";
 import { useDirectoryListing, useFileExplorer } from "@/hooks/useFileExplorer";
 import type { FileNode } from "@/lib/file-explorer-data";
 import { useI18n } from "@/i18n";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { formatNumber } from "@/lib/locale-format";
 import { Button } from "@/components/ui/Button";
 
@@ -314,19 +315,14 @@ export function FileExplorer({ cwd, onOpenFile, refreshKey, onAtMention }: Props
           marginBottom: 3,
         }}
       >
-        <span
+        <StatusDot
+          size="sm"
+          color={watching ? "success" : "border"}
           title={
             watching
               ? t("projectChangesMonitored", "Project changes are monitored")
               : t("projectWatcherUnavailable", "Project watcher unavailable")
           }
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: "50%",
-            background: watching ? "var(--success)" : "var(--border)",
-            flexShrink: 0,
-          }}
         />
         {gitStatus?.isGit ? (
           <>

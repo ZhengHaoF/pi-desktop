@@ -12,6 +12,7 @@ import { useHerdrFleet } from "@/hooks/useHerdrFleet";
 import { useHerdrRuntime } from "@/hooks/useHerdrRuntime";
 import type { HerdrPane, HerdrTerminalState, HerdrTerminalStatus } from "@contract/herdr";
 import { Button } from "@/components/ui/Button";
+import { StatusDot } from "@/components/ui/StatusDot";
 
 const TERMINAL_RESIZE_DEBOUNCE_MS = 180;
 const COPY_BUFFER_LINES = 240;
@@ -645,7 +646,7 @@ export function TerminalDock({ pane, visible, expanded, onToggleExpanded, onPane
                 {title}
               </span>
               <span role="status" aria-live="polite" style={statusBadgeStyle(state)}>
-                <span aria-hidden="true" style={{ ...statusDotStyle, background: terminalStateColor(state) }} />
+                <StatusDot size="sm" color={terminalStateColor(state)} />
                 {stateText}
               </span>
             </div>
@@ -885,7 +886,6 @@ const footerButtonStyle: React.CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: 9,
 };
-const statusDotStyle: React.CSSProperties = { width: 6, height: 6, borderRadius: "50%", flexShrink: 0 };
 const emptyStyle: React.CSSProperties = {
   height: "100%",
   display: "grid",

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { SectionTitle } from "../form-controls";
 import { useI18n } from "@/i18n";
 import { call, subscribeAuthLogin } from "@/lib/api-client";
@@ -289,15 +290,7 @@ export function OAuthDetail({
             : t("modelGuidedLogin", "Guided API key setup")}
         </SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: provider.loggedIn ? "#4ade80" : "var(--border)",
-              display: "inline-block",
-            }}
-          />
+          <StatusDot color={provider.loggedIn ? "#4ade80" : "border"} />
           <span style={{ fontSize: 11, color: provider.loggedIn ? "#4ade80" : "var(--text-dim)" }}>
             {authType === "api_key"
               ? provider.loggedIn

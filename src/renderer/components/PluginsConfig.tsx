@@ -8,6 +8,7 @@ import { CapabilityRequired, parseCapabilityIssue, type CapabilityIssue } from "
 import { formatNumber } from "@/lib/locale-format";
 import { pluginResourceSummary, pluginStatusLabel, pluginVersionSummary } from "@/lib/plugin-presentation";
 import { Button } from "@/components/ui/Button";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { Input } from "@/components/ui/Input";
 
 type Translate = (key: string, fallback: string) => string;
@@ -827,15 +828,7 @@ export function PluginsConfig({
                             if (!isSelected) e.currentTarget.style.background = "none";
                           }}
                         >
-                          <span
-                            style={{
-                              flexShrink: 0,
-                              width: 7,
-                              height: 7,
-                              borderRadius: "50%",
-                              background: statusColor(pkg.status),
-                            }}
-                          />
+                          <StatusDot size="sm" color={statusColor(pkg.status)} />
                           <div style={{ minWidth: 0, flex: 1 }}>
                             <div
                               style={{

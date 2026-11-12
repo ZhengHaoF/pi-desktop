@@ -8,6 +8,7 @@ import {
 } from "@/lib/quick-channel-binding-layout";
 import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/Button";
+import { StatusDot } from "@/components/ui/StatusDot";
 
 interface QuickChannelBindingProps {
   sessionId: string;
@@ -204,16 +205,10 @@ export function QuickChannelBinding({ sessionId, snapshot, isMobile, onSnapshotC
             overflow: "hidden",
           }}
         >
-          <span
-            aria-hidden="true"
-            style={{
-              width: 7,
-              height: 7,
-              flexShrink: 0,
-              borderRadius: "50%",
-              background: bound ? (online ? accent : "var(--text-dim)") : "var(--accent)",
-              boxShadow: bound && online ? `0 0 0 2px color-mix(in srgb, ${accent} 18%, transparent)` : "none",
-            }}
+          <StatusDot
+            size="sm"
+            color={bound ? (online ? accent : "muted") : "accent"}
+            boxShadow={bound && online ? `0 0 0 2px color-mix(in srgb, ${accent} 18%, transparent)` : "none"}
           />
           <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
             {label}

@@ -9,6 +9,7 @@ import { watchFile } from "@/lib/file-watch-client";
 import { INITIAL_TEXT_FILE_LOAD_STATE, textFileLoadReducer, type TextFileData } from "@/lib/file-viewer-load-state";
 import { createBoundedTextDiff, type DiffLine } from "@/lib/text-diff";
 import { useI18n } from "@/i18n";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { formatFileSize, formatNumber } from "@/lib/locale-format";
 import { Button } from "@/components/ui/Button";
 
@@ -410,16 +411,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId }: Props) {
             color: watching ? "var(--success)" : "var(--text-dim)",
           }}
         >
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: watching ? "var(--success)" : "var(--border)",
-              display: "inline-block",
-              boxShadow: watching ? "0 0 4px var(--success)" : "none",
-            }}
-          />
+          <StatusDot color={watching ? "success" : "border"} boxShadow={watching ? "0 0 4px var(--success)" : "none"} />
           {watching ? t("live", "live") : t("static", "static")}
         </span>
         <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />
@@ -524,16 +516,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId }: Props) {
             color: watching ? "var(--success)" : "var(--text-dim)",
           }}
         >
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: watching ? "var(--success)" : "var(--border)",
-              display: "inline-block",
-              boxShadow: watching ? "0 0 4px var(--success)" : "none",
-            }}
-          />
+          <StatusDot color={watching ? "success" : "border"} boxShadow={watching ? "0 0 4px var(--success)" : "none"} />
           {watching ? t("live", "live") : t("static", "static")}
         </span>
         <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />
@@ -695,16 +678,7 @@ function DocumentViewer({ filePath, cwd, sourceSessionId }: Props) {
             flexShrink: 0,
           }}
         >
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: watching ? "var(--success)" : "var(--border)",
-              display: "inline-block",
-              boxShadow: watching ? "0 0 4px var(--success)" : "none",
-            }}
-          />
+          <StatusDot color={watching ? "success" : "border"} boxShadow={watching ? "0 0 4px var(--success)" : "none"} />
           {watching ? t("live", "live") : t("static", "static")}
         </span>
       </div>
@@ -917,16 +891,7 @@ function TextFileViewer({ filePath, cwd, sourceSessionId }: Props) {
             color: watching ? "var(--success)" : "var(--text-dim)",
           }}
         >
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: watching ? "var(--success)" : "var(--border)",
-              display: "inline-block",
-              boxShadow: watching ? "0 0 4px var(--success)" : "none",
-            }}
-          />
+          <StatusDot color={watching ? "success" : "border"} boxShadow={watching ? "0 0 4px var(--success)" : "none"} />
           {watching ? t("live", "live") : t("static", "static")}
         </span>
 

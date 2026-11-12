@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { Field, SecretTextInput, SectionTitle, TextInput } from "../form-controls";
 import { useI18n } from "@/i18n";
 import { call } from "@/lib/api-client";
@@ -131,15 +132,7 @@ export function ApiKeyDetail({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <SectionTitle>{t("modelApiKey", "API Key")}</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: provider.configured ? "#4ade80" : "var(--border)",
-              display: "inline-block",
-            }}
-          />
+          <StatusDot color={provider.configured ? "#4ade80" : "border"} />
           <span style={{ fontSize: 11, color: provider.configured ? "#4ade80" : "var(--text-dim)" }}>
             {provider.storedAuthType === "oauth"
               ? t("modelOAuthActive", "Account login active")

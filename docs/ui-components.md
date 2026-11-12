@@ -13,6 +13,7 @@
 | `SecretTextInput` | 密钥 / token 类输入（带显隐切换） | 手写 password + 眼睛按钮 |
 | `Select` | 下拉单选（主题化弹层） | `<select>` |
 | `Checkbox` | 勾选框（原生 + accent-color） | `<input type="checkbox">` |
+| `StatusDot` | 状态小圆点（语义色 + pulse） | 手写 50% 圆角 span |
 | `usePopoverAnchor` | portal 弹层贴附触发器的定位 hook | 手写 getBoundingClientRect 逻辑 |
 
 尚未组件化（当前允许裸写）：`checkbox` / `radio` / `file` 输入。计划中的组件见文末。
@@ -26,6 +27,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { SecretTextInput } from "@/components/ui/SecretTextInput";
 import { Select, SelectOption } from "@/components/ui/Select";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { StatusDot } from "@/components/ui/StatusDot";
 ```
 
 ## Button
@@ -118,6 +120,23 @@ class 承担；组件只提供布局默认值。**需要微调布局时传 `styl
 - 样式走 `.pi-checkbox`（accent-color var(--accent)）；自绘勾选框是禁手——
   原生控件的暗色正确性与无障碍行为是白拿的
 
+## StatusDot
+
+```tsx
+<StatusDot color="success" />                                    // 语义色
+<StatusDot color={stateColor(process)} size="sm" />              // 动态色
+<StatusDot color="accent" pulse />                               // 运行中呼吸
+<StatusDot color="success" boxShadow="0 0 4px var(--success)" /> // 光晕
+```
+
+- **color**：语义名（`accent/success/danger/warning/muted/border`）或任意 CSS
+  颜色（动态状态函数的原样返回值）
+- **size**：`md`（8px 默认）｜ `sm`（6px，列表行）
+- **pulse**：复用全局 `@keyframes pulse` 的呼吸动画
+- **boxShadow**：光晕/圆环（herdr working 态、watch 指示灯）
+- 纯装饰元素（`role="presentation"`），状态语义靠相邻文字或 title 传达；
+  `.mcp-status-dot` 这类既有 CSS 类保持不动
+
 ## 通用约定
 
 1. **ref 是普通 prop**（React 19）：`<Input ref={inputRef} />`，不要用 forwardRef
@@ -175,6 +194,5 @@ class 承担；组件只提供布局默认值。**需要微调布局时传 `styl
 
 - `Toggle`（合并 PluginsConfig / SkillsConfig / BrowserSettings 三份本地实现，
   `.pi-switch` CSS 已就绪）
-- `StatusDot`（32 处状态点）
 - `Dialog`（统一焦点圈禁 / Escape / backdrop，弥补 aria-modal 短板）
 - `Menu`（复用 usePopoverAnchor）

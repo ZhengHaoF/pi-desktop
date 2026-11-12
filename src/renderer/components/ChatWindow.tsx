@@ -40,6 +40,7 @@ import type { ThinkingExpansionStore } from "@/lib/thinking-expansion-store";
 import { skillInvocationCommandText } from "@shared/skill-invocation";
 import { localizedExtensionConfirmCopy } from "@/lib/extension-ui-copy";
 import { Button } from "@/components/ui/Button";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { Textarea } from "@/components/ui/Textarea";
 import { Input } from "@/components/ui/Input";
 
@@ -898,18 +899,11 @@ export function ChatWindow({
                   <polyline points="3.5 6 8 10.5 12.5 6" />
                 </svg>
                 {agentRunning && (
-                  <span
-                    aria-hidden="true"
+                  <StatusDot
+                    size="sm"
+                    color="accent"
                     className="chat-scroll-to-bottom-live-dot"
-                    style={{
-                      position: "absolute",
-                      top: 2,
-                      right: 2,
-                      width: 6,
-                      height: 6,
-                      borderRadius: "50%",
-                      background: "var(--accent)",
-                    }}
+                    style={{ position: "absolute", top: 2, right: 2 }}
                   />
                 )}
               </Button>
@@ -1044,15 +1038,7 @@ function NoticeShelf({
               padding: "0 12px",
             }}
           >
-            <span
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                background: color,
-                flexShrink: 0,
-              }}
-            />
+            <StatusDot size="sm" color={color} />
             <span
               style={{
                 padding: "14px 0",

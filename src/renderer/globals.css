@@ -638,6 +638,17 @@ body {
   cursor: not-allowed;
 }
 
+/* Shared status dot: size and color stay inline via the component; only the
+   optional pulse loop lives here. */
+.pi-status-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: 9999px;
+}
+.pi-status-dot[data-pulse="true"] {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
 /* Shared button color states. Inline styles cannot express :hover, so
    components keep only layout (padding/size/radius) inline and take colors
    from these classes. */

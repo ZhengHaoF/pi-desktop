@@ -882,6 +882,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                     right: -4,
                     width: 16,
                     height: 16,
+                    minHeight: 16,
                     borderRadius: "50%",
                     display: "flex",
                     alignItems: "center",
@@ -987,6 +988,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                     style={{
                       width: 16,
                       height: 16,
+                      minHeight: 16,
                       borderRadius: "50%",
                       border: "none",
                       display: "flex",

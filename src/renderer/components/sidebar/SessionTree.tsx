@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n";
 import { getSessionDisplayTitle } from "@/lib/session-list";
 import { formatNumber, formatRelativeDateTime } from "@/lib/locale-format";
 import { Button } from "@/components/ui/Button";
+import { StatusDot } from "@/components/ui/StatusDot";
 
 export interface SessionTreeNode {
   session: SessionInfo;
@@ -540,15 +541,10 @@ function SessionItem({
                 ) : isUnread ? (
                   <UnreadSessionIndicator />
                 ) : (
-                  <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "50%",
-                      flexShrink: 0,
-                      background: isSelected ? "var(--success)" : "var(--text-dim)",
-                      opacity: isSelected ? 1 : 0.55,
-                    }}
+                  <StatusDot
+                    size="sm"
+                    color={isSelected ? "success" : "muted"}
+                    style={{ opacity: isSelected ? 1 : 0.55, flexShrink: 0 }}
                   />
                 )}
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>

@@ -7,6 +7,7 @@ import {
 } from "@/lib/update-display";
 import { Select } from "@/components/ui/Select";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -551,17 +552,7 @@ function SoftwareUpdate({ onClose }: { onClose: () => void }) {
             aria-atomic="true"
             style={{ display: "flex", alignItems: "flex-start", gap: 10 }}
           >
-            <span
-              aria-hidden="true"
-              style={{
-                width: 8,
-                height: 8,
-                marginTop: 5,
-                borderRadius: "50%",
-                flexShrink: 0,
-                background: updateStatusColor(phase),
-              }}
-            />
+            <StatusDot size="md" color={updateStatusColor(phase)} style={{ marginTop: 5 }} />
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 650, color: "var(--text)" }}>{statusTitle}</div>
               {state && (
