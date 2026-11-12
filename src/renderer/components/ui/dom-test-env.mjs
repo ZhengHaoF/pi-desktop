@@ -1,8 +1,9 @@
 /**
- * Shared test-environment helpers for component tests that exercise ui/Select.
- * Select portals its option list via react-dom and registers document
- * listeners while open, so bundles need a DOM-ish global mock and a portal
- * stub for react-test-renderer to see the options.
+ * Shared test-environment helpers for component tests that exercise ui/Select
+ * and ui/Dialog. Select portals its option list via react-dom and registers
+ * document listeners while open; Dialog locks body scroll via body.style.
+ * Bundles need a DOM-ish global mock and a portal stub for
+ * react-test-renderer to see the portaled children.
  */
 export function installDomTestEnvironment() {
   const saved = new Map(
@@ -24,7 +25,14 @@ export function installDomTestEnvironment() {
   });
   Object.assign(globalThis, {
     IS_REACT_ACT_ENVIRONMENT: true,
-    document: { ...surface(documentListeners), body: {} },
+    document: {
+      ...surface(documentListeners),
+      // Dialog's scroll lock reads and restores body.style.overflow.
+      body: { style: { overflow: "" } },
+      createElement: () => ({ style: {}, focus() {} }),
+      activeElement: null,
+      querySelectorAll: () => [],
+    },
     window: {
       ...surface(windowListeners),
       innerHeight: 800,

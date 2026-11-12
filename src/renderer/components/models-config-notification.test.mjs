@@ -228,6 +228,7 @@ async function mount(t, options = {}) {
     detail(name) {
       return renderer.root.find((node) => typeof node.type === "function" && node.type.name === name);
     },
+    documentListeners: dom.documentListeners,
   };
 }
 
@@ -376,12 +377,11 @@ test("provider picker owns its search and focus lifecycle, supports Escape, and 
       escapeStopped = true;
     },
   };
-  await act(async () =>
-    fixture
-      .detail("AddProviderPicker")
-      .find((node) => node.props.role === "dialog")
-      .props.onKeyDown(escape),
-  );
+  // The shared Dialog handles Escape through a capture keydown listener on
+  // document (not a React onKeyDown on the card).
+  await act(async () => {
+    for (const listener of fixture.documentListeners.get("keydown")) listener(escape);
+  });
   assert.equal(escapeStopped, true, "closing the picker must not also close the parent Settings dialog");
   await fixture.flushFocus();
   assert.deepEqual(fixture.focused, [], "an unmounted picker cannot steal focus");
@@ -398,12 +398,9 @@ test("provider picker owns its search and focus lifecycle, supports Escape, and 
       .props.onChange({ target: { value: "no-such-provider" } }),
   );
   assert.match(text(fixture.detail("AddProviderPicker")), /No providers match/);
-  await act(async () =>
-    fixture
-      .detail("AddProviderPicker")
-      .find((node) => node.props.role === "dialog")
-      .props.onKeyDown(escape),
-  );
+  await act(async () => {
+    for (const listener of fixture.documentListeners.get("keydown")) listener(escape);
+  });
   await fixture.click("+ Add provider");
   assert.equal(fixture.detail("AddProviderPicker").findByType("input").props.value, "");
   const custom = fixture
