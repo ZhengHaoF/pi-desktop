@@ -221,6 +221,53 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// 移除项目：逐个删除该项目下的会话记录（磁盘代码不动，与桌面端
+  /// SessionSidebar.handleRemoveProject 同语义），完成后刷新列表。部分
+  /// 失败如实汇报，不让用户以为全删干净了。
+  Future<void> _confirmRemoveProject(String projectRoot) async {
+    final count = _sessions.where((s) => s.projectRoot == projectRoot).length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('移除项目'),
+        content: Text(
+          count > 0
+              ? '移除「${projectName(projectRoot)}」？其 $count 条会话记录将被删除；磁盘上的代码不受影响。该操作不可撤销。'
+              : '从列表中移除「${projectName(projectRoot)}」？',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('取消')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('移除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final targets = _sessions.where((s) => s.projectRoot == projectRoot).toList();
+    final failures = <String>[];
+    for (final session in targets) {
+      try {
+        await widget.connection.request('sessions.delete', {'id': session.id, 'force': true});
+      } catch (err) {
+        failures.add(err is StateError ? err.message.replaceFirst('Bad state: ', '') : err.toString());
+      }
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          failures.isEmpty
+              ? '已移除「${projectName(projectRoot)}」'
+              : '部分会话记录删除失败：${failures.first}${failures.length > 1 ? '（等 $failures 条）' : ''}',
+        ),
+      ),
+    );
+    await _refresh();
+  }
+
   void _renameDialog(SessionSummary session) {
     final controller = TextEditingController(text: session.name ?? '');
     showDialog<void>(
@@ -456,6 +503,7 @@ class _HomePageState extends State<HomePage> {
                           onRename: _renameDialog,
                           onDelete: _confirmDelete,
                           onRefresh: _refresh,
+                          onRemoveProject: () => _confirmRemoveProject(root),
                         ),
                     ],
                   ),
@@ -656,6 +704,7 @@ class _ProjectGroup extends StatelessWidget {
   final void Function(SessionSummary) onRename;
   final void Function(SessionSummary) onDelete;
   final VoidCallback onRefresh;
+  final VoidCallback onRemoveProject;
 
   const _ProjectGroup({
     required this.root,
@@ -669,6 +718,7 @@ class _ProjectGroup extends StatelessWidget {
     required this.onRename,
     required this.onDelete,
     required this.onRefresh,
+    required this.onRemoveProject,
   });
 
   int get runningCount => sessions.where((s) => runningIds.contains(s.id)).length;
@@ -721,13 +771,20 @@ class _ProjectGroup extends StatelessWidget {
                     tooltip: creating ? '正在创建…' : '新建任务',
                     onTap: creating ? null : onNewTask,
                   ),
-                  _IconAction(
-                    icon: Icons.more_horiz,
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_horiz, size: 20, color: Colors.black54),
                     tooltip: '更多',
-                    onTap: () {
-                      onRefresh();
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已刷新会话列表')));
+                    onSelected: (value) {
+                      if (value == 'refresh') {
+                        onRefresh();
+                      } else if (value == 'remove') {
+                        onRemoveProject();
+                      }
                     },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'refresh', child: Text('刷新')),
+                      PopupMenuItem(value: 'remove', child: Text('移除项目')),
+                    ],
                   ),
                 ],
               ),
