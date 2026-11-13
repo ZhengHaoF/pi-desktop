@@ -40,6 +40,8 @@ import { beginSessionLoadTrace } from "@/lib/session-performance";
 import { reduceFileTabState } from "@/lib/file-tab-state";
 import { readSessionIdFromSearch, routerCompat } from "@/lib/router-compat";
 import { SessionProfiler } from "./SessionProfiler";
+import { ChatBranchIndicator } from "./ChatBranchIndicator";
+import { useGitBranchStatus } from "@/hooks/useGitBranchStatus";
 import { buildAtMentionText } from "@/lib/file-fuzzy";
 import { ThinkingExpansionRegistry } from "@/lib/thinking-expansion-store";
 import {
@@ -95,11 +97,24 @@ export function AppShell({
   const displayedSession =
     presentation?.sessionId === selectedSession?.id ? (presentation?.info ?? selectedSession) : selectedSession;
 
+  const [homeDir, setHomeDir] = useState("");
+  useEffect(() => {
+    call("system.home")
+      .then((d: { home?: string }) => {
+        if (d.home) setHomeDir(d.home);
+      })
+      .catch(() => {});
+  }, []);
+
   // When user clicks +, we only store the cwd — no fake session id
   const [newSessionCwd, setNewSessionCwd] = useState<string | null>(null);
   const [worktreesRefreshKey, setWorktreesRefreshKey] = useState(0);
   const [sessionKey, setSessionKey] = useState(0);
   const [explorerRefreshKey, setExplorerRefreshKey] = useState(0);
+
+  // Chat-area branch indicator: git facts for the session cwd, refreshed when
+  // the session changes or an agent turn ends (handleAgentEnd bumps the key).
+  const branchStatus = useGitBranchStatus(displayedSession?.cwd ?? null, worktreesRefreshKey);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>("general");
   const [settingsNavigationRequestId, setSettingsNavigationRequestId] = useState(0);
@@ -1053,6 +1068,14 @@ export function AppShell({
                 snapshot={channelSnapshot}
                 isMobile={isMobile}
                 onSnapshotChange={setChannelSnapshot}
+              />
+            )}
+            {showChat && !isMobile && (
+              <ChatBranchIndicator
+                status={branchStatus}
+                cwd={displayedSession?.cwd ?? null}
+                worktreeBranch={displayedSession?.worktreeBranch}
+                homeDir={homeDir}
               />
             )}
             {showChat && (
