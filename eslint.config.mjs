@@ -81,7 +81,8 @@ export default tseslint.config(
       // <button> elements are reserved to the Button component itself. Text
       // inputs, textareas, selects and checkboxes route through ui/Input,
       // ui/Textarea, ui/Select and ui/Checkbox. Radios and file inputs stay
-      // native until dedicated components exist.
+      // native until dedicated components exist. Native confirm()/alert() and
+      // their window.* forms route through ui/ConfirmDialog (useConfirm).
       "no-restricted-syntax": [
         "error",
         {
@@ -104,6 +105,21 @@ export default tseslint.config(
           selector:
             'JSXOpeningElement[name.name="input"] JSXAttribute[name.name="type"][value.value=/^(text|password|number|search|checkbox)$/] , JSXOpeningElement[name.name="input"]:not(:has(JSXAttribute[name.name="type"]))',
           message: "Use <Input> or <Checkbox> from components/ui instead of raw text-like <input> elements.",
+        },
+        {
+          selector: 'CallExpression[callee.object.name="window"][callee.property.name=/^(confirm|alert)$/]',
+          message: "Use useConfirm() from components/ui/ConfirmDialog instead of window.confirm/window.alert.",
+        },
+      ],
+      "no-restricted-globals": [
+        "error",
+        {
+          name: "confirm",
+          message: "Use useConfirm() from components/ui/ConfirmDialog instead of the native confirm().",
+        },
+        {
+          name: "alert",
+          message: "Use useConfirm() from components/ui/ConfirmDialog instead of the native alert().",
         },
       ],
     },

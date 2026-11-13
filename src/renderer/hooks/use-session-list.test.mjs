@@ -58,6 +58,17 @@ const { useSessionList, SessionSidebar, testApi } = await importTestBundle("sess
         }));
       },
     },
+    {
+      name: "session-list-portal-stub",
+      setup(build) {
+        // Inline portal children (the shared Dialog shell) so the fixture's
+        // minimal document stub never needs a real container.
+        build.onResolve({ filter: /^react-dom$/ }, () => ({ path: "react-dom-stub", namespace: "list-portal" }));
+        build.onLoad({ filter: /.*/, namespace: "list-portal" }, () => ({
+          contents: "export const createPortal = (children) => children;",
+        }));
+      },
+    },
   ],
 });
 
@@ -73,6 +84,7 @@ const session = (id, name = id) => ({
   firstMessage: name,
 });
 const response = (sessions, runningSessionIds = []) => ({ sessions, runningSessionIds });
+const textOf = (node) => (typeof node === "string" ? node : (node.children?.map(textOf).join("") ?? ""));
 
 async function mount(t, { sidebar = false, installation, runningInstallation, storedUnread = [], worktrees } = {}) {
   testApi.reset(installation, runningInstallation, worktrees);
@@ -102,7 +114,7 @@ async function mount(t, { sidebar = false, installation, runningInstallation, st
       removeItem: (key) => storage.delete(key),
     },
   };
-  globalThis.document = { addEventListener() {}, removeEventListener() {} };
+  globalThis.document = { addEventListener() {}, removeEventListener() {}, body: { style: {} } };
   globalThis.EventSource = class {
     constructor() {
       throw new Error("Sidebar must use typed streams");
@@ -386,8 +398,11 @@ test("delete retains running guards and backend conflicts without issuing an imp
   await act(async () => fixture.sources[0].on({ type: "running", sessionIds: ["one"] }));
   await fixture.click("Session actions for one");
   await fixture.click("Delete");
+  // The running guard surfaces as a ConfirmDialog alert.
+  assert.match(textOf(fixture.renderer.root.find((node) => node.props.role === "dialog")), /still running/);
+  await fixture.click("OK");
+  assert.equal(fixture.renderer.root.findAll((node) => node.props.role === "dialog").length, 0);
   assert.equal(fixture.mutations.length, 0);
-  assert.match(fixture.alerts.at(-1), /still running/);
   await act(async () => fixture.sources[0].on({ type: "running", sessionIds: [] }));
   await fixture.click("Session actions for one");
   await fixture.click("Delete");
@@ -395,7 +410,8 @@ test("delete retains running guards and backend conflicts without issuing an imp
   assert.deepEqual(fixture.next("sessions.delete").params, { id: "one" });
   await fixture.failRpc("sessions.delete", "CONFLICT", "Stop managed processes before deleting.");
   assert.deepEqual(fixture.deleted, []);
-  assert.match(fixture.alerts.at(-1), /Stop managed processes/);
+  assert.match(textOf(fixture.renderer.root.find((node) => node.props.role === "dialog")), /Stop managed processes/);
+  await fixture.click("OK");
   await fixture.click("Session actions for one");
   await fixture.click("Delete");
   await fixture.click("Delete");

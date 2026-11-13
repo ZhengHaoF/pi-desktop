@@ -62,6 +62,12 @@ interface SettingsConfigProps {
   onChatAppearanceChange: (preferences: ChatAppearancePreferences) => Promise<void>;
   /** Element to refocus on close; the deferred wrapper captures it before any loading frame takes focus. */
   returnFocusTarget?: HTMLElement | null;
+  /**
+   * false skips the dialog's first enter animation (loading-frame handoff:
+   * animating in over the already-visible frame reads as popping up twice).
+   * The exit always animates.
+   */
+  animateEnter?: boolean;
 }
 
 export function SettingsConfig({
@@ -77,6 +83,7 @@ export function SettingsConfig({
   chatAppearanceSaving,
   onChatAppearanceChange,
   returnFocusTarget,
+  animateEnter,
 }: SettingsConfigProps) {
   const isMobile = useIsMobile();
   const { isDark, toggleTheme } = useTheme();
@@ -144,6 +151,7 @@ export function SettingsConfig({
   return (
     <Dialog
       open
+      animateEnter={animateEnter}
       onClose={() => requestSettingsTransition(onClose)}
       ariaLabel={t("settings", "Settings")}
       width={isMobile ? "calc(100vw - 16px)" : 960}

@@ -19,21 +19,43 @@ const { AccountCard, FEISHU_PERMISSION_IMPORT_JSON, FeishuCredentialDialog, Logi
     // qrcode 的 CJS 主入口 require("fs")（png renderer）；external 让 node
     // 运行时自行加载，bundle 内 ESM 无法 dynamic require。
     external: ["react", "react-dom", "react-dom/*", "@rc-component/qrcode", "qrcode"],
+    plugins: [
+      {
+        name: "channels-dialog-portal-stub",
+        setup(build) {
+          // Inline portal children (the shared Dialog shell) so both static
+          // markup and react-test-renderer see the card.
+          build.onResolve({ filter: /^react-dom$/ }, () => ({ path: "react-dom-stub", namespace: "channels-stub" }));
+          build.onLoad({ filter: /.*/, namespace: "channels-stub" }, () => ({
+            contents: "export const createPortal = (children) => children;",
+          }));
+        },
+      },
+    ],
   });
+
+// The migrated dialogs portal through the shared Dialog shell, which renders
+// null when `document` is missing. Minimal stub; React never touches real DOM
+// in these tests. Defined after the bundle import so i18n module init (which
+// touches document.documentElement) has already completed.
+Object.assign(globalThis, {
+  document: {
+    addEventListener() {},
+    removeEventListener() {},
+    body: { style: {} },
+    createElement: () => ({ style: {}, focus() {} }),
+    activeElement: null,
+    querySelectorAll: () => [],
+  },
+});
 
 test("a PowerShell-only channel grant requires the elevated-capability confirmation", async (t) => {
   const savedWindow = Object.getOwnPropertyDescriptor(globalThis, "window"),
     savedAct = Object.getOwnPropertyDescriptor(globalThis, "IS_REACT_ACT_ENVIRONMENT");
-  let confirmed = false,
-    confirmations = 0,
+  let saved = [],
     renderer;
-  const saved = [];
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   globalThis.window = {
-    confirm: () => {
-      confirmations++;
-      return confirmed;
-    },
     piBridge: {
       getToolchainState: async () => ({
         platform: "win32",
@@ -71,19 +93,36 @@ test("a PowerShell-only channel grant requires the elevated-capability confirmat
     }
   });
   const text = (node) => (typeof node === "string" ? node : (node?.children?.map(text).join("") ?? ""));
-  const button = renderer.root.find((node) => node.type === "button" && text(node) === "Save");
-  await act(async () => button.props.onClick());
+  const cardButton = (label) => {
+    const matches = renderer.root.findAll((node) => node.type === "button" && text(node) === label);
+    assert.equal(matches.length, 1, `expected exactly one ${label} button on the card`);
+    return matches[0];
+  };
+  const dialogButton = (label) => {
+    const dialog = renderer.root.find((node) => node.props.role === "dialog");
+    const matches = dialog.findAll((node) => node.type === "button" && text(node) === label);
+    assert.equal(matches.length, 1, `expected exactly one ${label} button in the dialog`);
+    return matches[0];
+  };
+  // Elevated save opens the gated confirmation instead of saving directly.
+  await act(async () => cardButton("Save").props.onClick());
   assert.equal(saved.length, 0);
-  assert.equal(confirmations, 1);
-  confirmed = true;
-  await act(async () => button.props.onClick());
-  assert.equal(confirmations, 2);
+  // Dismissing the dialog keeps the account untouched.
+  await act(async () => dialogButton("Cancel").props.onClick());
+  assert.equal(saved.length, 0);
+  // Confirming persists the draft.
+  await act(async () => cardButton("Save").props.onClick());
+  await act(async () => {
+    dialogButton("Save").props.onClick();
+    await Promise.resolve();
+  });
   assert.deepEqual(saved[0].toolNames, ["powershell"]);
 });
 
 test("Telegram token dialog renders connection failures without closing", () => {
   const html = renderToStaticMarkup(
     createElement(TelegramTokenDialog, {
+      open: true,
       busy: false,
       error: "Telegram getMe failed",
       onConnect() {},
@@ -142,6 +181,7 @@ test("channel account settings expose the opt-in IM command switch", () => {
 test("Feishu setup dialog provides one-click batch permission import and concise guidance", () => {
   const html = renderToStaticMarkup(
     createElement(FeishuCredentialDialog, {
+      open: true,
       busy: false,
       error: "",
       initialMode: "manual",
@@ -176,6 +216,7 @@ test("Feishu setup dialog provides one-click batch permission import and concise
 test("Feishu connection defaults to scan-create while keeping the existing-app fallback", () => {
   const html = renderToStaticMarkup(
     createElement(FeishuCredentialDialog, {
+      open: true,
       busy: false,
       error: "",
       onStartScan() {},
@@ -198,6 +239,7 @@ test("Feishu connection defaults to scan-create while keeping the existing-app f
 test("Feishu existing-app setup remains available when manual mode is selected", () => {
   const html = renderToStaticMarkup(
     createElement(FeishuCredentialDialog, {
+      open: true,
       busy: false,
       error: "",
       initialMode: "manual",
@@ -217,6 +259,7 @@ test("Feishu existing-app setup remains available when manual mode is selected",
 test("generic channel login dialog renders Feishu QR state without exposing credentials", () => {
   const html = renderToStaticMarkup(
     createElement(LoginDialog, {
+      open: true,
       event: {
         channel: "feishu",
         sessionKey: "session-one",

@@ -52,6 +52,7 @@ export const enUS: Record<string, string> = {
   dmAccess: "Direct-message access",
   elevatedChannelConfirm:
     "This configuration allows remote messages to reach powerful local capabilities. Confirm that the account and allowed users are trusted.",
+  elevatedChannelTitle: "Elevated channel configuration",
   enabled: "Enabled",
   enableImCommands: "Enable /help, /status, /new, /compact, and /reload",
   expiresAt: "expires",
@@ -202,6 +203,7 @@ export const zhCN: Record<string, string> = {
   directConversation: "私聊",
   dmAccess: "私聊访问",
   elevatedChannelConfirm: "此配置允许远程消息调用高权限本地能力。请确认该账号和允许的用户均可信。",
+  elevatedChannelTitle: "高权限渠道配置",
   enabled: "已启用",
   enableImCommands: "启用 /help、/status、/new、/compact 和 /reload",
   expiresAt: "过期时间",
@@ -346,6 +348,7 @@ export const zhTW: Record<string, string> = {
   directConversation: "私人對話",
   dmAccess: "私人對話存取",
   elevatedChannelConfirm: "此設定允許遠端訊息呼叫高權限的本機功能。請確認此帳號與允許的使用者均為可信。",
+  elevatedChannelTitle: "高權限渠道設定",
   enabled: "已啟用",
   enableImCommands: "啟用 /help、/status、/new、/compact 與 /reload",
   expiresAt: "到期時間",

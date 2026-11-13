@@ -1,6 +1,6 @@
 import { ChannelToolSelection } from "./ChannelToolSelection";
 import { QRCodeSVG } from "@rc-component/qrcode";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   ChannelAccountConfig,
   ChannelAccountView,
@@ -24,6 +24,8 @@ import { Input } from "@/components/ui/Input";
 import { SecretTextInput } from "@/components/ui/SecretTextInput";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Select } from "@/components/ui/Select";
+import { Dialog } from "@/components/ui/Dialog";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 const EMPTY: ChannelsSnapshot = { accounts: [], statuses: [], pairings: [], bindings: [], activities: [] };
 const TELEGRAM_BASE_URL = "https://api.telegram.org";
@@ -112,6 +114,7 @@ function channelAccent(channel: ChannelAccountConfig["channel"]): string {
 
 export function ChannelsConfig({ onSnapshotChange }: { onSnapshotChange?: (snapshot: ChannelsSnapshot) => void }) {
   const { t } = useI18n();
+  const { confirm, dialog } = useConfirm();
   const [snapshot, setSnapshot] = useState<ChannelsSnapshot>(EMPTY);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -515,9 +518,13 @@ export function ChannelsConfig({ onSnapshotChange }: { onSnapshotChange?: (snaps
                     run(() => call("channels.testSend", { accountId: account.id, peerId, message }))
                   }
                   onDelete={() => {
-                    if (window.confirm(t("deleteChannelConfirm", "Delete this messaging account and its bindings?"))) {
-                      void run(() => call("channels.accountDelete", { accountId: account.id }));
-                    }
+                    void confirm({
+                      title: t("deleteChannelConfirm", "Delete this messaging account and its bindings?"),
+                      danger: true,
+                      confirmLabel: t("delete", "Delete"),
+                    }).then((ok) => {
+                      if (ok) void run(() => call("channels.accountDelete", { accountId: account.id }));
+                    });
                   }}
                 />
               ))}
@@ -530,46 +537,50 @@ export function ChannelsConfig({ onSnapshotChange }: { onSnapshotChange?: (snaps
         <ActivitySection snapshot={snapshot} />
       </div>
 
-      {login && (
-        <LoginDialog
-          event={login}
-          code={verificationCode}
-          setCode={setVerificationCode}
-          onSubmitCode={() =>
-            run(async () => {
-              await call("channels.loginSubmitCode", {
-                channel: login.channel,
-                sessionKey: login.sessionKey,
-                code: verificationCode,
-              });
-              setVerificationCode("");
-              setLogin({ ...login, phase: "waiting", message: "正在验证…" });
-            })
-          }
-          onRetry={() => {
-            if (login.channel === "feishu") void beginFeishuLogin(feishuScanDomain);
-            else void beginLogin();
-          }}
-          onClose={closeLogin}
-        />
-      )}
-      {telegramDialogOpen && (
-        <TelegramTokenDialog
-          busy={busy}
-          error={telegramError}
-          onConnect={(token) => void connectTelegram(token)}
-          onClose={() => setTelegramDialogOpen(false)}
-        />
-      )}
-      {feishuDialogOpen && (
-        <FeishuCredentialDialog
-          busy={busy}
-          error={feishuError}
-          onStartScan={(domain) => void beginFeishuLogin(domain)}
-          onConnect={(appId, appSecret, domain) => void connectFeishu(appId, appSecret, domain)}
-          onClose={() => setFeishuDialogOpen(false)}
-        />
-      )}
+      {/* Always mounted so the shared Dialog shell can play its exit
+          animation; open drives visibility and each dialog freezes its own
+          content for the shrink-out. */}
+      <LoginDialog
+        open={login !== null}
+        event={login}
+        code={verificationCode}
+        setCode={setVerificationCode}
+        onSubmitCode={() => {
+          if (!login) return;
+          const pendingLogin = login;
+          void run(async () => {
+            await call("channels.loginSubmitCode", {
+              channel: pendingLogin.channel,
+              sessionKey: pendingLogin.sessionKey,
+              code: verificationCode,
+            });
+            setVerificationCode("");
+            setLogin({ ...pendingLogin, phase: "waiting", message: "正在验证…" });
+          });
+        }}
+        onRetry={() => {
+          if (!login) return;
+          if (login.channel === "feishu") void beginFeishuLogin(feishuScanDomain);
+          else void beginLogin();
+        }}
+        onClose={closeLogin}
+      />
+      <TelegramTokenDialog
+        open={telegramDialogOpen}
+        busy={busy}
+        error={telegramError}
+        onConnect={(token) => void connectTelegram(token)}
+        onClose={() => setTelegramDialogOpen(false)}
+      />
+      <FeishuCredentialDialog
+        open={feishuDialogOpen}
+        busy={busy}
+        error={feishuError}
+        onStartScan={(domain) => void beginFeishuLogin(domain)}
+        onConnect={(appId, appSecret, domain) => void connectFeishu(appId, appSecret, domain)}
+        onClose={() => setFeishuDialogOpen(false)}
+      />
+      {dialog}
     </div>
   );
 }
@@ -602,6 +613,7 @@ export function AccountCard({
   onDelete: () => void;
 }) {
   const { language, t } = useI18n();
+  const { confirm, dialog } = useConfirm();
   const [draft, setDraft] = useState<ChannelAccountConfig>(account);
   const [testPeer, setTestPeer] = useState("");
   const [testMessage, setTestMessage] = useState(() => t("channelTestMessage", "Pi Agent Desktop channel test"));
@@ -948,18 +960,20 @@ export function AccountCard({
               draft.toolNames.includes("bash") ||
               draft.toolNames.includes("powershell") ||
               draft.toolNames.includes("write");
-            if (
-              elevated &&
-              !window.confirm(
-                t(
-                  "elevatedChannelConfirm",
-                  "This configuration allows remote messages to reach powerful local capabilities. Confirm that the account and allowed users are trusted.",
-                ),
-              )
-            ) {
+            if (!elevated) {
+              onSave(draft);
               return;
             }
-            onSave(draft);
+            void confirm({
+              title: t("elevatedChannelTitle", "Elevated channel configuration"),
+              message: t(
+                "elevatedChannelConfirm",
+                "This configuration allows remote messages to reach powerful local capabilities. Confirm that the account and allowed users are trusted.",
+              ),
+              confirmLabel: t("save", "Save"),
+            }).then((ok) => {
+              if (ok) onSave(draft);
+            });
           }}
         >
           {t("save", "Save")}
@@ -1038,6 +1052,7 @@ export function AccountCard({
           {t("testSend", "Test send")}
         </Button>
       </div>
+      {dialog}
     </div>
   );
 }
@@ -1302,11 +1317,13 @@ function ActivitySection({ snapshot }: { snapshot: ChannelsSnapshot }) {
 }
 
 export function TelegramTokenDialog({
+  open,
   busy,
   error,
   onConnect,
   onClose,
 }: {
+  open: boolean;
   busy: boolean;
   error: string;
   onConnect: (token: string) => void;
@@ -1314,70 +1331,67 @@ export function TelegramTokenDialog({
 }) {
   const { t } = useI18n();
   const [token, setToken] = useState("");
+  const tokenInputRef = useRef<HTMLInputElement>(null);
+  // The Dialog shell focuses its card on open; re-claim focus for the token field.
+  useEffect(() => {
+    if (open) tokenInputRef.current?.focus();
+  }, [open]);
+  // The dialog stays mounted so the shared shell can play its exit animation;
+  // keep the last error visible while shrinking out.
+  const lastError = useRef(error);
+  if (error) lastError.current = error;
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1200,
-        background: "rgba(0,0,0,.45)",
-        display: "grid",
-        placeItems: "center",
-      }}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      ariaLabel={t("connectTelegram", "Connect Telegram")}
+      width={430}
+      closeOnBackdrop={false}
+      closeOnEscape={!busy}
+      style={{ padding: 22, background: "var(--bg)", boxShadow: "0 14px 45px rgba(0,0,0,.25)" }}
     >
-      <div
-        style={{
-          width: 430,
-          maxWidth: "calc(100vw - 28px)",
-          border: "1px solid var(--border)",
-          borderRadius: 10,
-          background: "var(--bg)",
-          padding: 22,
-          boxShadow: "0 14px 45px rgba(0,0,0,.25)",
-        }}
-      >
-        <h3 style={{ margin: 0, color: "var(--text)", fontSize: 16 }}>{t("connectTelegram", "Connect Telegram")}</h3>
-        <p style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.6 }}>
-          {t(
-            "telegramTokenDescription",
-            "Create a bot with @BotFather, paste its token here, then Pi Desktop will verify it with getMe and store it using OS encryption.",
-          )}
-        </p>
-        <SecretTextInput
-          autoFocus
-          value={token}
-          onChange={setToken}
-          placeholder={t("telegramBotToken", "BotFather token")}
-        />
-        {error && (
-          <div
-            role="alert"
-            data-testid="telegram-connect-error"
-            style={{ marginTop: 10, color: "var(--danger)", fontSize: 11, lineHeight: 1.5, overflowWrap: "anywhere" }}
-          >
-            {error}
-          </div>
+      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 16 }}>{t("connectTelegram", "Connect Telegram")}</h3>
+      <p style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.6 }}>
+        {t(
+          "telegramTokenDescription",
+          "Create a bot with @BotFather, paste its token here, then Pi Desktop will verify it with getMe and store it using OS encryption.",
         )}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 7, marginTop: 16 }}>
-          <Button type="button" disabled={busy} size="lg" onClick={onClose}>
-            {t("cancel", "Cancel")}
-          </Button>
-          <Button
-            type="button"
-            disabled={busy || !token.trim()}
-            variant="primary"
-            size="lg"
-            onClick={() => onConnect(token.trim())}
-          >
-            {busy ? t("testingConnection", "Testing…") : t("saveAndConnect", "Save and connect")}
-          </Button>
+      </p>
+      <SecretTextInput
+        ref={tokenInputRef}
+        value={token}
+        onChange={setToken}
+        placeholder={t("telegramBotToken", "BotFather token")}
+      />
+      {lastError.current && (
+        <div
+          role="alert"
+          data-testid="telegram-connect-error"
+          style={{ marginTop: 10, color: "var(--danger)", fontSize: 11, lineHeight: 1.5, overflowWrap: "anywhere" }}
+        >
+          {lastError.current}
         </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 7, marginTop: 16 }}>
+        <Button type="button" disabled={busy} size="lg" onClick={onClose}>
+          {t("cancel", "Cancel")}
+        </Button>
+        <Button
+          type="button"
+          disabled={busy || !token.trim()}
+          variant="primary"
+          size="lg"
+          onClick={() => onConnect(token.trim())}
+        >
+          {busy ? t("testingConnection", "Testing…") : t("saveAndConnect", "Save and connect")}
+        </Button>
       </div>
-    </div>
+    </Dialog>
   );
 }
 
 export function FeishuCredentialDialog({
+  open,
   busy,
   error,
   onStartScan,
@@ -1385,6 +1399,7 @@ export function FeishuCredentialDialog({
   onClose,
   initialMode = "scan",
 }: {
+  open: boolean;
   busy: boolean;
   error: string;
   onStartScan: (domain: FeishuDomain) => void;
@@ -1395,31 +1410,26 @@ export function FeishuCredentialDialog({
   const { t } = useI18n();
   const [mode, setMode] = useState<"scan" | "manual">(initialMode);
   const [domain, setDomain] = useState<FeishuDomain>("feishu");
+  // Keep the last error visible while the shell plays its exit animation.
+  const lastError = useRef(error);
+  if (error) lastError.current = error;
   return (
-    <div
+    <Dialog
+      open={open}
+      onClose={onClose}
+      ariaLabel={t("connectFeishu", "Connect Feishu / Lark")}
+      width={560}
+      closeOnBackdrop={false}
+      closeOnEscape={!busy}
       style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1200,
-        background: "rgba(0,0,0,.45)",
-        display: "grid",
-        placeItems: "center",
+        padding: 22,
+        background: "var(--bg)",
+        boxShadow: "0 14px 45px rgba(0,0,0,.25)",
+        maxHeight: "calc(100dvh - 40px)",
+        overflowY: "auto",
       }}
     >
-      <div
-        data-testid="feishu-connect-dialog"
-        style={{
-          width: 560,
-          maxWidth: "calc(100vw - 28px)",
-          maxHeight: "calc(100dvh - 32px)",
-          overflowY: "auto",
-          border: "1px solid var(--border)",
-          borderRadius: 10,
-          background: "var(--bg)",
-          padding: 22,
-          boxShadow: "0 14px 45px rgba(0,0,0,.25)",
-        }}
-      >
+      <div data-testid="feishu-connect-dialog">
         <h3 style={{ margin: 0, color: "var(--text)", fontSize: 16 }}>{t("connectFeishu", "Connect Feishu / Lark")}</h3>
         <p style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.6 }}>
           {mode === "scan"
@@ -1502,7 +1512,7 @@ export function FeishuCredentialDialog({
                 )}
               </div>
             </div>
-            <FeishuDialogError error={error} />
+            <FeishuDialogError error={lastError.current} />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 7, marginTop: 16 }}>
               <Button type="button" disabled={busy} size="lg" onClick={onClose}>
                 {t("cancel", "Cancel")}
@@ -1530,7 +1540,7 @@ export function FeishuCredentialDialog({
           />
         )}
       </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -1566,6 +1576,12 @@ function FeishuManualForm({
   const [appId, setAppId] = useState("");
   const [appSecret, setAppSecret] = useState("");
   const [permissionCopyState, setPermissionCopyState] = useState<"idle" | "copied" | "error">("idle");
+  // Keep the last error visible while the shell plays its exit animation.
+  const lastError = useRef(error);
+  if (error) lastError.current = error;
+  const appIdInputRef = useRef<HTMLInputElement>(null);
+  // The Dialog shell focuses its card on open; re-claim focus for the app id field.
+  useEffect(() => appIdInputRef.current?.focus(), []);
   const docsBase = domain === "lark" ? "https://open.larksuite.com" : "https://open.feishu.cn";
   const copyPermissionJson = async () => {
     try {
@@ -1579,7 +1595,7 @@ function FeishuManualForm({
     <div data-testid="feishu-existing-app" style={{ marginTop: 14 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 150px", gap: 8 }}>
         <Input
-          autoFocus
+          ref={appIdInputRef}
           autoComplete="off"
           value={appId}
           onChange={(event) => setAppId(event.target.value)}
@@ -1683,7 +1699,7 @@ function FeishuManualForm({
         </div>
       </div>
 
-      <FeishuDialogError error={error} />
+      <FeishuDialogError error={lastError.current} />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 7, marginTop: 16 }}>
         <Button type="button" disabled={busy} size="lg" onClick={onClose}>
           {t("cancel", "Cancel")}
@@ -1703,6 +1719,7 @@ function FeishuManualForm({
 }
 
 export function LoginDialog({
+  open,
   event,
   code,
   setCode,
@@ -1710,7 +1727,8 @@ export function LoginDialog({
   onRetry,
   onClose,
 }: {
-  event: ChannelLoginEvent;
+  open: boolean;
+  event: ChannelLoginEvent | null;
   code: string;
   setCode: (value: string) => void;
   onSubmitCode: () => void;
@@ -1718,47 +1736,51 @@ export function LoginDialog({
   onClose: () => void;
 }) {
   const { t } = useI18n();
-  const terminal = ["confirmed", "already_connected", "expired", "error", "cancelled"].includes(event.phase);
+  // The dialog stays mounted so the shared shell can play its exit animation;
+  // freeze the last event so the card keeps its content (QR, phase message)
+  // while shrinking out after the parent clears the login state.
+  const lastEvent = useRef<ChannelLoginEvent | null>(event);
+  if (event) lastEvent.current = event;
+  const current = lastEvent.current;
+  const terminal = current
+    ? ["confirmed", "already_connected", "expired", "error", "cancelled"].includes(current.phase)
+    : false;
   const [clock, setClock] = useState(() => Date.now());
   useEffect(() => {
-    if (!event.expiresAt || terminal) return;
+    if (!current?.expiresAt || terminal) return;
     const timer = setInterval(() => setClock(Date.now()), 1_000);
     return () => clearInterval(timer);
-  }, [event.expiresAt, terminal]);
-  const remainingSeconds = event.expiresAt ? Math.max(0, Math.ceil((event.expiresAt - clock) / 1_000)) : undefined;
-  const isFeishu = event.channel === "feishu";
+  }, [current?.expiresAt, terminal]);
+  const remainingSeconds = current?.expiresAt ? Math.max(0, Math.ceil((current.expiresAt - clock) / 1_000)) : undefined;
+  const isFeishu = current?.channel === "feishu";
   const retryable =
-    event.phase === "expired" || event.phase === "cancelled" || (event.phase === "error" && !event.accountId);
+    current?.phase === "expired" ||
+    current?.phase === "cancelled" ||
+    (current?.phase === "error" && !current.accountId);
+  const codeInputRef = useRef<HTMLInputElement>(null);
+  // The Dialog shell focuses its card on open; re-claim focus for the code field.
+  useEffect(() => {
+    if (open && current?.phase === "verification_required") codeInputRef.current?.focus();
+  }, [open, current?.phase]);
+  if (!current) return null;
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1200,
-        background: "rgba(0,0,0,.45)",
-        display: "grid",
-        placeItems: "center",
-      }}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      ariaLabel={
+        isFeishu ? t("feishuScanCreateTitle", "Scan to create Feishu / Lark bot") : t("connectWeixin", "Connect WeChat")
+      }
+      width={390}
+      closeOnBackdrop={false}
+      style={{ padding: 22, background: "var(--bg)", boxShadow: "0 14px 45px rgba(0,0,0,.25)" }}
     >
-      <div
-        data-testid={`channel-login-dialog-${event.channel}`}
-        style={{
-          width: 390,
-          maxWidth: "calc(100vw - 28px)",
-          border: "1px solid var(--border)",
-          borderRadius: 10,
-          background: "var(--bg)",
-          padding: 22,
-          textAlign: "center",
-          boxShadow: "0 14px 45px rgba(0,0,0,.25)",
-        }}
-      >
+      <div data-testid={`channel-login-dialog-${current.channel}`} style={{ textAlign: "center" }}>
         <h3 style={{ margin: 0, color: "var(--text)", fontSize: 16 }}>
           {isFeishu
             ? t("feishuScanCreateTitle", "Scan to create Feishu / Lark bot")
             : t("connectWeixin", "Connect WeChat")}
         </h3>
-        {event.qrContent && !terminal && (
+        {current.qrContent && !terminal && (
           <div
             style={{
               width: 236,
@@ -1770,7 +1792,7 @@ export function LoginDialog({
             }}
           >
             <QRCodeSVG
-              value={event.qrContent}
+              value={current.qrContent ?? ""}
               size={216}
               level="M"
               marginSize={2}
@@ -1789,17 +1811,17 @@ export function LoginDialog({
         )}
         <p
           style={{
-            color: event.phase === "error" ? "var(--danger)" : "var(--text-muted)",
+            color: current.phase === "error" ? "var(--danger)" : "var(--text-muted)",
             fontSize: 12,
             lineHeight: 1.6,
           }}
         >
-          {event.message}
+          {current.message}
         </p>
-        {event.phase === "verification_required" && (
+        {current.phase === "verification_required" && (
           <div style={{ display: "flex", gap: 7, marginTop: 12 }}>
             <Input
-              autoFocus
+              ref={codeInputRef}
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
               placeholder={t("verificationNumber", "Verification number")}
@@ -1809,7 +1831,7 @@ export function LoginDialog({
             </Button>
           </div>
         )}
-        {(event.phase === "waiting" || event.phase === "scanned") && (
+        {(current.phase === "waiting" || current.phase === "scanned") && (
           <div style={{ color: "var(--text-dim)", fontSize: 11 }}>
             {isFeishu
               ? t("waitingForFeishuAuthorization", "Waiting securely for Feishu / Lark authorization…")
@@ -1827,7 +1849,7 @@ export function LoginDialog({
           </Button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
 

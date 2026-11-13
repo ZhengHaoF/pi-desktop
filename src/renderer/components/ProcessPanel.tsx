@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { StatusDot } from "@/components/ui/StatusDot";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type Props = {
   onActiveCountChange?: (count: number) => void;
@@ -43,6 +44,7 @@ const buttonStyle = {
 
 export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
   const { t } = useI18n();
+  const { confirm, dialog } = useConfirm();
   const [processes, setProcesses] = useState<ManagedProcessPublicInfo[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [records, setRecords] = useState<ManagedProcessLogRecord[]>([]);
@@ -593,16 +595,21 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
                   disabled={busy}
                   style={buttonStyle}
                   onClick={() =>
-                    window.confirm(t("closeStdinConfirm", "Close stdin for this process?")) &&
-                    void invoke(() =>
-                      call("processes.write", {
-                        processId: selected.processId,
-                        runId: selected.runId,
-                        text: "",
-                        appendNewline: false,
-                        close: true,
-                      }),
-                    )
+                    void confirm({
+                      title: t("closeStdinConfirm", "Close stdin for this process?"),
+                      confirmLabel: t("closeStdin", "Close stdin"),
+                    }).then((ok) => {
+                      if (!ok) return;
+                      void invoke(() =>
+                        call("processes.write", {
+                          processId: selected.processId,
+                          runId: selected.runId,
+                          text: "",
+                          appendNewline: false,
+                          close: true,
+                        }),
+                      );
+                    })
                   }
                 >
                   {t("closeStdin", "Close stdin")}
@@ -616,6 +623,7 @@ export function ProcessPanel({ onActiveCountChange, onOpenBrowser }: Props) {
           </div>
         )}
       </div>
+      {dialog}
     </div>
   );
 }

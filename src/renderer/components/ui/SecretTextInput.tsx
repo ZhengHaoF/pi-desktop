@@ -2,7 +2,7 @@
  * Password-style input with a visibility toggle. Internally composed from
  * Input and Button; the toggle keeps a 32px pointer target.
  */
-import { useEffect, useState, type KeyboardEventHandler, type CSSProperties } from "react";
+import { useEffect, useState, type KeyboardEventHandler, type CSSProperties, type Ref } from "react";
 import { Input } from "./Input";
 import { Button } from "./Button";
 
@@ -19,6 +19,8 @@ export interface SecretTextInputProps {
   id?: string;
   style?: CSSProperties;
   disabled?: boolean;
+  /** Forwarded to Input; lets dialogs re-focus the field after the shell. */
+  ref?: Ref<HTMLInputElement>;
 }
 
 export function SecretTextInput({
@@ -33,6 +35,7 @@ export function SecretTextInput({
   id,
   style,
   disabled,
+  ref,
 }: SecretTextInputProps) {
   const [visible, setVisible] = useState(false);
 
@@ -44,6 +47,7 @@ export function SecretTextInput({
     <div style={{ position: "relative", width: "100%", ...style }}>
       <Input
         id={id}
+        ref={ref}
         type={visible ? "text" : "password"}
         value={value}
         onChange={(e) => onChange(e.target.value)}

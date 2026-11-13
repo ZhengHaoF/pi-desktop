@@ -1515,6 +1515,58 @@ span.linenumber {
   }
 }
 
+/* ── Shared Dialog open/close motion (ui/Dialog) ───────────────────
+   Plain scale + fade on the card over a fading backdrop. Transforms exist
+   only while an animation runs (enter uses no fill mode): Select portals
+   fixed-position layers into the dialog card, so a resting transform
+   would hijack their viewport coordinates. Exit durations must stay in
+   sync with DIALOG_EXIT_MS in ui/dialog-motion.ts. */
+.pi-dialog-backdrop-enter {
+  animation: pi-dialog-backdrop-in 180ms ease-out;
+}
+.pi-dialog-backdrop-exit {
+  animation: pi-dialog-backdrop-out 150ms ease-out both;
+}
+.pi-dialog-card-enter {
+  animation: pi-dialog-card-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.pi-dialog-card-exit {
+  /* Inert while shrinking: frozen content must not accept clicks that
+     would fire callbacks whose state has already settled. */
+  pointer-events: none;
+  animation: pi-dialog-card-out 150ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+@keyframes pi-dialog-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes pi-dialog-backdrop-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes pi-dialog-card-in {
+  from {
+    transform: scale(0.32);
+    opacity: 0;
+  }
+}
+@keyframes pi-dialog-card-out {
+  to {
+    transform: scale(0.36);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pi-dialog-backdrop-enter,
+  .pi-dialog-backdrop-exit,
+  .pi-dialog-card-enter,
+  .pi-dialog-card-exit {
+    animation: none;
+  }
+}
+
 /* Floating "scroll to bottom" badge (chat) */
 .chat-scroll-to-bottom {
   position: absolute;

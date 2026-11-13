@@ -15,6 +15,7 @@
 | `Checkbox` | 勾选框（原生 + accent-color） | `<input type="checkbox">` |
 | `Switch` | 轨道开关（on/off 状态） | 手写 track+knob 开关 |
 | `Dialog` | 居中模态（backdrop/卡片/焦点圈禁/滚动锁） | 手写 fixed 覆盖层 |
+| `ConfirmDialog` | 标准确认框/提示框（`useConfirm()` 返回 promise） | `window.confirm` / `window.alert` / 手写确认弹窗 |
 | `StatusDot` | 状态小圆点（语义色 + pulse） | 手写 50% 圆角 span |
 | `usePopoverAnchor` | portal 弹层贴附触发器的定位 hook | 手写 getBoundingClientRect 逻辑 |
 
@@ -153,6 +154,13 @@ class 承担；组件只提供布局默认值。**需要微调布局时传 `styl
 
 - **壳职责**：backdrop + 居中卡片 + 真·焦点圈禁（Tab 循环不出卡片）+
   Escape 关闭 + backdrop 点击关闭 + body 滚动锁；portal 到 body
+- **动效**：打开时卡片居中 scale+fade 展开，关闭时缩回居中位置并延迟卸载；
+  `prefers-reduced-motion` 或无 `matchMedia` 的 stub 环境即时挂载/卸载。
+  基线卡片**不带** transform——Select 会 portal fixed 定位层进卡片，残留
+  transform 会劫持其视口坐标；退场期间卡片 `pointer-events: none` 且
+  backdrop 点击无效。常驻挂载（`open={cond}` 而非 `{cond && <Dialog/>}`）
+  才能看到退场动画；确认框等有内容冻结需求的调用方在关闭后保留最后一份
+  内容渲染
 - **closeOnEscape={false}**：Escape 有专属语义的对话框（如授权框 deny 流程）
 - **closeOnBackdrop={false}**：带保存状态门控的确认框
 - **width**：默认 480；设置外壳这类大卡传 960 并用 style 覆盖高度/overflow
@@ -163,6 +171,50 @@ class 承担；组件只提供布局默认值。**需要微调布局时传 `styl
 - **锚定弹出层**（跟随触发器的 popover，如 herdr 舰队面板、渠道快绑、
   Select 下拉）**不用 Dialog**——它们走 usePopoverAnchor 定位
 - ImageLightbox（整屏画布预览）保持独立实现，非卡片形态
+
+## ConfirmDialog
+
+标准确认/提示对话框，基于共享 `Dialog` 壳；替代 `window.confirm`、
+`window.alert` 和手写确认弹窗。
+
+```tsx
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+
+function Example() {
+  const { confirm, dialog } = useConfirm();
+  return (
+    <>
+      <Button
+        variant="danger"
+        onClick={() =>
+          void confirm({
+            title: t("deleteChannelConfirm", "Delete this messaging account and its bindings?"),
+            danger: true,
+            confirmLabel: t("delete", "Delete"),
+          }).then((ok) => {
+            if (ok) doDelete();
+          })
+        }
+      >
+        {t("delete", "Delete")}
+      </Button>
+      {dialog}
+    </>
+  );
+}
+```
+
+- **useConfirm()**：每个组件调用一次，把返回的 `dialog` 渲进 JSX；
+  `confirm(request)` 返回 `Promise<boolean>`——true 确认，false 取消/关闭
+  （组件卸载时也 resolve false，调用方不会悬挂）
+- **request**：`title` 必传；`message` 可选补充说明；`confirmLabel` /
+  `cancelLabel` 覆盖默认（确认/取消）；`danger` 用红色删除按钮
+- **alert 型**（原 `window.alert`）：传 `cancelLabel: null`，只剩单个
+  "OK/知道了" 按钮，backdrop 点击也可关闭
+- **门控默认值**：确认框 backdrop 点击不关闭（防误触），Escape = 取消；
+  渲染内容、后续动作全部留在调用方
+- 短问题直接作 `title`；超过一行的长说明拆成短 `title` + `message`
+- 新确认文案需要新 i18n key 时，同步补三个语言的字典（`check:i18n` 会查）
 
 ## StatusDot
 
@@ -202,6 +254,8 @@ class 承担；组件只提供布局默认值。**需要微调布局时传 `styl
 - 带 `type="text|password|number|search|checkbox"` 的裸 `<input>`，以及**未标注
   type** 的 `<input>`（默认即文本框）→ 用 `<Input>` 或 `<Checkbox>`
 - `radio` / `file` 暂时放行（组件化后收紧）
+- `window.confirm(...)` / `window.alert(...)` 及裸调 `confirm(...)` /
+  `alert(...)` → 用 `useConfirm()`（ui/ConfirmDialog）
 
 个别确需绕过的地方：`// eslint-disable-next-line no-restricted-syntax -- 原因`
 （本仓库强制 disable 必须带说明）。ChatInput 的 composer textarea 因自动增高

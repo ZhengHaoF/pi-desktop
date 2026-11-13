@@ -1,5 +1,6 @@
 import { subscribeRunning, call } from "@/lib/api-client";
 import { Input } from "@/components/ui/Input";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useEffect, useState, useCallback, useRef, useSyncExternalStore } from "react";
 import type { SessionInfo } from "@/lib/types";
 import { useI18n } from "@/i18n";
@@ -110,6 +111,7 @@ export function SessionSidebar({
   onCwdChange,
 }: Props) {
   const { t } = useI18n();
+  const { confirm, dialog } = useConfirm();
   const {
     sessions: allSessions,
     loading,
@@ -383,14 +385,16 @@ export function SessionSidebar({
       }
 
       if (failures.length > 0) {
-        window.alert(
-          t("projectRemovePartialFailed", "{count} session record(s) could not be deleted: {message}")
+        void confirm({
+          title: t("projectRemovePartialTitle", "Some session records were not deleted"),
+          message: t("projectRemovePartialFailed", "{count} session record(s) could not be deleted: {message}")
             .replace("{count}", String(failures.length))
             .replace("{message}", failures[0]),
-        );
+          cancelLabel: null,
+        });
       }
     },
-    [allSessions, knownProjectRoots, selectedProject, sessionList, setSelectedCwd, t],
+    [allSessions, knownProjectRoots, selectedProject, sessionList, setSelectedCwd, t, confirm],
   );
 
   const toggleProjectGroupCollapse = useCallback((projectRoot: string) => {
@@ -552,6 +556,7 @@ export function SessionSidebar({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+      {dialog}
       {/* Header */}
       <div
         style={{

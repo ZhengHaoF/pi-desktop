@@ -13,6 +13,7 @@ import { useHerdrRuntime } from "@/hooks/useHerdrRuntime";
 import type { HerdrPane, HerdrTerminalState, HerdrTerminalStatus } from "@contract/herdr";
 import { Button } from "@/components/ui/Button";
 import { StatusDot } from "@/components/ui/StatusDot";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 const TERMINAL_RESIZE_DEBOUNCE_MS = 180;
 const COPY_BUFFER_LINES = 240;
@@ -28,6 +29,7 @@ interface TerminalDockProps {
 
 export function TerminalDock({ pane, visible, expanded, onToggleExpanded, onPaneUnavailable }: TerminalDockProps) {
   const { t } = useI18n();
+  const { confirm, dialog } = useConfirm();
   const { runtime } = useHerdrRuntime();
   const runtimeReady = runtime?.status === "ready";
   const snapshotMode = Boolean(runtimeReady && runtime?.capabilities.readOnly && !runtime.capabilities.terminalObserve);
@@ -206,19 +208,20 @@ export function TerminalDock({ pane, visible, expanded, onToggleExpanded, onPane
   const takeControl = useCallback(async () => {
     await runTerminalControlFlow({
       confirmInitial: () =>
-        window.confirm(t("takeTerminalControlConfirm", "Take keyboard control of this Herdr pane?")),
+        confirm({ title: t("takeTerminalControlConfirm", "Take keyboard control of this Herdr pane?") }),
       confirmTakeover: () =>
-        window.confirm(
-          t(
+        confirm({
+          title: t("takeOverPaneTitle", "Take over this pane?"),
+          message: t(
             "takeTerminalControlBusyConfirm",
             "Another client controls this pane. Take over and disconnect that controller?",
           ),
-        ),
+        }),
       openControl: (takeover) => open("control", takeover),
       restoreObserve: () => open("observe", false, true),
       onBusy: () => setOwnershipState("controlled-elsewhere"),
     });
-  }, [open, t]);
+  }, [open, t, confirm]);
 
   useEffect(() => {
     reopenObserveRef.current = async () => {
@@ -539,21 +542,22 @@ export function TerminalDock({ pane, visible, expanded, onToggleExpanded, onPane
       if (modeRef.current !== "control") return;
       const text = event.clipboardData?.getData("text") ?? "";
       if (text.length <= 4_096) return;
-      if (
-        !window.confirm(
-          t("largeTerminalPasteConfirm", "Paste {count} characters into the Herdr pane?").replace(
-            "{count}",
-            text.length.toLocaleString(),
-          ),
-        )
-      ) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
+      // The confirmation dialog decides asynchronously, so the native paste is
+      // always blocked here and re-injected through xterm when confirmed.
+      event.preventDefault();
+      event.stopPropagation();
+      void confirm({
+        title: t("largeTerminalPasteConfirm", "Paste {count} characters into the Herdr pane?").replace(
+          "{count}",
+          text.length.toLocaleString(),
+        ),
+      }).then((ok) => {
+        if (ok) terminalRef.current?.paste(text);
+      });
     };
     mount.addEventListener("paste", onPaste, true);
     return () => mount.removeEventListener("paste", onPaste, true);
-  }, [t]);
+  }, [t, confirm]);
 
   useEffect(
     () => () => {
@@ -617,6 +621,7 @@ export function TerminalDock({ pane, visible, expanded, onToggleExpanded, onPane
         background: "#09101d",
       }}
     >
+      {dialog}
       {pane && (
         <div
           style={{

@@ -7,6 +7,7 @@ import { getSessionDisplayTitle } from "@/lib/session-list";
 import { formatNumber, formatRelativeDateTime } from "@/lib/locale-format";
 import { Button } from "@/components/ui/Button";
 import { StatusDot } from "@/components/ui/StatusDot";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 export interface SessionTreeNode {
   session: SessionInfo;
@@ -230,6 +231,7 @@ function SessionItem({
   onToggleCollapse?: () => void;
 }) {
   const { language, t } = useI18n();
+  const { confirm, dialog } = useConfirm();
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -295,19 +297,27 @@ function SessionItem({
       closeActionsMenu();
       // ISSUE-001: block delete while agent is running
       if (isRunning) {
-        window.alert(t("deleteRunningSessionBlocked", "This session is still running. Stop it before deleting."));
+        void confirm({
+          title: t("sessionRunningTitle", "Session is running"),
+          message: t("deleteRunningSessionBlocked", "This session is still running. Stop it before deleting."),
+          cancelLabel: null,
+        });
         return;
       }
       setConfirmDelete(true);
     },
-    [closeActionsMenu, isRunning, t],
+    [closeActionsMenu, isRunning, t, confirm],
   );
 
   const handleDeleteConfirm = useCallback(
     async (e: React.MouseEvent) => {
       e.stopPropagation();
       if (isRunning) {
-        window.alert(t("deleteRunningSessionBlocked", "This session is still running. Stop it before deleting."));
+        void confirm({
+          title: t("sessionRunningTitle", "Session is running"),
+          message: t("deleteRunningSessionBlocked", "This session is still running. Stop it before deleting."),
+          cancelLabel: null,
+        });
         setConfirmDelete(false);
         return;
       }
@@ -317,13 +327,15 @@ function SessionItem({
         await call("sessions.delete", { id: session.id });
         onDeleted?.(session.id);
       } catch (err) {
-        window.alert(
-          (err instanceof Error ? err.message : String(err)) || t("deleteSessionFailed", "Failed to delete session."),
-        );
+        void confirm({
+          title: t("deleteSessionFailed", "Failed to delete session."),
+          message: err instanceof Error ? err.message : String(err),
+          cancelLabel: null,
+        });
         setDeleting(false);
       }
     },
-    [session.id, onDeleted, isRunning, t],
+    [session.id, onDeleted, isRunning, t, confirm],
   );
 
   const handleDeleteCancel = useCallback((e: React.MouseEvent) => {
@@ -364,6 +376,7 @@ function SessionItem({
         overflow: "visible",
       }}
     >
+      {dialog}
       {confirmDelete ? (
         /* ── Delete confirmation: same height, two flat buttons ── */
         <>

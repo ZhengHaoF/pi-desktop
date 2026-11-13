@@ -15,9 +15,11 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Dialog } from "@/components/ui/Dialog";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
   const { language, t } = useI18n();
+  const { confirm, dialog } = useConfirm();
   const [state, setState] = useState<BrowserRendererState | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -691,16 +693,17 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
                 variant="danger"
 
                 onClick={() => {
-                  if (
-                    window.confirm(
-                      t("browserResetConfirm", "Reset Browser settings and revoke all Browser capabilities?"),
-                    )
-                  ) {
+                  void confirm({
+                    title: t("browserResetConfirm", "Reset Browser settings and revoke all Browser capabilities?"),
+                    danger: true,
+                    confirmLabel: t("browserReset", "Reset Browser"),
+                  }).then((ok) => {
+                    if (!ok) return;
                     void window.piBridge
                       .browserReset()
                       .then(setState)
                       .catch((cause) => setError(messageOf(cause)));
-                  }
+                  });
                 }}
               >
                 {t("browserReset", "Reset Browser")}
@@ -710,6 +713,7 @@ export function BrowserSettings({ sessionId }: { sessionId: string | null }) {
         </div>
       </div>
       {prompt && <TextPromptDialog prompt={prompt} cancelLabel={t("cancel", "Cancel")} onRespond={respondToPrompt} />}
+      {dialog}
     </>
   );
 }
@@ -1050,6 +1054,7 @@ function ProfileSection({
   setError: (value: string) => void;
 }) {
   const { t } = useI18n();
+  const { confirm, dialog } = useConfirm();
   const { prompt, requestPrompt, respondToPrompt } = useTextPrompt();
   const create = async (mode: BrowserProfileInfo["mode"]) => {
     const name = await requestPrompt({
@@ -1122,18 +1127,19 @@ function ProfileSection({
                   <Button
                     size="sm"
                     onClick={() => {
-                      if (
-                        window.confirm(
-                          formatMessage(t("browserDeleteProfileConfirm", "Delete Browser Profile “{name}”?"), {
-                            name: profile.name,
-                          }),
-                        )
-                      ) {
+                      void confirm({
+                        title: formatMessage(t("browserDeleteProfileConfirm", "Delete Browser Profile “{name}”?"), {
+                          name: profile.name,
+                        }),
+                        danger: true,
+                        confirmLabel: t("browserDelete", "Delete"),
+                      }).then((ok) => {
+                        if (!ok) return;
                         void window.piBridge
                           .browserDeleteProfile(profile.id)
                           .then(refresh)
                           .catch((cause) => setError(messageOf(cause)));
-                      }
+                      });
                     }}
                   >
                     {t("browserDelete", "Delete")}
@@ -1155,6 +1161,7 @@ function ProfileSection({
         </div>
       </Section>
       {prompt && <TextPromptDialog prompt={prompt} cancelLabel={t("cancel", "Cancel")} onRespond={respondToPrompt} />}
+      {dialog}
     </>
   );
 }

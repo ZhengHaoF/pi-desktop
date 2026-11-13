@@ -20,6 +20,19 @@ export function preloadSettingsConfig(): Promise<SettingsConfigModule> {
   return settingsConfigLoad;
 }
 
+// Synchronous peek at the shared cache: non-null only when the chunk has
+// already fully loaded, so a dialog can render without any loading frame.
+let settingsConfigModule: SettingsConfigModule | null = null;
+preloadSettingsConfig().then(
+  (module) => {
+    settingsConfigModule = module;
+  },
+  () => undefined,
+);
+export function peekSettingsConfigModule(): SettingsConfigModule | null {
+  return settingsConfigModule;
+}
+
 export function scheduleSettingsConfigPreload(): () => void {
   const handle = window.requestIdleCallback(
     () => {
@@ -30,7 +43,6 @@ export function scheduleSettingsConfigPreload(): () => void {
   return () => window.cancelIdleCallback(handle);
 }
 
-const LazySettingsConfig = lazy(preloadSettingsConfig);
 const LazyTerminalDock = lazy(() =>
   import("./herdr/TerminalDock").then((module) => ({ default: module.TerminalDock })),
 );
@@ -181,18 +193,47 @@ function SettingsLoading({
   );
 }
 
-export function SettingsConfig(props: Omit<ComponentProps<typeof LazySettingsConfig>, "returnFocusTarget">) {
+type SettingsConfigProps = ComponentProps<typeof import("./SettingsConfig").SettingsConfig>;
+
+export function SettingsConfig(props: Omit<SettingsConfigProps, "returnFocusTarget" | "animateEnter">) {
   // Captured before the loading frame or the dialog takes focus, so closing returns to the original opener.
   const [returnFocusTarget] = useState(() =>
     document.activeElement instanceof HTMLElement ? document.activeElement : null,
   );
-  return (
-    <Suspense fallback={<SettingsLoading onClose={props.onClose} returnFocusTarget={returnFocusTarget} />}>
-      <LazySettingsConfig {...props} returnFocusTarget={returnFocusTarget} />
-    </Suspense>
-  );
-}
+  // Resolve the chunk by hand instead of going through Suspense: when the
+  // module is cached (hover/idle preload won the race) the real dialog renders
+  // synchronously with its full enter animation; when it is not, the loading
+  // frame shows and the real dialog takes over WITHOUT replaying the enter —
+  // animating in over the already-visible frame read as the dialog popping
+  // up twice.
+  const [module, setModule] = useState<SettingsConfigModule | null>(() => peekSettingsConfigModule());
+  const peekedModuleRef = useRef<SettingsConfigModule | null>(module);
+  useEffect(() => {
+    if (module) return;
+    let cancelled = false;
+    void preloadSettingsConfig().then(
+      (resolved) => {
+        if (!cancelled) setModule(resolved);
+      },
+      () => {
+        // Keep the dismissible loading frame; the next open retries the load.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [module]);
 
+  // A module resolved from the initial cache had no loading frame before it,
+  // so its enter animation plays; one resolved after the frame showed must
+  // skip it, or the handoff reads as a second dialog popping up.
+  const skipEnter = module !== null && module !== peekedModuleRef.current;
+  if (module) {
+    const SettingsConfigPanel = module.default;
+    return <SettingsConfigPanel {...props} returnFocusTarget={returnFocusTarget} animateEnter={!skipEnter} />;
+  }
+  return <SettingsLoading onClose={props.onClose} returnFocusTarget={returnFocusTarget} />;
+}
 export function TerminalDock(props: ComponentProps<typeof LazyTerminalDock>) {
   return (
     <Suspense fallback={<PanelLoading />}>
