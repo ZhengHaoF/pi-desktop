@@ -454,6 +454,7 @@
   --tool-bg: #1c1a17;
   --tool-fg: #c9c5bb;
   --tool-border: #33302a;
+  --tool-hover: color-mix(in srgb, var(--tool-fg) 8%, transparent);
   --bg-subtle: rgba(28, 26, 23, 0.035);
   --accent-soft: #fff0e6;
   --accent-soft-border: #f7d9bd;
@@ -501,6 +502,7 @@ html.dark {
   --tool-bg: #1d1d1d;
   --tool-fg: #c0c0c0;
   --tool-border: #414141;
+  --tool-hover: color-mix(in srgb, var(--tool-fg) 7%, transparent);
   --bg-subtle: rgba(255, 255, 255, 0.04);
   --accent-soft: rgba(255, 138, 48, 0.16);
   --accent-soft-border: rgba(255, 138, 48, 0.38);
@@ -738,6 +740,20 @@ body {
   background: var(--accent-soft);
   border-color: transparent;
   color: var(--accent);
+}
+/* Tool cards keep a dark surface in both themes, so ghost buttons inside them
+   must not take the page-surface hover/active colors (--bg-hover flashes
+   near-white over the dark card in the light theme). Lighten toward --tool-fg
+   instead; the shared .pi-btn transition still applies. */
+.pi-tool-card .pi-btn-ghost:hover:not(:disabled) {
+  background: var(--tool-hover);
+  border-color: transparent;
+  color: var(--tool-fg);
+}
+.pi-tool-card .pi-btn-ghost:active:not(:disabled) {
+  background: color-mix(in srgb, var(--tool-fg) 14%, transparent);
+  border-color: transparent;
+  color: var(--tool-fg);
 }
 .pi-btn-link {
   border: 0;

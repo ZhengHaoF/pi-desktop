@@ -1057,6 +1057,7 @@ function ToolCallBlock({
 
   return (
     <div
+      className="pi-tool-card"
       style={{
         borderRadius: 9,
         overflow: "hidden",
