@@ -21,7 +21,7 @@ import {
   splitFinalAssistantBlocks,
 } from "@/lib/message-display";
 import { MessageView } from "./MessageView";
-import { AskUserDialog } from "./AskUserDialog";
+import { AskUserDialog, AskUserPanel } from "./AskUserDialog";
 import { ProcessDetailsGroup } from "./ProcessDetailsGroup";
 import { SessionProfiler } from "./SessionProfiler";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
@@ -405,6 +405,9 @@ export function ChatWindow({
 
   const aboveEditorWidgets = extensionWidgets.filter((widget) => widget.placement !== "belowEditor");
   const belowEditorWidgets = extensionWidgets.filter((widget) => widget.placement === "belowEditor");
+  // Wide windows dock the ask panel over the composer (the transcript stays
+  // readable); narrow ones keep the modal, which has no room to dock.
+  const askPanelRequest = extensionDialog?.method === "ask" && !isMobile ? extensionDialog : null;
 
   if (loading) {
     return <div className="flex h-full items-center justify-center text-text-muted">Loading session...</div>;
@@ -500,7 +503,11 @@ export function ChatWindow({
 
       {extensionDialog &&
         (extensionDialog.method === "ask" ? (
-          <AskUserDialog request={extensionDialog} onRespond={respondToExtensionUi} />
+          // Wide windows dock the question panel over the composer instead of
+          // covering the chat; narrow ones keep the modal (no room to dock).
+          isMobile ? (
+            <AskUserDialog request={extensionDialog} onRespond={respondToExtensionUi} />
+          ) : null
         ) : (
           <ExtensionDialog request={extensionDialog} onRespond={respondToExtensionUi} />
         ))}
@@ -923,7 +930,24 @@ export function ChatWindow({
             </div>
           </div>
         )}
-        {chatInputElement}
+        {/*
+          The panel owns the composer's slot instead of displacing it: the
+          composer keeps its space (visibility, not display, so nothing above
+          reflows) but goes inert while the question is open.
+        */}
+        <div style={askPanelRequest ? { visibility: "hidden" } : undefined} inert={askPanelRequest ? true : undefined}>
+          {chatInputElement}
+        </div>
+        {askPanelRequest ? (
+          <AskUserPanel
+            request={askPanelRequest}
+            onRespond={respondToExtensionUi}
+            style={{
+              padding: `0 ${CHAT_COLUMN_PADDING}px 12px`,
+              paddingRight: isMobile ? CHAT_COLUMN_PADDING : CHAT_INPUT_RIGHT_PADDING,
+            }}
+          />
+        ) : null}
       </div>
 
       <div className="chat-input-bottom-spacer" data-expanded={isEmptyNew ? "true" : "false"} aria-hidden="true" />

@@ -1,5 +1,5 @@
 /**
- * The model-facing `ask_question` tool: one to four questions, each with a
+ * The model-facing `ask_question` tool: one to five questions, each with a
  * small set of options plus a free-text answer. It is a host-registered
  * ToolDefinition, so the question never leaves the extension-UI channel the
  * renderer already owns: `ctx.ui.askQuestions` emits one ask request and the
@@ -12,7 +12,7 @@ import type { ExtensionUiContextLike } from "../shared/pi-types";
 import type { AskQuestion, AskQuestionAnswer } from "../shared/types";
 
 export const ASK_QUESTION_TOOL_NAME = "ask_question";
-export const MAX_ASK_QUESTIONS = 4;
+export const MAX_ASK_QUESTIONS = 5;
 export const MAX_ASK_OPTIONS = 6;
 /** A remote client may never answer: do not suspend the turn indefinitely. */
 export const ASK_QUESTION_TIMEOUT_MS = 5 * 60 * 1000;
@@ -125,7 +125,7 @@ export function createAskQuestionTool() {
     name: ASK_QUESTION_TOOL_NAME,
     label: "Ask the user",
     description:
-      "Ask the user one to four multiple-choice questions and wait for their answer. Each question offers 2-6 labeled options with optional descriptions, and the user can also type their own answer. Use this when a decision is genuinely the user's and you want the answer before continuing, such as choosing between approaches, clarifying requirements, or settling a trade-off.",
+      "Ask the user one to five multiple-choice questions and wait for their answer. Each question offers 2-6 labeled options with optional descriptions, and the user can also type their own answer. Use this when a decision is genuinely the user's and you want the answer before continuing, such as choosing between approaches, clarifying requirements, or settling a trade-off.",
     promptSnippet: "Ask the user a question with options when their decision is required",
     promptGuidelines: [
       "Use ask_question only when the user must decide something you cannot infer from the codebase; prefer acting on a sensible default when one clearly exists.",

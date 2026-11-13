@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ASK_QUESTION_TOOL_NAME, createAskQuestionTool } from "./ask-tool.ts";
+import { ASK_QUESTION_TOOL_NAME, MAX_ASK_QUESTIONS, createAskQuestionTool } from "./ask-tool.ts";
 
 const questions = [
   {
@@ -91,4 +91,12 @@ test("treats an aborted turn as an unanswered question", async () => {
   const result = await execute({ askQuestions: async () => undefined }, controller.signal);
   assert.equal(result.details.cancelled, true);
   assert.match(result.content[0].text, /turn stopped/);
+});
+
+test("allows five questions, one per dialog row", () => {
+  const tool = createAskQuestionTool();
+  const schema = tool.parameters.properties.questions;
+  assert.equal(schema.minItems, 1);
+  assert.equal(schema.maxItems, MAX_ASK_QUESTIONS);
+  assert.equal(MAX_ASK_QUESTIONS, 5);
 });

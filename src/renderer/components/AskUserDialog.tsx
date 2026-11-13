@@ -1,10 +1,16 @@
 /**
- * Ask dialog for the `ask` extension-UI request: one to four questions, each
- * with labeled options (optional descriptions) and a free-text "Other" answer.
+ * Ask UI for the `ask` extension-UI request: one to five questions, each with
+ * labeled options (optional descriptions) and a free-text "Other" answer.
  * Multi-select questions toggle rows; single-select replaces the choice. The
  * answers travel back one AskQuestionAnswer per question, in request order.
+ *
+ * Two shells share the same content:
+ * - AskUserPanel docks above the composer (desktop): a non-modal overlay, so
+ *   the conversation stays scrollable and the composer keeps its space.
+ * - AskUserDialog is a modal Dialog, kept for narrow windows where an inline
+ *   panel would leave too little room for the questions.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useI18n } from "@/i18n";
 import type { AskQuestion, AskQuestionAnswer, ExtensionUiRequest } from "@/lib/types";
 import { Button } from "./ui/Button";
@@ -12,11 +18,15 @@ import { Dialog } from "./ui/Dialog";
 import { Input } from "./ui/Input";
 
 type AskRequest = Extract<ExtensionUiRequest, { method: "ask" }>;
+type AskResponse = { answers: AskQuestionAnswer[] } | { cancelled: true };
 
 export interface AskUserDialogProps {
   request: AskRequest;
-  onRespond: (request: AskRequest, response: { answers: AskQuestionAnswer[] } | { cancelled: true }) => void;
+  onRespond: (request: AskRequest, response: AskResponse) => void;
 }
+
+/** Panel height ceiling: enough for five questions, leaving conversation visible. */
+const PANEL_MAX_HEIGHT = "min(70vh, 660px)";
 
 interface Draft {
   selected: string[];
@@ -39,8 +49,23 @@ const optionStyle = {
   whiteSpace: "normal",
   textAlign: "left",
 } as const;
+/** Header / scrolling question list / footer, so only the list scrolls. */
+const frameStyle = {
+  display: "flex",
+  flexDirection: "column",
+  flex: "1 1 auto",
+  minHeight: 0,
+} as const;
 
-export function AskUserDialog({ request, onRespond }: AskUserDialogProps) {
+function AskQuestionContent({
+  request,
+  onRespond,
+  maxHeight,
+}: {
+  request: AskRequest;
+  onRespond: AskUserDialogProps["onRespond"];
+  maxHeight?: string;
+}) {
   const { t } = useI18n();
   const [drafts, setDrafts] = useState<Draft[]>(() => emptyDrafts(request.questions));
 
@@ -98,15 +123,16 @@ export function AskUserDialog({ request, onRespond }: AskUserDialogProps) {
   const cancel = () => onRespond(request, { cancelled: true });
 
   return (
-    <Dialog
-      open
-      onClose={cancel}
-      ariaLabel={t("askQuestionTitle", "The agent needs your input")}
-      width={580}
-      closeOnBackdrop={false}
-      style={{ padding: 0, gap: 0, background: "var(--bg-panel)" }}
-    >
-      <header style={{ padding: "13px 16px", borderBottom: "1px solid var(--border)", display: "grid", gap: 3 }}>
+    <div style={{ ...frameStyle, ...(maxHeight ? { maxHeight } : {}) }}>
+      <header
+        style={{
+          padding: "13px 16px",
+          borderBottom: "1px solid var(--border)",
+          display: "grid",
+          gap: 3,
+          flexShrink: 0,
+        }}
+      >
         <div style={{ color: "var(--text)", fontSize: 14, fontWeight: 650 }}>
           {t("askQuestionTitle", "The agent needs your input")}
         </div>
@@ -116,13 +142,7 @@ export function AskUserDialog({ request, onRespond }: AskUserDialogProps) {
       </header>
 
       <div
-        style={{
-          display: "grid",
-          gap: 18,
-          padding: "14px 16px",
-          maxHeight: "min(62vh, 540px)",
-          overflowY: "auto",
-        }}
+        style={{ display: "grid", gap: 18, padding: "14px 16px", overflowY: "auto", minHeight: 0, flex: "1 1 auto" }}
       >
         {request.questions.map((question, index) => {
           const draft = drafts[index] ?? { selected: [], other: "", otherActive: false };
@@ -195,6 +215,7 @@ export function AskUserDialog({ request, onRespond }: AskUserDialogProps) {
           gap: 8,
           padding: "11px 16px",
           borderTop: "1px solid var(--border)",
+          flexShrink: 0,
         }}
       >
         <Button onClick={cancel}>{t("cancel", "Cancel")}</Button>
@@ -202,6 +223,87 @@ export function AskUserDialog({ request, onRespond }: AskUserDialogProps) {
           {t("submit", "Submit")}
         </Button>
       </footer>
+    </div>
+  );
+}
+
+/** Modal shell, used on narrow windows. */
+export function AskUserDialog({ request, onRespond }: AskUserDialogProps) {
+  const { t } = useI18n();
+  return (
+    <Dialog
+      open
+      onClose={() => onRespond(request, { cancelled: true })}
+      ariaLabel={t("askQuestionTitle", "The agent needs your input")}
+      width={580}
+      closeOnBackdrop={false}
+      style={{ padding: 0, gap: 0, background: "var(--bg-panel)" }}
+    >
+      <AskQuestionContent request={request} onRespond={onRespond} maxHeight={PANEL_MAX_HEIGHT} />
     </Dialog>
+  );
+}
+
+export interface AskUserPanelProps extends AskUserDialogProps {
+  /** Layout from the caller (docking, gutters); the panel owns only its surface. */
+  style?: CSSProperties;
+}
+
+/**
+ * Docked panel: sits where the composer is and grows upward over the
+ * conversation without reflowing it. Non-modal by design — the transcript
+ * stays readable and scrollable while the agent waits.
+ */
+export function AskUserPanel({ request, onRespond, style }: AskUserPanelProps) {
+  const { t } = useI18n();
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    panelRef.current?.focus();
+  }, [request.id]);
+
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    onRespond(request, { cancelled: true });
+  };
+
+  return (
+    <div
+      ref={panelRef}
+      role="group"
+      aria-label={t("askQuestionTitle", "The agent needs your input")}
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+      className="ask-panel-enter"
+      style={{
+        position: "absolute",
+        insetInline: 0,
+        bottom: 0,
+        zIndex: 3,
+        display: "grid",
+        minHeight: 0,
+        maxHeight: PANEL_MAX_HEIGHT,
+        outline: "none",
+        ...style,
+      }}
+    >
+      <div className="chat-content-column" style={{ display: "grid", minHeight: 0 }}>
+        <div
+          style={{
+            display: "grid",
+            minHeight: 0,
+            overflow: "hidden",
+            border: "1px solid var(--accent-soft-border)",
+            borderRadius: 14,
+            background: "var(--assistant-bg)",
+            boxShadow: "0 -2px 24px color-mix(in srgb, #000 10%, transparent)",
+          }}
+        >
+          <AskQuestionContent request={request} onRespond={onRespond} maxHeight={PANEL_MAX_HEIGHT} />
+        </div>
+      </div>
+    </div>
   );
 }
