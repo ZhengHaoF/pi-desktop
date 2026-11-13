@@ -31,6 +31,21 @@ test("renders the switch pattern with role and checked state", () => {
   assert.match(off, /background:var\(--border\)/);
 });
 
+test("track geometry: Button's min-height preset must not inflate the pill", () => {
+  const html = renderSwitch({ checked: false, onChange() {} });
+  const minHeight = Number(/min-height:(\d+(?:\.\d+)?)px/.exec(html)?.[1] ?? 0);
+  const height = Number(/(?:^|;)height:(\d+(?:\.\d+)?)px/.exec(html)?.[1] ?? 0);
+  assert.ok(height > 0, "track height must be declared");
+  assert.ok(
+    minHeight <= height,
+    `min-height ${minHeight}px exceeds track height ${height}px — Button preset leaks into the switch`,
+  );
+  // Knob centers vertically via transform so it stays centered whatever the
+  // track height resolves to.
+  assert.match(html, /top:50%/);
+  assert.match(html, /transform:translateY\(-50%\)/);
+});
+
 test("knob slides via left offset between 3px and 21px", () => {
   const on = renderSwitch({ checked: true, onChange() {} });
   assert.match(on, /left:21px/);
