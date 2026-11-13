@@ -336,6 +336,23 @@ export class RemoteGateway {
     }
   }
 
+  /** Send one approval mirror to a specific device (late-subscribe replay). */
+  private mirrorApproval(data: Record<string, unknown>, targetDeviceId?: string): void {
+    const key = typeof data.sessionId === "string" ? data.sessionId : "";
+    this.sendToRelay(
+      {
+        v: 1,
+        traceId: randomUUID(),
+        ts: Date.now(),
+        nonce: randomUUID(),
+        role: "host",
+        deviceId: undefined,
+        payload: { kind: "event", topic: "remote.approval", key, data },
+      },
+      targetDeviceId,
+    );
+  }
+
   private shouldMirror(topic: string, key: string): boolean {
     const keys = this.remoteSubscriptions.get(topic);
     if (!keys) return false;
@@ -417,6 +434,11 @@ export class RemoteGateway {
       keys.add(payload.key);
       this.remoteSubscriptions.set(payload.topic, keys);
       this.sendResponse(payload.id, true, { subscribed: true }, undefined, fromDevice);
+      // A device that just subscribed may have missed mirrored dialogs; replay
+      // the ones still pending for this session to it only.
+      if (payload.topic === "remote.approval") {
+        for (const data of this.approvalBridge.pendingFor(payload.key)) this.mirrorApproval(data, fromDevice);
+      }
       return;
     }
     if (payload.kind === "unsubscribe") {

@@ -157,6 +157,32 @@ export type ExtensionUiConfirmLocalization =
   | { id: "herdr.closeAgentPane"; paneId: string; agentKind: string }
   | { id: "mcp.authorize"; servers: string; tools: string; toolCount: number };
 
+/** One selectable answer offered by an ask request. */
+export interface AskQuestionOption {
+  label: string;
+  description?: string;
+}
+
+/** One question the agent asks through the renderer dialog. */
+export interface AskQuestion {
+  /** Short chip label shown above the question. */
+  header?: string;
+  question: string;
+  options: AskQuestionOption[];
+  /** Allow selecting more than one option. */
+  multiSelect?: boolean;
+}
+
+/** The user's answer to one ask question. */
+export interface AskQuestionAnswer {
+  header?: string;
+  question: string;
+  /** Chosen option labels in display order; empty when only free text was given. */
+  selected: string[];
+  /** Free text the user typed into the "Other" field. */
+  other?: string;
+}
+
 export type ExtensionUiRequest =
   | {
       type: "extension_ui_request";
@@ -192,6 +218,14 @@ export type ExtensionUiRequest =
       method: "editor";
       title: string;
       prefill?: string;
+      timeout?: number;
+      expiresAt?: number;
+    }
+  | {
+      type: "extension_ui_request";
+      id: string;
+      method: "ask";
+      questions: AskQuestion[];
       timeout?: number;
       expiresAt?: number;
     }
@@ -235,11 +269,22 @@ export type ExtensionUiRequest =
       method: "custom";
       lines: string[];
       closed?: boolean;
+    }
+  | {
+      /**
+       * A dialog settled somewhere else (another client answered, it timed
+       * out, or the turn aborted). Clients showing that request close it.
+       */
+      type: "extension_ui_request";
+      id: string;
+      method: "resolved";
+      requestId: string;
     };
 
 export type ExtensionUiResponse =
   | { type: "extension_ui_response"; id: string; value: string }
   | { type: "extension_ui_response"; id: string; confirmed: boolean }
+  | { type: "extension_ui_response"; id: string; answers: AskQuestionAnswer[] }
   | { type: "extension_ui_response"; id: string; cancelled: true };
 
 export interface ExtensionStatusItem {

@@ -54,7 +54,8 @@ cd mobile && flutter run -d 192.168.31.118:38043 # 真机无线调试
 - [x] **markdown 渲染**（assistant 气泡）：粗体/斜体/行内代码/代码块/标题/有序无序列表/链接（零依赖手写渲染器）
 - [x] **思考过程折叠卡片**（💭 思考过程 + 预览 + 展开全文，对齐桌面）
 - [x] 工具卡片（对齐桌面 ToolCallBlock）：toolCall/toolResult 按 toolCallId 配对、中文标签、输入预览、运行中/错误态
-- [x] 审批卡片（批准/拒绝回传）+ 中止按钮
+- [x] 审批卡片（批准/拒绝回传）+ 中止按钮 ✅ 2026-11-13 修正回传结构：手机原先发 `{response:{confirmed}}`，而宿主按 `ExtensionUiResponse` 顶层读 `confirmed`，点击实际按拒绝处理；现改为扁平 `{confirmed}`，宿主同时兼容旧嵌套结构
+- [x] **AI 提问弹层（`ask_question`）对齐桌面** ✅ 2026-11-13：桌面 `ask_question` 工具产生的多问题对话框经 `remote.approval` 镜像到手机，底部弹层渲染（header chip / 选项描述 / 单选·多选 / 其他输入框 / 未答完禁用提交），答完扁平回传 `{answers}`；手机进页面订阅 `remote.approval` 时宿主补发未决请求（`ApprovalBridge.pendingFor`），切页返回不丢问题；桌面先答则宿主广播 `method:"resolved"`，手机卡片与弹层自动关闭（先答先赢）；`ask_question` 带 5 分钟超时，远程无人应答不会永久挂住回合。协议 `ApprovalRequestData` 扩为 confirm/select/input/editor 与 ask 的联合类型，新增 `ApprovalResolvedData`
 - [x] **"/" 命令面板**：输入 "/" 弹出内置命令 + PC 技能列表（skills.list），点选填入
 - [x] AppBar 当前模型 chip → bottom sheet 切模型（models.preferences.get，enabledModels 过滤）
 

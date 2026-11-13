@@ -21,6 +21,7 @@ import {
   splitFinalAssistantBlocks,
 } from "@/lib/message-display";
 import { MessageView } from "./MessageView";
+import { AskUserDialog } from "./AskUserDialog";
 import { ProcessDetailsGroup } from "./ProcessDetailsGroup";
 import { SessionProfiler } from "./SessionProfiler";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
@@ -496,7 +497,12 @@ export function ChatWindow({
         </div>
       )}
 
-      {extensionDialog && <ExtensionDialog request={extensionDialog} onRespond={respondToExtensionUi} />}
+      {extensionDialog &&
+        (extensionDialog.method === "ask" ? (
+          <AskUserDialog request={extensionDialog} onRespond={respondToExtensionUi} />
+        ) : (
+          <ExtensionDialog request={extensionDialog} onRespond={respondToExtensionUi} />
+        ))}
 
       {extensionCustomUi && <ExtensionCustomPanel request={extensionCustomUi} onInput={sendExtensionCustomInput} />}
 

@@ -229,3 +229,32 @@ test("notice expiry keeps the exit animation and unmount clears presentation tim
   await fixture.unmount();
   assert.equal(fixture.timers.size, 0);
 });
+
+test("ask requests open the question dialog and forward collected answers", async (t) => {
+  const fixture = await mount(t);
+  const questions = [{ header: "Auth", question: "Which auth?", options: [{ label: "OAuth" }, { label: "API key" }] }];
+  await fixture.emit({ id: "ask", method: "ask", questions });
+  const request = fixture.current.extensionDialog;
+  assert.equal(request.method, "ask");
+  const answers = [{ header: "Auth", question: "Which auth?", selected: ["OAuth"] }];
+  await act(async () => fixture.current.respondToExtensionUi(request, { answers }));
+  assert.deepEqual(commands, [{ sid: "a", command: { type: "extension_ui_response", id: "ask", answers } }]);
+  assert.equal(fixture.current.extensionDialog, null);
+});
+
+test("a resolved signal from another client closes the matching dialog", async (t) => {
+  const fixture = await mount(t);
+  const questions = [{ question: "Which auth?", options: [{ label: "OAuth" }] }];
+  await fixture.emit({ id: "ask-1", method: "ask", questions });
+  assert.equal(fixture.current.extensionDialog.method, "ask");
+  await fixture.emit({ id: "wrapper", method: "resolved", requestId: "ask-1" });
+  assert.equal(fixture.current.extensionDialog, null);
+  assert.equal(commands.length, 0);
+  // An unrelated request id must not close the open dialog.
+  const request = fixture.current.extensionDialog;
+  await fixture.emit({ id: "keep", method: "input", title: "keep" });
+  await fixture.emit({ id: "wrapper-2", method: "resolved", requestId: "other" });
+  assert.notEqual(fixture.current.extensionDialog, null);
+  assert.notEqual(fixture.current.extensionDialog, request);
+  assert.equal(commands.length, 0);
+});

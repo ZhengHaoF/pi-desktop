@@ -6,7 +6,7 @@ import type {
   SlashCommandInfo,
   ToolInfo as SdkToolInfo,
 } from "@earendil-works/pi-coding-agent";
-import type { ExtensionUiConfirmLocalization } from "./types";
+import type { AskQuestion, AskQuestionAnswer, ExtensionUiConfirmLocalization } from "./types";
 
 export interface ContextUsage {
   percent: number | null;
@@ -104,6 +104,8 @@ export interface ExtensionUiContextLike {
   ): Promise<boolean>;
   input(title: string, placeholder?: string, opts?: DialogOptionsLike): Promise<string | undefined>;
   editor(title: string, prefill?: string, opts?: DialogOptionsLike): Promise<string | undefined>;
+  /** Desktop-only dialog: several questions with options plus free text; absent in other hosts. */
+  askQuestions?(questions: AskQuestion[], opts?: DialogOptionsLike): Promise<AskQuestionAnswer[] | undefined>;
   notify(message: string, type?: "info" | "warning" | "error"): void;
   onTerminalInput(): () => void;
   setStatus(key: string, text: string | undefined): void;

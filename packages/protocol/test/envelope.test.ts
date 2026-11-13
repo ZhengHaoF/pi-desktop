@@ -8,6 +8,7 @@ import {
   HelloAckPayload,
   ApprovalRequestData,
   ApprovalResponseData,
+  ApprovalResolvedData,
   RELIABILITY,
   PROTOCOL_VERSION,
   isCipherRequiredEnvelope,
@@ -97,6 +98,32 @@ test("golden: approval request/response", () => {
   assertShape(response, { requestId: "string", action: "string" });
 });
 
+test("golden: ask approval carries questions and answers answers", () => {
+  const request = {
+    requestId: "r2",
+    sessionId: "s1",
+    method: "ask",
+    questions: [
+      {
+        header: "Auth",
+        question: "Which auth?",
+        options: [{ label: "OAuth", description: "Browser login" }, { label: "API key" }],
+      },
+      { question: "Scopes?", options: [{ label: "Read" }], multiSelect: true },
+    ],
+    createdAt: 1_700_000_000_000,
+  };
+  assertShape(request, { requestId: "string", sessionId: "string", method: "string", createdAt: "number" });
+  const response = {
+    requestId: "r2",
+    action: "respond",
+    answers: [{ header: "Auth", question: "Which auth?", selected: ["OAuth"] }],
+  };
+  assertShape(response, { requestId: "string", action: "string" });
+  const resolved = { requestId: "r2", sessionId: "s1", resolved: true };
+  assertShape(resolved, { requestId: "string", sessionId: "string", resolved: "boolean" });
+});
+
 test("allowlist: allowed, forbidden, unknown methods", () => {
   assert.equal(isMethodAllowed("agent.command"), true);
   assert.equal(isMethodAllowed("sessions.contextPage"), true);
@@ -151,6 +178,7 @@ test("schemas are plain objects (typebox sanity)", () => {
     HelloAckPayload,
     ApprovalRequestData,
     ApprovalResponseData,
+    ApprovalResolvedData,
   ]) {
     assert.equal(typeof registry, "object");
     assert.ok(schema && typeof schema === "object");

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import '../core/chat_scroll_policy.dart';
 import '../core/remote_connection.dart';
+import '../widgets/ask_sheet.dart';
 import '../widgets/markdown_text.dart';
 import '../widgets/session_models.dart';
 
@@ -48,6 +49,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final _expandedTools = <String>{};
   final _expandedThinking = <String>{};
   final _approvals = <Map<String, dynamic>>[];
+  /// Pending ask requests keyed by requestId. The sheet shows one at a time and
+  /// the map survives a sheet being dismissed so it can be reopened.
+  final _asks = <String, Map<String, dynamic>>{};
+  /// Set while the active ask settled elsewhere (desktop answered) — the open
+  /// sheet watches it and closes without sending a second answer.
+  ValueNotifier<bool>? _askResolvedElsewhere;
+  String? _activeAskId;
+  bool _askSheetOpen = false;
   String? _error;
   StreamSubscription<RemoteSessionEvent>? _events;
   Timer? _renderThrottle;
@@ -104,6 +113,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // PC writes model_change / messages into the session file; the watcher
       // broadcasts sessions.changed. Use it to keep the model chip in sync.
       await widget.connection.subscribe('sessions.changed', _sessionId);
+      // Mirrored dialogs; subscribing also replays requests still pending at
+      // the PC (the host answers this subscribe with the unresolved ones).
+      await widget.connection.subscribe('remote.approval', _sessionId);
       unawaited(_loadModelNames());
       // includeState is required or the PC omits agentState entirely,
       // which would break the running-mirror restore below.
@@ -275,9 +287,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
     if (event.topic == 'remote.approval') {
       final data = Map<String, dynamic>.from(event.data as Map);
-      if ((data['sessionId'] as String?) == _sessionId) {
-        setState(() => _approvals.add(data));
+      if ((data['sessionId'] as String?) != _sessionId) return;
+      final requestId = data['requestId'] as String?;
+      if (data['resolved'] == true) {
+        // Answered on the PC (or timed out / aborted): drop every card and
+        // close the sheet if it is the one showing this request.
+        if (requestId != null) _settleRequest(requestId);
+        return;
       }
+      if (data['method'] == 'ask') {
+        if (requestId != null) _enqueueAsk(requestId, data);
+        return;
+      }
+      // A reconnect replays the pending set; never stack the same card twice.
+      if (requestId != null && _approvals.any((entry) => entry['requestId'] == requestId)) return;
+      setState(() => _approvals.add(data));
       return;
     }
     if (event.topic == 'agent.running') {
@@ -602,16 +626,72 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _respondApproval(Map<String, dynamic> approval, bool confirmed) async {
     final requestId = approval['requestId'] as String?;
     if (requestId == null) return;
+    setState(() => _approvals.remove(approval));
+    await _sendUiResponse(requestId, {'confirmed': confirmed});
+  }
+
+  /// Flat extension_ui_response body — the Host's ExtensionUiResponse shape.
+  Future<void> _sendUiResponse(String requestId, Map<String, dynamic> body) async {
     try {
       await widget.connection.agentCommand(_sessionId, {
         'type': 'extension_ui_response',
         'id': requestId,
-        'response': {'confirmed': confirmed},
+        ...body,
       });
-      setState(() => _approvals.remove(approval));
     } catch (err) {
-      setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = err.toString());
     }
+  }
+
+  void _enqueueAsk(String requestId, Map<String, dynamic> data) {
+    if (_asks.containsKey(requestId)) return;
+    _asks[requestId] = data;
+    unawaited(_openNextAsk());
+  }
+
+  /// Drops every card for a request and closes the sheet showing it.
+  void _settleRequest(String requestId) {
+    if (!mounted) return;
+    setState(() {
+      _approvals.removeWhere((entry) => entry['requestId'] == requestId);
+      _asks.remove(requestId);
+    });
+    if (_activeAskId == requestId) _askResolvedElsewhere?.value = true;
+  }
+
+  /// Shows the oldest pending ask; asks are sequential, so one sheet at a time.
+  Future<void> _openNextAsk() async {
+    if (!mounted || _askSheetOpen || _asks.isEmpty) return;
+    final entry = _asks.entries.first;
+    final questions = parseAskQuestions(entry.value['questions']);
+    if (questions == null) {
+      _asks.remove(entry.key);
+      await _sendUiResponse(entry.key, {'cancelled': true});
+      return _openNextAsk();
+    }
+    _askSheetOpen = true;
+    _activeAskId = entry.key;
+    final resolved = ValueNotifier<bool>(false);
+    _askResolvedElsewhere = resolved;
+    List<Map<String, dynamic>>? answers;
+    try {
+      answers = await showAskSheet(
+        context: context,
+        questions: questions,
+        resolvedElsewhere: resolved,
+      );
+    } finally {
+      final settledElsewhere = resolved.value;
+      _askSheetOpen = false;
+      _activeAskId = null;
+      _askResolvedElsewhere = null;
+      resolved.dispose();
+      _asks.remove(entry.key);
+      if (!settledElsewhere) {
+        await _sendUiResponse(entry.key, answers == null ? {'cancelled': true} : {'answers': answers});
+      }
+    }
+    if (mounted) unawaited(_openNextAsk());
   }
 
   Future<void> _send() async {
@@ -657,6 +737,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     widget.connection.unsubscribe('agent.events', _sessionId);
     widget.connection.unsubscribe('agent.running', _sessionId);
     widget.connection.unsubscribe('sessions.changed', _sessionId);
+    widget.connection.unsubscribe('remote.approval', _sessionId);
     WidgetsBinding.instance.removeObserver(this);
     _promptController.dispose();
     _scrollController.dispose();

@@ -1,14 +1,16 @@
 /**
- * Approval bridge — mirrors extension UI confirmations to the remote plane.
+ * Approval bridge — mirrors extension UI dialogs to the remote plane.
  *
  * Semantics (docs/remote-control-plan.md §7.4):
- * - extension_ui_request events are surfaced as remote.approval entries.
- * - Requests WITHOUT an extension timeout suspend indefinitely until the
- *   device responds, the user aborts the turn, or the gateway stops.
+ * - extension_ui_request dialogs are surfaced as remote.approval entries.
+ * - Requests WITHOUT an extension timeout suspend indefinitely until a client
+ *   responds, the user aborts the turn, or the gateway stops.
  * - Requests WITH expiresAt settle at the Host with its own default value;
  *   the bridge merely marks them expired locally for the UI.
- * - Responses are forwarded verbatim as extension_ui_response agent commands
- *   keyed by request id (the Host resolves them idempotently).
+ * - Responses are forwarded as extension_ui_response agent commands keyed by
+ *   request id (the Host resolves them idempotently, first answer wins).
+ * - When a request settles anywhere, the Host emits `method: "resolved"`; the
+ *   bridge drops it and mirrors `{resolved: true}` so stale cards disappear.
  */
 import { randomUUID } from "node:crypto";
 import type { WireMessage } from "../../contract/rpc.ts";
@@ -24,8 +26,13 @@ interface ExtensionUiRequestData {
   options?: unknown[];
   prefill?: string;
   placeholder?: string;
+  questions?: unknown[];
+  requestId?: string;
   expiresAt?: number;
 }
+
+/** Dialog methods worth a remote card; fire-and-forget methods are ignored. */
+const MIRRORED_METHODS = new Set(["confirm", "select", "input", "editor", "ask"]);
 
 export interface ApprovalDecision {
   requestId: string;
@@ -40,6 +47,8 @@ interface PendingApproval {
   sessionId: string;
   createdAt: number;
   expiresAt?: number;
+  /** Payload mirrored at request time, replayed to a device that subscribes late. */
+  payload: Record<string, unknown>;
 }
 
 export class ApprovalBridge {
@@ -58,37 +67,43 @@ export class ApprovalBridge {
     if (event.topic !== "agent.events" || !event.data || typeof event.data !== "object") return;
     const data = event.data as ExtensionUiRequestData;
     if (data.type !== "extension_ui_request" || typeof data.id !== "string") return;
+
+    if (data.method === "resolved") {
+      if (typeof data.requestId === "string") this.resolve(data.requestId, event.key);
+      return;
+    }
+    if (!data.method || !MIRRORED_METHODS.has(data.method)) return;
+
+    const createdAt = Date.now();
+    const payload: Record<string, unknown> = {
+      requestId: data.id,
+      sessionId: event.key,
+      method: data.method,
+      ...(data.title !== undefined ? { title: data.title } : {}),
+      ...(data.message !== undefined ? { message: data.message } : {}),
+      ...(data.options ? { options: data.options } : {}),
+      ...(data.questions ? { questions: data.questions } : {}),
+      ...(data.prefill !== undefined ? { prefill: data.prefill } : {}),
+      ...(data.placeholder !== undefined ? { placeholder: data.placeholder } : {}),
+      ...(data.expiresAt !== undefined ? { expiresAt: data.expiresAt } : {}),
+      createdAt,
+    };
     this.pending.set(data.id, {
       requestId: data.id,
       sessionId: event.key,
-      createdAt: Date.now(),
+      createdAt,
       ...(typeof data.expiresAt === "number" ? { expiresAt: data.expiresAt } : {}),
+      payload,
     });
-    this.send({
-      v: 1,
-      traceId: randomUUID(),
-      ts: Date.now(),
-      nonce: randomUUID(),
-      role: "host",
-      deviceId: undefined,
-      payload: {
-        kind: "event",
-        topic: "remote.approval",
-        key: event.key,
-        data: {
-          requestId: data.id,
-          sessionId: event.key,
-          method: data.method ?? "confirm",
-          title: data.title ?? "",
-          ...(data.message !== undefined ? { message: data.message } : {}),
-          ...(data.options ? { options: data.options } : {}),
-          ...(data.prefill !== undefined ? { prefill: data.prefill } : {}),
-          ...(data.placeholder !== undefined ? { placeholder: data.placeholder } : {}),
-          ...(data.expiresAt !== undefined ? { expiresAt: data.expiresAt } : {}),
-          createdAt: Date.now(),
-        },
-      },
-    });
+    this.sendMirror(event.key, payload);
+  }
+
+  /** Unresolved approvals of one session, for replay on a late subscribe. */
+  pendingFor(sessionId: string): Array<Record<string, unknown>> {
+    return [...this.pending.values()]
+      .filter((entry) => entry.sessionId === sessionId)
+      .sort((a, b) => a.createdAt - b.createdAt)
+      .map((entry) => entry.payload);
   }
 
   /** A device answered; forward as extension_ui_response agent command. */
@@ -96,22 +111,51 @@ export class ApprovalBridge {
     void response;
   }
 
-  /** Build the agent.command payload that resolves a pending approval. */
+  /**
+   * Build the agent.command payload that resolves a pending approval. The body
+   * is flat (`{confirmed}`, `{answers}`, `{cancelled}`) to match the local
+   * renderer and ExtensionUiResponse; older app builds send it wrapped in
+   * `response` and the Host unwraps that.
+   */
   buildResponseCommand(
     requestId: string,
-    response: unknown,
+    response: Record<string, unknown>,
   ):
     | {
         sessionId: string;
-        command: { type: "extension_ui_response"; id: string; response: unknown };
+        command: { type: "extension_ui_response"; id: string } & Record<string, unknown>;
       }
     | undefined {
     const pending = this.pending.get(requestId);
     if (!pending) return undefined;
     return {
       sessionId: pending.sessionId,
-      command: { type: "extension_ui_response" as const, id: requestId, response },
+      command: { type: "extension_ui_response" as const, id: requestId, ...response },
     };
+  }
+
+  /** Drop a settled request and tell devices to close its card. */
+  private resolve(requestId: string, sessionId: string): void {
+    const pending = this.pending.get(requestId);
+    if (!pending) return;
+    this.pending.delete(requestId);
+    this.sendMirror(pending.sessionId ?? sessionId, {
+      requestId,
+      sessionId: pending.sessionId ?? sessionId,
+      resolved: true,
+    });
+  }
+
+  private sendMirror(key: string, data: Record<string, unknown>): void {
+    this.send({
+      v: 1,
+      traceId: randomUUID(),
+      ts: Date.now(),
+      nonce: randomUUID(),
+      role: "host",
+      deviceId: undefined,
+      payload: { kind: "event", topic: "remote.approval", key, data },
+    });
   }
 
   /** Batch-abort (device revoked, total switch off, gateway stopping). */

@@ -275,6 +275,48 @@ test("gateway: extension_ui_request mirrored to remote.approval; stop aborts", a
   gateway.dispose();
 });
 
+test("gateway: ask dialogs mirror with questions and replay to a late subscriber", async () => {
+  const mod = await loadRemoteModule();
+  const { server, socket, gateway } = await makeGateway(mod);
+
+  socket.deliver({ kind: "subscribe", id: "sub-0", topic: "agent.events", key: "s1" });
+  await new Promise((resolve) => setTimeout(resolve, 30));
+
+  const questions = [{ question: "Which auth?", options: [{ label: "OAuth" }, { label: "Key" }] }];
+  server.emit("agent.events", "s1", { type: "extension_ui_request", id: "ask-1", method: "ask", questions });
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  const mirrored = socket.sent
+    .map((raw) => JSON.parse(raw))
+    .find((parsed) => parsed.payload?.data?.requestId === "ask-1");
+  assert.ok(mirrored, "ask must be mirrored");
+  assert.equal(mirrored.payload.topic, "remote.approval");
+  assert.deepEqual(mirrored.payload.data.questions, questions);
+
+  // A phone that subscribes after the question was asked still receives it.
+  const before = socket.sent.length;
+  socket.deliver({ kind: "subscribe", id: "sub-ask", topic: "remote.approval", key: "s1" });
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  const replayed = socket.sent
+    .slice(before)
+    .map((raw) => JSON.parse(raw))
+    .find((parsed) => parsed.payload?.data?.requestId === "ask-1");
+  assert.ok(replayed, "pending ask must replay to a late subscriber");
+
+  // Once the desktop answers, the closure is mirrored so the phone card clears.
+  server.emit("agent.events", "s1", {
+    type: "extension_ui_request",
+    id: "resolved-1",
+    method: "resolved",
+    requestId: "ask-1",
+  });
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  const closed = socket.sent
+    .map((raw) => JSON.parse(raw))
+    .find((parsed) => parsed.payload?.data?.resolved === true && parsed.payload.data.requestId === "ask-1");
+  assert.ok(closed, "resolving elsewhere must mirror a closure");
+  gateway.dispose();
+});
+
 test("@ pair.create control frame round-trips through the relay reply", async () => {
   const mod = await loadRemoteModule();
   const { socket, gateway } = await makeGateway(mod);

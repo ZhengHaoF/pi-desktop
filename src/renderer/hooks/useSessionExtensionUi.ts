@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type RefObject } from "react";
-import type { ExtensionStatusItem, ExtensionWidgetItem, ExtensionUiRequest } from "@/lib/types";
+import type { AskQuestionAnswer, ExtensionStatusItem, ExtensionWidgetItem, ExtensionUiRequest } from "@/lib/types";
 import type { SessionRuntimeState } from "@contract/types";
 import { sendAgentCommand } from "@/lib/agent-client";
 import { NOTICE_VISIBLE_MS, noticeExpiryDelay, noticeReducer, type NoticeType } from "@/lib/notice-queue";
@@ -7,7 +7,9 @@ import type { RuntimeSnapshotTicket, SessionRuntimeGate } from "@/lib/session-ru
 import { useI18n } from "@/i18n";
 import { modelSelectionNoticeText } from "@/lib/model-selection-notice";
 
-type DialogRequest = Extract<ExtensionUiRequest, { method: "select" | "confirm" | "input" | "editor" }>;
+type DialogRequest = Extract<ExtensionUiRequest, { method: "select" | "confirm" | "input" | "editor" | "ask" }>;
+type DialogResponse =
+  { value: string } | { confirmed: boolean } | { answers: AskQuestionAnswer[] } | { cancelled: true };
 type CustomRequest = Extract<ExtensionUiRequest, { method: "custom" }>;
 type RequestOwner<T> = { request: T; sessionId: string; signal: AbortSignal; expiresAt?: number };
 
@@ -80,7 +82,7 @@ export function useSessionExtensionUi({
   );
 
   const respondToExtensionUi = useCallback(
-    async (request: DialogRequest, response: { value: string } | { confirmed: boolean } | { cancelled: true }) => {
+    async (request: DialogRequest, response: DialogResponse) => {
       const owner = dialogOwnerRef.current;
       if (!owner || owner.request !== request || !owns(owner)) return;
       // Consume before awaiting RPC, so double clicks can produce only one answer.
@@ -115,10 +117,21 @@ export function useSessionExtensionUi({
         sid = sessionIdRef.current;
       if (signal.aborted || !sid) return;
       switch (request.method) {
+        case "resolved": {
+          // Settled elsewhere (a phone answered, it expired, or the turn
+          // aborted): close the matching dialog without sending anything.
+          const owner = dialogOwnerRef.current;
+          if (owner && owner.request.id === request.requestId) {
+            dialogOwnerRef.current = null;
+            setExtensionDialog(null);
+          }
+          break;
+        }
         case "select":
         case "confirm":
         case "input":
-        case "editor": {
+        case "editor":
+        case "ask": {
           const expiresAt = request.expiresAt ?? (request.timeout ? Date.now() + request.timeout : undefined);
           if (expiresAt !== undefined && expiresAt <= Date.now()) return;
           dialogOwnerRef.current = { request, sessionId: sid, signal, expiresAt };

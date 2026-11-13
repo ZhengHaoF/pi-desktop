@@ -133,19 +133,63 @@ export type HelloAckPayloadValue = Static<typeof HelloAckPayload>;
 // Pending approval mirror (topic "remote.approval")
 // ---------------------------------------------------------------------------
 
-export const ApprovalRequestData = Type.Object({
-  requestId: Type.String({ minLength: 1 }),
-  sessionId: Type.String({ minLength: 1 }),
-  method: Type.Union([Type.Literal("confirm"), Type.Literal("select"), Type.Literal("input"), Type.Literal("editor")]),
-  title: Type.String(),
-  message: Type.Optional(Type.String()),
-  options: Type.Optional(Type.Array(Type.String())),
-  prefill: Type.Optional(Type.String()),
-  placeholder: Type.Optional(Type.String()),
-  /** Present only when the extension supplied its own timeout. */
-  expiresAt: Type.Optional(Type.Integer({ minimum: 0 })),
-  createdAt: Type.Integer({ minimum: 0 }),
+/** One selectable answer offered by an ask request. */
+export const AskOptionData = Type.Object({
+  label: Type.String({ minLength: 1 }),
+  description: Type.Optional(Type.String()),
 });
+
+/** One question carried by an ask request (desktop ask_question tool). */
+export const AskQuestionData = Type.Object({
+  header: Type.Optional(Type.String()),
+  question: Type.String({ minLength: 1 }),
+  options: Type.Array(AskOptionData, { minItems: 1 }),
+  multiSelect: Type.Optional(Type.Boolean()),
+});
+
+export type AskQuestionDataValue = Static<typeof AskQuestionData>;
+
+/** One answered question; `selected` may be empty when only free text was given. */
+export const AskAnswerData = Type.Object({
+  header: Type.Optional(Type.String()),
+  question: Type.String({ minLength: 1 }),
+  selected: Type.Array(Type.String()),
+  other: Type.Optional(Type.String()),
+});
+
+export type AskAnswerDataValue = Static<typeof AskAnswerData>;
+
+/** Dialog methods mirrored from extension/agent UI requests. */
+export const ApprovalRequestData = Type.Union([
+  Type.Object({
+    requestId: Type.String({ minLength: 1 }),
+    sessionId: Type.String({ minLength: 1 }),
+    method: Type.Union([
+      Type.Literal("confirm"),
+      Type.Literal("select"),
+      Type.Literal("input"),
+      Type.Literal("editor"),
+    ]),
+    title: Type.String(),
+    message: Type.Optional(Type.String()),
+    options: Type.Optional(Type.Array(Type.String())),
+    prefill: Type.Optional(Type.String()),
+    placeholder: Type.Optional(Type.String()),
+    /** Present only when the extension supplied its own timeout. */
+    expiresAt: Type.Optional(Type.Integer({ minimum: 0 })),
+    createdAt: Type.Integer({ minimum: 0 }),
+  }),
+  Type.Object({
+    requestId: Type.String({ minLength: 1 }),
+    sessionId: Type.String({ minLength: 1 }),
+    method: Type.Literal("ask"),
+    /** The model-supplied question text; each question carries its own wording. */
+    title: Type.Optional(Type.String()),
+    questions: Type.Array(AskQuestionData, { minItems: 1 }),
+    expiresAt: Type.Optional(Type.Integer({ minimum: 0 })),
+    createdAt: Type.Integer({ minimum: 0 }),
+  }),
+]);
 
 export type ApprovalRequestDataValue = Static<typeof ApprovalRequestData>;
 
@@ -154,9 +198,20 @@ export const ApprovalResponseData = Type.Object({
   action: Type.Union([Type.Literal("respond"), Type.Literal("cancel")]),
   /** extension_ui_response body: { value } | { confirmed } | { cancelled } */
   response: Type.Optional(Type.Unknown()),
+  /** ask payload; one entry per question, in request order. */
+  answers: Type.Optional(Type.Array(AskAnswerData)),
 });
 
 export type ApprovalResponseDataValue = Static<typeof ApprovalResponseData>;
+
+/** Sent when a mirrored request settles anywhere (desktop answered, timeout, abort). */
+export const ApprovalResolvedData = Type.Object({
+  requestId: Type.String({ minLength: 1 }),
+  sessionId: Type.String({ minLength: 1 }),
+  resolved: Type.Literal(true),
+});
+
+export type ApprovalResolvedDataValue = Static<typeof ApprovalResolvedData>;
 
 // ---------------------------------------------------------------------------
 // Reliability constants shared by all three ends
