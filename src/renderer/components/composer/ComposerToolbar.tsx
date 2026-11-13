@@ -6,6 +6,7 @@ import { scaledChatFont } from "@/lib/chat-appearance";
 import type { ToolPreset, SelectableToolPreset } from "@shared/tool-presets";
 import { thinkingMenuLevels, type ThinkingLevelOption } from "@shared/thinking-levels";
 import { Button } from "@/components/ui/Button";
+import { Check, Cpu, Image, Lightbulb, Shrink, Square, Volume2, VolumeX, Wrench } from "lucide-react";
 
 interface ModelOption {
   provider: string;
@@ -304,20 +305,7 @@ function ComposerToolbarView({
             color: hasAttachments ? "var(--accent)" : undefined,
           }}
         >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
-            <polyline points="21 15 16 10 5 21" />
-          </svg>
+          <Image size={15} strokeWidth={1.8} />
         </Button>
         {/* Model selector — visible always, disabled during streaming */}
         {(onModelsRefresh || (modelOptions.length > 0 && currentName && onModelChange)) && (
@@ -344,27 +332,7 @@ function ComposerToolbarView({
                 fontSize: scaledChatFont(12),
               }}
             >
-              <svg
-                width="11"
-                height="11"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect x="4" y="4" width="16" height="16" rx="2" />
-                <rect x="9" y="9" width="6" height="6" />
-                <line x1="9" y1="1" x2="9" y2="4" />
-                <line x1="15" y1="1" x2="15" y2="4" />
-                <line x1="9" y1="20" x2="9" y2="23" />
-                <line x1="15" y1="20" x2="15" y2="23" />
-                <line x1="20" y1="9" x2="23" y2="9" />
-                <line x1="20" y1="14" x2="23" y2="14" />
-                <line x1="1" y1="9" x2="4" y2="9" />
-                <line x1="1" y1="14" x2="4" y2="14" />
-              </svg>
+              <Cpu size={11} />
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
                 {currentName ?? t("models", "Models")}
               </span>
@@ -491,19 +459,7 @@ function ComposerToolbarView({
                                 }}
                               >
                                 {isActive ? (
-                                  <svg
-                                    width="10"
-                                    height="10"
-                                    viewBox="0 0 10 10"
-                                    fill="none"
-                                    stroke="var(--accent)"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    style={{ flexShrink: 0 }}
-                                  >
-                                    <polyline points="1.5 5 4 7.5 8.5 2.5" />
-                                  </svg>
+                                  <Check size={10} strokeWidth={2} color="var(--accent)" style={{ flexShrink: 0 }} />
                                 ) : (
                                   <span style={{ width: 10, flexShrink: 0 }} />
                                 )}
@@ -565,9 +521,7 @@ function ComposerToolbarView({
               letterSpacing: "-0.01em",
             }}
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <rect x="1.5" y="1.5" width="7" height="7" rx="1.5" fill="currentColor" />
-            </svg>
+            <Square size={10} fill="currentColor" strokeWidth={0} />
             {!isMobile && t("stop", "Stop")}
           </Button>
         )}
@@ -601,20 +555,7 @@ function ComposerToolbarView({
                   fontSize: scaledChatFont(12),
                 }}
               >
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M9.5 2A5.5 5.5 0 0 0 4 7.5c0 1.7.78 3.21 2 4.21V14a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-2.29c1.22-1 2-2.51 2-4.21A5.5 5.5 0 0 0 9.5 2z" />
-                  <line x1="7" y1="18" x2="12" y2="18" />
-                  <line x1="8" y1="21" x2="11" y2="21" />
-                </svg>
+                <Lightbulb size={11} />
                 {!isMobile && <span style={{ whiteSpace: "nowrap" }}>{thinkingDisplayLabel}</span>}
               </Button>
               {thinkingDropdownOpen && (
@@ -671,19 +612,7 @@ function ComposerToolbarView({
                         }}
                       >
                         {isActive ? (
-                          <svg
-                            width="10"
-                            height="10"
-                            viewBox="0 0 10 10"
-                            fill="none"
-                            stroke="var(--accent)"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            style={{ flexShrink: 0 }}
-                          >
-                            <polyline points="1.5 5 4 7.5 8.5 2.5" />
-                          </svg>
+                          <Check size={10} strokeWidth={2} color="var(--accent)" style={{ flexShrink: 0 }} />
                         ) : (
                           <span style={{ width: 10, flexShrink: 0 }} />
                         )}
@@ -728,18 +657,7 @@ function ComposerToolbarView({
                   fontSize: scaledChatFont(12),
                 }}
               >
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-                </svg>
+                <Wrench size={11} />
                 {!isMobile && <span style={{ whiteSpace: "nowrap" }}>{toolPresetLabel}</span>}
               </Button>
               {toolDropdownOpen && (
@@ -800,19 +718,7 @@ function ComposerToolbarView({
                         }}
                       >
                         {isActive ? (
-                          <svg
-                            width="10"
-                            height="10"
-                            viewBox="0 0 10 10"
-                            fill="none"
-                            stroke="var(--accent)"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            style={{ flexShrink: 0 }}
-                          >
-                            <polyline points="1.5 5 4 7.5 8.5 2.5" />
-                          </svg>
+                          <Check size={10} strokeWidth={2} color="var(--accent)" style={{ flexShrink: 0 }} />
                         ) : (
                           <span style={{ width: 10, flexShrink: 0 }} />
                         )}
@@ -882,28 +788,12 @@ function ComposerToolbarView({
               >
                 {isCompacting ? (
                   <>
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                      <rect x="2" y="2" width="6" height="6" rx="1" fill="currentColor" />
-                    </svg>
+                    <Square size={10} fill="currentColor" strokeWidth={0} />
                     {!isMobile && <span style={{ whiteSpace: "nowrap" }}>{t("compacting", "Compacting…")}</span>}
                   </>
                 ) : (
                   <>
-                    <svg
-                      width="11"
-                      height="11"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <polyline points="4 14 10 14 10 20" />
-                      <polyline points="20 10 14 10 14 4" />
-                      <line x1="10" y1="14" x2="3" y2="21" />
-                      <line x1="21" y1="3" x2="14" y2="10" />
-                    </svg>
+                    <Shrink size={11} />
                     {!isMobile && <span style={{ whiteSpace: "nowrap" }}>{t("compactAction", "Compact")}</span>}
                   </>
                 )}
@@ -940,37 +830,7 @@ function ComposerToolbarView({
                 opacity: soundEnabled ? 1 : 0.55,
               }}
             >
-              {soundEnabled ? (
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-                </svg>
-              ) : (
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                  <line x1="23" y1="9" x2="17" y2="15" />
-                  <line x1="17" y1="9" x2="23" y2="15" />
-                </svg>
-              )}
+              {soundEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
             </Button>
           )}
         </div>

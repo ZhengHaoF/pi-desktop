@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { forwardRef, useState, useEffect, useCallback, useImperativeHandle, useRef } from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useI18n } from "@/i18n";
+import { Plus } from "lucide-react";
 import type { SkillRecord as Skill, SkillSearchResult } from "@/lib/api-types";
 import { LatestAbortableRequest } from "@/lib/latest-abortable-request";
 import { CapabilityRequired, parseCapabilityIssue, type CapabilityIssue } from "@/components/CapabilityRequired";
@@ -926,19 +927,7 @@ export const SkillsConfig = forwardRef<
                   fontSize: 12,
                 }}
               >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
+                <Plus size={13} />
                 {t("addSkill", "Add skill")}
               </Button>
             </div>

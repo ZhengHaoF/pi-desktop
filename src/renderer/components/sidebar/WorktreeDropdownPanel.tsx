@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { Input } from "@/components/ui/Input";
 import { useI18n } from "@/i18n";
+import { Check, Plus, Trash2 } from "lucide-react";
 import { abbreviateHomePath } from "@/lib/display-path";
 import type { WorktreeEntry } from "@/hooks/useSidebarWorkspace";
 import { PathLabel, useDeferredFocus } from "./WorkspaceDropdown";
@@ -180,19 +181,7 @@ export function WorktreeDropdownPanel({
                 }}
               >
                 {isCurrent ? (
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 10 10"
-                    fill="none"
-                    stroke="var(--accent)"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{ flexShrink: 0 }}
-                  >
-                    <polyline points="1.5 5 4 7.5 8.5 2.5" />
-                  </svg>
+                  <Check size={10} strokeWidth={2} color="var(--accent)" style={{ flexShrink: 0 }} />
                 ) : (
                   <span style={{ width: 10, flexShrink: 0 }} />
                 )}
@@ -225,21 +214,7 @@ export function WorktreeDropdownPanel({
                     flexShrink: 0,
                   }}
                 >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                    <path d="M10 11v6M14 11v6" />
-                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                  </svg>
+                  <Trash2 size={12} />
                 </Button>
               )}
             </div>
@@ -268,19 +243,7 @@ export function WorktreeDropdownPanel({
             fontSize: 11,
           }}
         >
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 10 10"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.1"
-            strokeLinecap="round"
-            style={{ flexShrink: 0 }}
-          >
-            <line x1="5" y1="1" x2="5" y2="9" />
-            <line x1="1" y1="5" x2="9" y2="5" />
-          </svg>
+          <Plus size={10} strokeWidth={1.1} style={{ flexShrink: 0 }} />
           <span>{t("newWorktree", "New worktree…")}</span>
         </Button>
       ) : (

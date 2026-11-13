@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useI18n } from "@/i18n";
+import { ChevronDown, GitBranch } from "lucide-react";
 import type { WorktreeState } from "@/hooks/useSidebarWorkspace";
 import { abbreviateHomePath } from "@/lib/display-path";
 import { worktreePathsEqual } from "@shared/worktree-path";
@@ -127,25 +128,13 @@ export function WorktreePicker({
                   textAlign: "left",
                 }}
               >
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                <GitBranch
+                  size={11}
                   style={{
                     flexShrink: 0,
                     color: currentWt && !currentWt.isMain ? "var(--accent)" : "var(--text-dim)",
                   }}
-                >
-                  <line x1="6" y1="3" x2="6" y2="15" />
-                  <circle cx="18" cy="6" r="3" />
-                  <circle cx="6" cy="18" r="3" />
-                  <path d="M18 9a9 9 0 0 1-9 9" />
-                </svg>
+                />
                 <PathLabel
                   text={currentWt ? (currentWt.branch ?? abbreviateHomePath(currentWt.path, homeDir)) : "…"}
                   style={{ flex: 1, fontFamily: "var(--font-mono)", color: "var(--text)" }}
@@ -160,19 +149,7 @@ export function WorktreePicker({
                     {worktreeState.worktrees.length}
                   </span>
                 )}
-                <svg
-                  width="9"
-                  height="9"
-                  viewBox="0 0 10 10"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ flexShrink: 0 }}
-                >
-                  <polyline points="2 3.5 5 6.5 8 3.5" />
-                </svg>
+                <ChevronDown size={9} strokeWidth={1.8} style={{ flexShrink: 0 }} />
               </Button>
 
               <AnimatedDropdown
@@ -248,22 +225,7 @@ export function WorktreePicker({
               opacity: 0.82,
             }}
           >
-            <svg
-              width="11"
-              height="11"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ flexShrink: 0 }}
-            >
-              <line x1="6" y1="3" x2="6" y2="15" />
-              <circle cx="18" cy="6" r="3" />
-              <circle cx="6" cy="18" r="3" />
-              <path d="M18 9a9 9 0 0 1-9 9" />
-            </svg>
+            <GitBranch size={11} style={{ flexShrink: 0 }} />
             <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{inactiveWorktreeSelector.label}</span>
           </Button>
           {wtGuideHintOpen && (

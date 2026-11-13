@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/Input";
 import { useI18n } from "@/i18n";
+import { Plus, Search } from "lucide-react";
 import { oauthProviderName } from "./provider-display";
 import type { ProviderStatus as OAuthProvider, ApiKeyProviderStatus as ApiKeyProvider } from "@contract/types";
 import { ProviderIcon } from "./ProviderIcon";
@@ -98,20 +99,7 @@ export function AddProviderPicker({
           gap: 8,
         }}
       >
-        <svg
-          width="13"
-          height="13"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          style={{ color: "var(--text-dim)", flexShrink: 0 }}
-        >
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
+        <Search size={13} style={{ color: "var(--text-dim)", flexShrink: 0 }} />
         <Input
           ref={inputRef}
           value={search}
@@ -195,20 +183,7 @@ export function AddProviderPicker({
                     flexShrink: 0,
                   }}
                 >
-                  <svg
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{ color: "var(--text-dim)" }}
-                  >
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
+                  <Plus size={13} style={{ color: "var(--text-dim)" }} />
                 </span>
               </Button>
             )}

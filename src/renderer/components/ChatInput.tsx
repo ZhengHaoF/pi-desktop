@@ -7,6 +7,7 @@ import type { CompactResultInfo, QueuedMessages, SlashCommandInfo } from "@/hook
 import { buildAtInsertText, extractAtQuery, type AtQueryMatch, type FileIndexEntry } from "@/lib/file-fuzzy";
 import { useFileSuggestions } from "@/hooks/useFileSuggestions";
 import { FolderIcon, getFileIcon } from "./FileIcons";
+import { ArrowRight, ArrowUpToLine, Check, CornerUpLeft, File, RotateCcw, X } from "lucide-react";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useI18n } from "@/i18n";
 import { localFilePathKey, splitLocalFileReferenceMarkdown } from "@/lib/file-url";
@@ -698,19 +699,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                     whiteSpace: "nowrap",
                   }}
                 >
-                  <svg
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="9 14 4 9 9 4" />
-                    <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
-                  </svg>
+                  <CornerUpLeft size={13} />
                   {t("recallToInput", "Recall to input")}
                 </Button>
               )}
@@ -739,20 +728,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
               gap: 6,
             }}
           >
-            <svg
-              width="11"
-              height="11"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ flexShrink: 0 }}
-            >
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-              <path d="M3 3v5h5" />
-            </svg>
+            <RotateCcw size={11} style={{ flexShrink: 0 }} />
             {t("retrying", "Retrying")} ({retryInfo.attempt}/{retryInfo.maxAttempts})…
             {retryInfo.errorMessage && <span style={{ opacity: 0.7, marginLeft: 4 }}>— {retryInfo.errorMessage}</span>}
           </div>
@@ -841,19 +817,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
               gap: 6,
             }}
           >
-            <svg
-              width="11"
-              height="11"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ flexShrink: 0 }}
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
+            <Check size={11} style={{ flexShrink: 0 }} />
             {compactResultText}
           </div>
         )}
@@ -890,18 +854,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                     padding: 0,
                   }}
                 >
-                  <svg
-                    width="8"
-                    height="8"
-                    viewBox="0 0 8 8"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  >
-                    <line x1="1" y1="1" x2="7" y2="7" />
-                    <line x1="7" y1="1" x2="1" y2="7" />
-                  </svg>
+                  <X size={8} strokeWidth={1.5} />
                 </Button>
               </div>
             ))}
@@ -956,20 +909,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                     fontSize: scaledChatFont(12),
                   }}
                 >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{ flexShrink: 0, color: "var(--text-muted)" }}
-                  >
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
+                  <File size={12} style={{ flexShrink: 0, color: "var(--text-muted)" }} />
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {file.name}
                   </span>
@@ -998,18 +938,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                       flexShrink: 0,
                     }}
                   >
-                    <svg
-                      width="8"
-                      height="8"
-                      viewBox="0 0 8 8"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                    >
-                      <line x1="1" y1="1" x2="7" y2="7" />
-                      <line x1="7" y1="1" x2="1" y2="7" />
-                    </svg>
+                    <X size={8} strokeWidth={1.5} />
                   </Button>
                 </div>
               ))}
@@ -1377,19 +1306,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                       letterSpacing: "-0.01em",
                     }}
                   >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 10 10"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M5 1 L9 5 L5 9" />
-                      <line x1="1" y1="5" x2="9" y2="5" />
-                    </svg>
+                    <ArrowRight size={12} strokeWidth={1.8} />
                     {t("steer", "Steer")}
                   </Button>
                 )}
@@ -1416,20 +1333,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                       letterSpacing: "-0.01em",
                     }}
                   >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 10 10"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="5" y1="1" x2="5" y2="6" />
-                      <polyline points="2.5 3.5 5 1 7.5 3.5" />
-                      <line x1="2" y1="9" x2="8" y2="9" />
-                    </svg>
+                    <ArrowUpToLine size={12} strokeWidth={1.8} />
                     {t("followUp", "Follow-up")}
                   </Button>
                 )}

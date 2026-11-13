@@ -1,4 +1,5 @@
 import { JsonObjectField } from "./JsonObjectField";
+import { Check as CheckIcon, Info } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { ProviderModelDiscovery } from "./ProviderModelDiscovery";
 import { THINKING_LEVELS, configuredThinkingLevels, type ThinkingLevel } from "@shared/thinking-levels";
@@ -650,20 +651,7 @@ export function ModelDetail({
                 : {}),
             }}
           >
-            {testState.phase === "success" && (
-              <svg
-                width="11"
-                height="11"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            )}
+            {testState.phase === "success" && <CheckIcon size={11} strokeWidth={3} />}
             {testState.phase === "testing"
               ? t("testingConnection", "Testing…")
               : testState.phase === "success"
@@ -779,20 +767,7 @@ export function ModelDetail({
             fontSize: 12,
           }}
         >
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="16" x2="12" y2="12" />
-            <line x1="12" y1="8" x2="12.01" y2="8" />
-          </svg>
+          <Info size={12} />
           {fillState.phase === "loading"
             ? t("modelFillInfoLoading", "Querying models.dev…")
             : t("modelFillInfo", "Fill model info")}

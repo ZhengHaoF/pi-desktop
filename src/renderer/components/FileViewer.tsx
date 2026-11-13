@@ -9,6 +9,7 @@ import { watchFile } from "@/lib/file-watch-client";
 import { INITIAL_TEXT_FILE_LOAD_STATE, textFileLoadReducer, type TextFileData } from "@/lib/file-viewer-load-state";
 import { createBoundedTextDiff, type DiffLine } from "@/lib/text-diff";
 import { useI18n } from "@/i18n";
+import { Download } from "lucide-react";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { formatFileSize, formatNumber } from "@/lib/locale-format";
 import { Button } from "@/components/ui/Button";
@@ -47,21 +48,7 @@ function DownloadLink({ filePath, sourceSessionId }: { filePath: string; sourceS
         flexShrink: 0,
       }}
     >
-      <svg
-        width="11"
-        height="11"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-        <polyline points="7 10 12 15 17 10" />
-        <line x1="12" y1="15" x2="12" y2="3" />
-      </svg>
+      <Download size={11} strokeWidth={2.2} aria-hidden="true" />
     </Button>
   );
 }

@@ -4,6 +4,7 @@ import { getRelativeFilePath } from "@/lib/file-paths";
 import { useDirectoryListing, useFileExplorer } from "@/hooks/useFileExplorer";
 import type { FileNode } from "@/lib/file-explorer-data";
 import { useI18n } from "@/i18n";
+import { AtSign, ChevronRight, Download, LoaderCircle } from "lucide-react";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { formatNumber } from "@/lib/locale-format";
 import { Button } from "@/components/ui/Button";
@@ -100,19 +101,12 @@ function TreeNode({
           }}
         >
           {node.isDir && (
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 10 10"
-              fill="none"
-              stroke="var(--text-dim)"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <ChevronRight
+              size={10}
+              strokeWidth={1.8}
+              color="var(--text-dim)"
               style={{ flexShrink: 0, transform: open ? "rotate(90deg)" : "none", transition: "transform 0.1s" }}
-            >
-              <polyline points="3 2 7 5 3 8" />
-            </svg>
+            />
           )}
           {!node.isDir && <span style={{ width: 10, flexShrink: 0 }} />}
           <span style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>
@@ -130,19 +124,7 @@ function TreeNode({
           >
             {node.name}
           </span>
-          {loading && (
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--text-dim)"
-              strokeWidth="2"
-              strokeLinecap="round"
-            >
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4" />
-            </svg>
-          )}
+          {loading && <LoaderCircle size={10} color="var(--text-dim)" className="spin" />}
         </Button>
         {onAtMention && (hovered || focusedWithin) && (
           <Button
@@ -170,19 +152,7 @@ function TreeNode({
               whiteSpace: "nowrap",
             }}
           >
-            <svg
-              width="11"
-              height="11"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="4" />
-              <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
-            </svg>
+            <AtSign size={11} strokeWidth={2.2} />
             {t("mention", "mention")}
           </Button>
         )}
@@ -218,20 +188,7 @@ function TreeNode({
               whiteSpace: "nowrap",
             }}
           >
-            <svg
-              width="11"
-              height="11"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
+            <Download size={11} strokeWidth={2.2} />
           </Button>
         )}
       </div>

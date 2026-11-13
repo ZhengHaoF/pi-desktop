@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "./Button";
+import { ChevronDown } from "lucide-react";
 import { usePopoverAnchor } from "./usePopoverAnchor";
 
 export interface SelectOption {
@@ -241,20 +242,7 @@ export function Select({
         >
           {triggerLabel}
         </span>
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 10 10"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-          style={{ flexShrink: 0 }}
-        >
-          <polyline points="2 3.5 5 6.5 8 3.5" />
-        </svg>
+        <ChevronDown size={10} strokeWidth={1.6} aria-hidden="true" style={{ flexShrink: 0 }} />
       </Button>
       {open &&
         rect &&

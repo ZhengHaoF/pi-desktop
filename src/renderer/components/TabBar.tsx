@@ -1,4 +1,5 @@
 import { getFileIcon } from "./FileIcons";
+import { X } from "lucide-react";
 import type { FileTab } from "@/lib/file-tab-state";
 import { Button } from "@/components/ui/Button";
 
@@ -81,18 +82,7 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
               }}
               title="Close"
             >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 10 10"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              >
-                <line x1="2" y1="2" x2="8" y2="8" />
-                <line x1="8" y1="2" x2="2" y2="8" />
-              </svg>
+              <X size={10} strokeWidth={1.8} />
             </Button>
           </div>
         );

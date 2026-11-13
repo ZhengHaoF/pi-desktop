@@ -2,6 +2,7 @@ import { RoutingSettings, AdvancedSettings } from "./models/ModelSettings";
 import { useState, useEffect, useCallback, useReducer, useRef } from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useI18n } from "@/i18n";
+import { Check } from "lucide-react";
 import { oauthProviderName } from "./models/provider-display";
 import {
   addModelTransition,
@@ -829,19 +830,11 @@ export function ModelsConfig({
                 }}
               >
                 {savedOk && (
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                  <Check
+                    size={14}
+                    strokeWidth={3}
                     style={{ strokeDasharray: 18, animation: "saved-check-draw 0.35s ease forwards", flexShrink: 0 }}
-                  >
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
+                  />
                 )}
                 <span>{savedOk ? t("saved", "Saved") : saving ? t("saving", "Saving…") : t("save", "Save")}</span>
               </Button>

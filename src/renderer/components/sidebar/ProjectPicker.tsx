@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Input } from "@/components/ui/Input";
 import { call } from "@/lib/api-client";
 import { useI18n } from "@/i18n";
+import { Check, Folder, Plus } from "lucide-react";
 import type { SessionInfo } from "@/lib/types";
 import { getRecentProjects } from "@/hooks/useSidebarWorkspace";
 import { abbreviateHomePath } from "@/lib/display-path";
@@ -145,20 +146,7 @@ export function ProjectPicker({
             flexShrink: 0,
           }}
         >
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 10 10"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.1"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            style={{ flexShrink: 0 }}
-          >
-            <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
-          </svg>
+          <Folder size={12} strokeWidth={1.1} aria-hidden="true" style={{ flexShrink: 0 }} />
           {t("openProjectEllipsis", "Open project…")}
         </Button>
       ) : (
@@ -279,19 +267,7 @@ export function ProjectPicker({
                 title={project}
               >
                 {project === selectedProject && (
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 10 10"
-                    fill="none"
-                    stroke="var(--accent)"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{ flexShrink: 0 }}
-                  >
-                    <polyline points="1.5 5 4 7.5 8.5 2.5" />
-                  </svg>
+                  <Check size={10} strokeWidth={2} color="var(--accent)" style={{ flexShrink: 0 }} />
                 )}
                 {project !== selectedProject && <span style={{ width: 10, flexShrink: 0 }} />}
                 <PathLabel text={abbreviateHomePath(project, homeDir)} style={{ flex: 1 }} />
@@ -325,19 +301,7 @@ export function ProjectPicker({
               fontSize: 11,
             }}
           >
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 10 10"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.1"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ flexShrink: 0 }}
-            >
-              <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
-            </svg>
+            <Folder size={10} strokeWidth={1.1} style={{ flexShrink: 0 }} />
             <span>{t("useDefaultDirectory", "Use default directory")}</span>
           </Button>
         )}
@@ -361,19 +325,7 @@ export function ProjectPicker({
               fontSize: 11,
             }}
           >
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 10 10"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.1"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ flexShrink: 0 }}
-            >
-              <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
-            </svg>
+            <Folder size={10} strokeWidth={1.1} style={{ flexShrink: 0 }} />
             <span>{t("browseFolder", "Browse folder…")}</span>
           </Button>
         )}
@@ -399,19 +351,7 @@ export function ProjectPicker({
               fontSize: 11,
             }}
           >
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 10 10"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.1"
-              strokeLinecap="round"
-              style={{ flexShrink: 0 }}
-            >
-              <line x1="5" y1="1" x2="5" y2="9" />
-              <line x1="1" y1="5" x2="9" y2="5" />
-            </svg>
+            <Plus size={10} strokeWidth={1.1} style={{ flexShrink: 0 }} />
             <span>{t("customPath", "Custom path…")}</span>
           </Button>
         ) : (

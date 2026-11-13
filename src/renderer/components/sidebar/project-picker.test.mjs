@@ -12,7 +12,7 @@ const { ProjectPicker } = await importTestBundle("project-picker", {
     loader: "tsx",
   },
   tsconfig: path.join(import.meta.dirname, "../../../../tsconfig.renderer.json"),
-  external: ["react", "react-dom", "react-dom/*"],
+  external: ["react", "react-dom", "react-dom/*", "lucide-react"],
   plugins: [
     {
       name: "picker-fixture",
@@ -149,8 +149,10 @@ test("independent mode keeps the project list, its checkmark and the separator",
   assert.equal(fixture.titled("/project").length, 2);
   assert.equal(fixture.titled("/other").length, 1);
   // Only the active row carries the checkmark; other rows keep the spacer.
-  assert.equal(fixture.titled("/project")[1].findAll((node) => node.type === "polyline").length, 1);
-  assert.equal(fixture.titled("/other")[0].findAll((node) => node.type === "polyline").length, 0);
+  const hasLucideCheck = (node) =>
+    node.type === "svg" && String(node.props.className ?? node.props.class ?? "").includes("lucide");
+  assert.equal(fixture.titled("/project")[1].findAll(hasLucideCheck).length, 1);
+  assert.equal(fixture.titled("/other")[0].findAll(hasLucideCheck).length, 0);
   assert.equal(fixture.byText("Use default directory").props.style.borderTop, "1px solid var(--border)");
   await fixture.click("/other");
   assert.deepEqual(fixture.chosen, ["/other"]);

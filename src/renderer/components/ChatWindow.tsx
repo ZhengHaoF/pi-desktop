@@ -37,6 +37,7 @@ import { MessageRenderKeyRegistry, type MessageRenderRole } from "@/lib/message-
 import { ToolMessageIndex } from "@/lib/tool-message-index";
 import { withGeneratedImageReply } from "@/lib/generated-image-reply";
 import { useI18n } from "@/i18n";
+import { ChevronDown } from "lucide-react";
 import type { ThinkingExpansionStore } from "@/lib/thinking-expansion-store";
 import { skillInvocationCommandText } from "@shared/skill-invocation";
 import { localizedExtensionConfirmCopy } from "@/lib/extension-ui-copy";
@@ -891,19 +892,7 @@ export function ChatWindow({
                   right: isMobile ? 12 : CHAT_MINIMAP_WIDTH + 12,
                 }}
               >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <polyline points="3.5 6 8 10.5 12.5 6" />
-                </svg>
+                <ChevronDown size={16} strokeWidth={1.8} aria-hidden="true" />
                 {agentRunning && (
                   <StatusDot
                     size="sm"

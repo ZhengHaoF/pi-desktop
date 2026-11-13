@@ -1,6 +1,6 @@
 {
   "name": "@dlyzzt/pi-desktop",
-  "version": "0.5.1",
+  "version": "0.5.3",
   "private": true,
   "description": "Pi Agent Desktop — pure Electron desktop app for the pi coding agent",
   "homepage": "https://github.com/DLYZZT/pi-desktop#readme",
@@ -80,6 +80,7 @@
     "@xterm/xterm": "6.0.0",
     "electron-updater": "6.8.9",
     "katex": "^0.16.47",
+    "lucide-react": "^1.72.0",
     "mammoth": "^1.12.3",
     "mermaid": "^11.17.2",
     "proper-lockfile": "4.1.2",

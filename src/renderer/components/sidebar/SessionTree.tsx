@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/Input";
 import { useEffect, useState, useCallback, useRef, type CSSProperties } from "react";
 import type { SessionInfo } from "@/lib/types";
 import { useI18n } from "@/i18n";
+import { ChevronDown, EllipsisVertical, GitBranch, Pencil, Trash2 } from "lucide-react";
 import { getSessionDisplayTitle } from "@/lib/session-list";
 import { formatNumber, formatRelativeDateTime } from "@/lib/locale-format";
 import { Button } from "@/components/ui/Button";
@@ -417,21 +418,7 @@ function SessionItem({
                 color: "#fff",
               }}
             >
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                <path d="M10 11v6M14 11v6" />
-                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-              </svg>
+              <Trash2 size={12} />
               {t("delete", "Delete")}
             </Button>
             <Button
@@ -510,25 +497,7 @@ function SessionItem({
             }}
           >
             {/* Fork indicator for child sessions */}
-            {depth > 0 && (
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--text-dim)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ flexShrink: 0 }}
-                aria-hidden="true"
-              >
-                <line x1="6" y1="3" x2="6" y2="15" />
-                <circle cx="18" cy="6" r="3" />
-                <circle cx="6" cy="18" r="3" />
-                <path d="M18 9a9 9 0 0 1-9 9" />
-              </svg>
-            )}
+            {depth > 0 && <GitBranch size={10} color="var(--text-dim)" style={{ flexShrink: 0 }} aria-hidden="true" />}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div
                 style={{
@@ -601,22 +570,7 @@ function SessionItem({
                       overflow: "hidden",
                     }}
                   >
-                    <svg
-                      width="9"
-                      height="9"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.4"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{ flexShrink: 0 }}
-                    >
-                      <line x1="6" y1="3" x2="6" y2="15" />
-                      <circle cx="18" cy="6" r="3" />
-                      <circle cx="6" cy="18" r="3" />
-                      <path d="M18 9a9 9 0 0 1-9 9" />
-                    </svg>
+                    <GitBranch size={9} strokeWidth={2.4} style={{ flexShrink: 0 }} />
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {session.worktreeBranch}
                     </span>
@@ -650,23 +604,15 @@ function SessionItem({
                 borderRadius: 7,
               }}
             >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 10 10"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              <ChevronDown
+                size={10}
+                strokeWidth={1.8}
                 aria-hidden="true"
                 style={{
                   transform: collapsed ? "rotate(-90deg)" : "none",
                   transition: "transform 0.15s",
                 }}
-              >
-                <polyline points="2 3.5 5 6.5 8 3.5" />
-              </svg>
+              />
             </Button>
           )}
 
@@ -709,11 +655,7 @@ function SessionItem({
                   : {}),
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <circle cx="5" cy="12" r="1.7" />
-                <circle cx="12" cy="12" r="1.7" />
-                <circle cx="19" cy="12" r="1.7" />
-              </svg>
+              <EllipsisVertical size={16} fill="currentColor" strokeWidth={0} aria-hidden="true" />
             </Button>
             {actionsOpen && (
               <div
@@ -740,19 +682,7 @@ function SessionItem({
                   onClick={startRename}
                   style={sessionMenuItemStyle}
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-                  </svg>
+                  <Pencil size={14} aria-hidden="true" />
                   {t("rename", "Rename")}
                 </Button>
                 <Button
@@ -763,22 +693,7 @@ function SessionItem({
                   onClick={handleDeleteClick}
                   style={{ ...sessionMenuItemStyle, color: "var(--danger)" }}
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                    <path d="M10 11v6M14 11v6" />
-                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                  </svg>
+                  <Trash2 size={14} aria-hidden="true" />
                   {t("delete", "Delete")}
                 </Button>
               </div>

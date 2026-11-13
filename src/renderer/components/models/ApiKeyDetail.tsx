@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { Field, SecretTextInput, SectionTitle, TextInput } from "../form-controls";
 import { useI18n } from "@/i18n";
+import { Check } from "lucide-react";
 import { call } from "@/lib/api-client";
 import type { ApiKeyProviderStatus as ApiKeyProvider } from "@contract/types";
 import { AuthReplacementNotice } from "./AuthReplacementNotice";
@@ -217,20 +218,7 @@ export function ApiKeyDetail({
               ...(savedOk ? { background: "#16a34a", color: "#fff" } : {}),
             }}
           >
-            {savedOk && (
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            )}
+            {savedOk && <Check size={12} strokeWidth={3} />}
             {savedOk ? t("saved", "Saved") : saving ? t("saving", "Saving…") : t("save", "Save")}
           </Button>
         </div>

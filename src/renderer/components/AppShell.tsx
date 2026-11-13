@@ -4,6 +4,19 @@ import {
   loadBrowserPanelPreferredWidth,
 } from "@/lib/panel-preferences";
 import { useSessionList } from "@/hooks/useSessionList";
+import {
+  ArrowLeft,
+  Folder,
+  Globe,
+  Menu,
+  Moon,
+  PanelLeft,
+  PanelRight,
+  RotateCcw,
+  Settings,
+  SquareTerminal,
+  Sun,
+} from "lucide-react";
 import { call, subscribe } from "@/lib/api-client";
 import {
   useState,
@@ -778,20 +791,7 @@ export function AppShell({
             void preloadSettingsConfig().catch(() => undefined);
           }}
         >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.12.38.33.72.6 1 .3.29.69.42 1.1.4h.09v4h-.09a1.7 1.7 0 0 0-1.7.6Z" />
-          </svg>
+          <Settings size={15} aria-hidden="true" />
           {t("settings", "Settings")}
         </Button>
       </div>
@@ -953,35 +953,7 @@ export function AppShell({
                 flexShrink: 0,
               }}
             >
-              {sidebarOpen ? (
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <line x1="9" y1="3" x2="9" y2="21" />
-                </svg>
-              ) : (
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                >
-                  <line x1="3" y1="6" x2="21" y2="6" />
-                  <line x1="3" y1="12" x2="21" y2="12" />
-                  <line x1="3" y1="18" x2="21" y2="18" />
-                </svg>
-              )}
+              {sidebarOpen ? <PanelLeft size={16} /> : <Menu size={18} />}
             </Button>
             <Button
               variant="ghost"
@@ -1006,41 +978,7 @@ export function AppShell({
                 flexShrink: 0,
               }}
             >
-              {isDark ? (
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="5" />
-                  <line x1="12" y1="1" x2="12" y2="3" />
-                  <line x1="12" y1="21" x2="12" y2="23" />
-                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                  <line x1="1" y1="12" x2="3" y2="12" />
-                  <line x1="21" y1="12" x2="23" y2="12" />
-                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                </svg>
-              ) : (
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                </svg>
-              )}
+              {isDark ? <Sun size={16} /> : <Moon size={16} />}
             </Button>
             {selectedSession && !isMobile && (
               <div
@@ -1150,20 +1088,12 @@ export function AppShell({
                     pointerEvents: "none",
                   }}
                 >
-                  <svg
-                    width="44"
-                    height="44"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="var(--accent)"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                  <ArrowLeft
+                    size={44}
+                    strokeWidth={1.5}
+                    color="var(--accent)"
                     style={{ opacity: 0.7, flexShrink: 0 }}
-                  >
-                    <line x1="20" y1="12" x2="4" y2="12" />
-                    <polyline points="10 6 4 12 10 18" />
-                  </svg>
+                  />
                   <div>
                     <div style={{ fontSize: 18, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>
                       {t("getStarted", "Get Started")}
@@ -1244,19 +1174,7 @@ export function AppShell({
                 fontSize: 12,
               }}
             >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M3 5a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
-              </svg>
+              <Folder size={13} aria-hidden="true" />
               {t("explorer", "Explorer")}
             </Button>
             <Button
@@ -1278,20 +1196,7 @@ export function AppShell({
                 fontSize: 12,
               }}
             >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <circle cx="12" cy="12" r="9" />
-                <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
-              </svg>
+              <Globe size={13} aria-hidden="true" />
               {t("browser", "Browser")}
             </Button>
             <Button
@@ -1313,20 +1218,7 @@ export function AppShell({
                 fontSize: 12,
               }}
             >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <rect x="3" y="4" width="18" height="16" rx="2" />
-                <path d="m7 9 3 3-3 3M13 15h4" />
-              </svg>
+              <SquareTerminal size={13} aria-hidden="true" />
               {t("processes", "Processes")}
               {(managedProcessCount > 0 || managedProcessAttention) && (
                 <span
@@ -1397,20 +1289,7 @@ export function AppShell({
                   borderRadius: 5,
                 }}
               >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                  <path d="M3 3v5h5" />
-                </svg>
+                <RotateCcw size={13} aria-hidden="true" />
               </Button>
             )}
           </div>
@@ -1506,19 +1385,7 @@ export function AppShell({
           color: rightPanelOpen ? "var(--text)" : undefined,
         }}
       >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <line x1="15" y1="3" x2="15" y2="21" />
-        </svg>
+        <PanelRight size={16} />
       </Button>
       {/* Persistent through the exit fade: only `open` flips so the closing
           dialog animates out instead of dropping in one commit. */}

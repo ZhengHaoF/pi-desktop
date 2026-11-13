@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n";
+import { ChevronDown } from "lucide-react";
 import type { ProjectWorktreeInfo } from "@/hooks/useSidebarWorkspace";
 import { AnimatedDropdown } from "./WorkspaceDropdown";
 import { WorktreeDropdownPanel } from "./WorktreeDropdownPanel";
@@ -84,22 +85,7 @@ export function ProjectBranchMenu({
         }}
       >
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{branch ?? "…"}</span>
-        {interactive && (
-          <svg
-            width="8"
-            height="8"
-            viewBox="0 0 10 10"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            style={{ flexShrink: 0 }}
-          >
-            <polyline points="2 3.5 5 6.5 8 3.5" />
-          </svg>
-        )}
+        {interactive && <ChevronDown size={8} strokeWidth={1.8} aria-hidden="true" style={{ flexShrink: 0 }} />}
       </Button>
       {interactive && open && worktreeInfo && (
         <AnimatedDropdown

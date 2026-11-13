@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useI18n } from "@/i18n";
+import { ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import type { ModelsConfigSelection, ProviderEntry } from "@/lib/models-config-state";
@@ -83,18 +84,12 @@ export function CustomProviderTree({
                 disabled={Boolean(search)}
                 onClick={() => setExpanded((current) => ({ ...current, [name]: !open }))}
               >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
+                <ChevronRight
+                  size={12}
+                  strokeWidth={2}
                   aria-hidden="true"
                   style={{ transform: open ? "rotate(90deg)" : undefined }}
-                >
-                  <path d="m9 5 7 7-7 7" />
-                </svg>
+                />
               </Button>
               <Button
                 className="custom-model-tree-name"

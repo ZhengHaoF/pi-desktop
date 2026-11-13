@@ -1,5 +1,6 @@
 import { useI18n } from "@/i18n";
 import { abbreviateHomePath } from "@/lib/display-path";
+import { GitBranch } from "lucide-react";
 import type { GitBranchStatus } from "@/hooks/useGitBranchStatus";
 
 interface Props {
@@ -12,25 +13,7 @@ interface Props {
   homeDir: string;
 }
 
-const GitBranchGlyph = (
-  <svg
-    width="11"
-    height="11"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    style={{ flexShrink: 0 }}
-  >
-    <line x1="6" y1="3" x2="6" y2="15" />
-    <circle cx="18" cy="6" r="3" />
-    <circle cx="6" cy="18" r="3" />
-    <path d="M18 9a9 9 0 0 1-9 9" />
-  </svg>
-);
+const GitBranchGlyph = <GitBranch size={11} aria-hidden="true" style={{ flexShrink: 0 }} />;
 
 /**
  * Persistent chat-area indicator answering "which branch / worktree is the

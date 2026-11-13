@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useI18n } from "@/i18n";
+import { Check, CircleAlert, Copy, Info } from "lucide-react";
 import { copyText } from "@/lib/clipboard";
 import { formatCompactNumber } from "@/lib/locale-format";
 import type { SessionPresentationStore } from "@/lib/session-presentation-store";
@@ -135,21 +136,7 @@ export function SessionInfoPanel({
                 fontVariantNumeric: "tabular-nums",
               }}
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="16" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12.01" y2="8" />
-              </svg>
+              <Info size={14} aria-hidden="true" />
               {!isMobile && tokenStats && tokenStats.total > 0 && (
                 <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   {fmt(tokenStats.total)} {t("tokens", "tokens")}
@@ -315,49 +302,11 @@ export function SessionInfoPanel({
                         }}
                       >
                         {failed ? (
-                          <svg
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            aria-hidden="true"
-                          >
-                            <circle cx="12" cy="12" r="9" />
-                            <line x1="12" y1="7" x2="12" y2="13" />
-                            <line x1="12" y1="17" x2="12" y2="17" />
-                          </svg>
+                          <CircleAlert size={12} aria-hidden="true" />
                         ) : copied ? (
-                          <svg
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
+                          <Check size={12} aria-hidden="true" />
                         ) : (
-                          <svg
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                          </svg>
+                          <Copy size={12} aria-hidden="true" />
                         )}
                       </Button>
                     );
