@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/keep_alive.dart';
+import '../core/navigation.dart';
 import '../core/remote_connection.dart';
 import 'connect_page.dart';
 
@@ -56,9 +57,9 @@ class _SettingsPageState extends State<SettingsPage> {
     widget.connection.disconnect();
     // 断开后没有需要保活的链路，停掉前台服务。
     unawaited(stopKeepAlive());
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const ConnectPage()),
-    );
+    // 一并清掉底下的 HomePage：它的连接已经断开，留着只会让用户在连接页
+    // 误按返回退回到一个死掉的首页。
+    pushAsRoot(context, const ConnectPage());
   }
 
   @override

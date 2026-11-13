@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../core/device_label.dart';
 import '../core/host_store.dart';
 import '../core/keep_alive.dart';
+import '../core/navigation.dart';
 import '../core/remote_connection.dart';
 import 'home_page.dart';
 import 'scan_page.dart';
@@ -84,9 +85,10 @@ class _ConnectPageState extends State<ConnectPage> {
         await startKeepAlive();
       }
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => HomePage(connection: connection)),
-      );
+      // 清空导航栈而不是替换当前页：从设置页「断开连接并返回」进来时，
+      // 栈底还压着一条已断开连接的旧 HomePage，仅替换当前页会把首页留成
+      // 「可返回」状态（AppBar 显示返回箭头，按返回退到死连接）。
+      pushAsRoot(context, HomePage(connection: connection));
     } catch (err) {
       setState(() {
         _state = LinkState.disconnected;
