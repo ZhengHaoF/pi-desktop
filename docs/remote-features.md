@@ -89,6 +89,7 @@ cd mobile && flutter run -d 192.168.31.118:38043 # 真机无线调试
 - [x] **手机**：`parseRelayQr` 支持 JSON 配对载荷（兼容纯 URL）；deviceId 持久化（`remote.deviceId`）；配对成功自动保存 relay 签发的 `deviceSecret`；重连 hello 携带凭证，免重复扫码
 - [x] **多电脑配对（1:N）** ✅ 2026-11-10：relay `DeviceBinding` 改为按 `(deviceId, hostId)` 复合键存储，一台手机可分别配对多台电脑、各自持有独立凭证；`verifyDevice` 增加目标 `hostId` 校验（旧实现一份凭证可连任意主机），`revokeDevice` 只删对应主机那一条绑定。手机端 `deviceSecret` 按 `(relay, device, host)` 持久化，切换电脑时重载对应凭证。**升级不做旧凭证兼容，需重新扫码一次**
 - [x] **`pair.unbind`**：device 可主动解绑自己与某台电脑（host 调用返回 4002）；「选择电脑」长按删除 → relay 解绑 + 清本机凭证 + 标记「未配对」，提示「删除后，需要重新扫码才能再次连接」
+- [x] **设备型号标签** ✅ 2026-11-13：手机 hello 的 `label` 从写死的 `Pi Go (Android)` 改为 `<厂商> <型号> · Android <版本>`（`mobile/lib/core/device_label.dart`，用 `device_info_plus` 读 `Build.MANUFACTURER/MODEL` 与系统版本，取不到时回退旧标签，长度上限 48）；relay `pair.devices` 改为**优先返回在线连接的 label**——配对表里的 label 是配对瞬间的快照，不做这一步老设备需撤销重扫才会改名；桌面设备行单行省略 + `title` 提示，日期不被长名字挤掉；relay 测试覆盖「重连换 label → 列表立即更新」
 - [x] 测试：relay 17 项（含 1:N 独立绑定 / 跨主机凭证拒绝 / unbind 权限）、手机 40 项（含按主机凭证隔离与删除互不影响）；三端 typecheck + 桌面全量通过
 - [ ] **真机扫码配对端到端**（需物理相机 + 设置页点「添加设备」）：与「真机扫码端到端」待办合并验证
 

@@ -391,7 +391,7 @@ test("pairing: hash verification is timing-safe and deterministic", () => {
 
 function pairingHello(
   role: "host" | "device",
-  opts: { deviceId?: string; hostId?: string; auth?: Record<string, unknown> } = {},
+  opts: { deviceId?: string; hostId?: string; label?: string; auth?: Record<string, unknown> } = {},
 ): string {
   return JSON.stringify({
     v: 1,
@@ -406,6 +406,7 @@ function pairingHello(
       protocolVersion: 1,
       appVersion: "0.1.0",
       ...(opts.hostId ? { hostId: opts.hostId } : {}),
+      ...(opts.label ? { label: opts.label } : {}),
       auth: opts.auth ?? {},
     },
   });
@@ -449,6 +450,7 @@ test("relay: pairing issues a credential, re-connect works, revoke cuts access",
       pairingHello("device", {
         deviceId: "dev-pair-1",
         hostId: "host-pair-1",
+        label: "Pi Go (Android)",
         auth: { pairingToken: created.payload.token },
       }),
     );
@@ -461,7 +463,15 @@ test("relay: pairing issues a credential, re-connect works, revoke cuts access",
     // 3. Reconnect with the stored credential (no token).
     const again = await connect(relay.url, "device");
     again.send(
-      pairingHello("device", { deviceId: "dev-pair-1", hostId: "host-pair-1", auth: { deviceSecret: secret } }),
+      pairingHello("device", {
+        deviceId: "dev-pair-1",
+        hostId: "host-pair-1",
+        // The phone now reports its model. The binding still holds the label it
+        // was paired with ("Pi Go (Android)"), so the listing must prefer the
+        // live label — otherwise users would have to revoke + re-scan.
+        label: "Pixel 8 · Android 15",
+        auth: { deviceSecret: secret },
+      }),
     );
     const ack2 = JSON.parse(await nextMessage(again)) as { payload: { kind: string } };
     assert.equal(ack2.payload.kind, "hello_ack");
@@ -479,13 +489,15 @@ test("relay: pairing issues a credential, re-connect works, revoke cuts access",
       }),
     );
     const listed = JSON.parse(await nextMessage(host)) as {
-      payload: { kind: string; devices: Array<{ deviceId: string }> };
+      payload: { kind: string; devices: Array<{ deviceId: string; label?: string; online: boolean }> };
     };
     assert.equal(listed.payload.kind, "pair.devices.result");
     assert.deepEqual(
       listed.payload.devices.map((d) => d.deviceId),
       ["dev-pair-1"],
     );
+    assert.equal(listed.payload.devices[0]?.label, "Pixel 8 · Android 15");
+    assert.equal(listed.payload.devices[0]?.online, true);
 
     // 5. Revoke → live connection is closed and the credential stops working.
     const closed = nextClose(again);

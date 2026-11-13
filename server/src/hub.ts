@@ -520,8 +520,13 @@ export class RelayHub {
       // offline here).
       const devices = this.pairing.listDevices(from.id).map((binding) => {
         const peer = this.registry.get(binding.deviceId);
-        const online = peer?.role === "device" && peer.addressedHostId === from.id;
-        return { ...binding, online };
+        const devicePeer = peer?.role === "device" ? peer : undefined;
+        const online = devicePeer?.addressedHostId === from.id;
+        // Live label wins over the binding's: pairing freezes the label it saw
+        // at pair time, so a phone that starts reporting its model (or is
+        // renamed) would otherwise keep its old name here until it re-pairs.
+        const label = devicePeer?.label ?? binding.label;
+        return { ...binding, ...(label ? { label } : {}), online };
       });
       from.send(
         JSON.stringify({

@@ -564,34 +564,53 @@ export function RemoteControlCard() {
 
           {devices.length > 0 ? (
             <div style={{ display: "grid", gap: 4 }}>
-              {devices.map((device) => (
-                <div key={device.deviceId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-                  <span
-                    title={device.online ? t("remoteDeviceOnline", "online") : t("remoteDeviceOffline", "offline")}
-                    style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: 999,
-                      flex: "none",
-                      background: device.online ? "var(--success)" : "var(--text-dim)",
-                    }}
-                  />
-                  <span style={{ flex: 1, color: "var(--text)" }}>
-                    {device.label?.trim() ? device.label : device.deviceId}
-                    <span style={{ color: "var(--text-dim)", marginLeft: 8, fontSize: 11 }}>
-                      {new Date(device.pairedAt).toLocaleDateString()}
+              {devices.map((device) => {
+                // Phones now report `<model> · Android <release>`; keep the
+                // label on one line and let the date win the space it needs.
+                const name = device.label?.trim() ? device.label : device.deviceId;
+                return (
+                  <div key={device.deviceId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                    <span
+                      title={device.online ? t("remoteDeviceOnline", "online") : t("remoteDeviceOffline", "offline")}
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: 999,
+                        flex: "none",
+                        background: device.online ? "var(--success)" : "var(--text-dim)",
+                      }}
+                    />
+                    <span
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        display: "flex",
+                        alignItems: "baseline",
+                        gap: 8,
+                        color: "var(--text)",
+                      }}
+                    >
+                      <span
+                        title={name}
+                        style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                      >
+                        {name}
+                      </span>
+                      <span style={{ color: "var(--text-dim)", fontSize: 11, flex: "none" }}>
+                        {new Date(device.pairedAt).toLocaleDateString()}
+                      </span>
                     </span>
-                  </span>
-                  <Button
-                    type="button"
-                    variant="danger"
-                    style={{ padding: "4px 9px", borderRadius: 7, fontSize: 11.5 }}
-                    onClick={() => void revokeDevice(device.deviceId)}
-                  >
-                    {t("remotePairingRevoke", "Revoke")}
-                  </Button>
-                </div>
-              ))}
+                    <Button
+                      type="button"
+                      variant="danger"
+                      style={{ padding: "4px 9px", borderRadius: 7, fontSize: 11.5 }}
+                      onClick={() => void revokeDevice(device.deviceId)}
+                    >
+                      {t("remotePairingRevoke", "Revoke")}
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <span style={{ fontSize: 11, color: "var(--text-dim)" }}>

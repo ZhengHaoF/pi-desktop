@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../core/device_label.dart';
 import '../core/host_store.dart';
 import '../core/keep_alive.dart';
 import '../core/remote_connection.dart';
@@ -70,7 +71,8 @@ class _ConnectPageState extends State<ConnectPage> {
     final connection = RemoteConnection(
       relayUrl: _urlController.text.trim(),
       deviceId: _deviceController.text.trim(),
-      deviceLabel: 'Pi Go (Android)',
+      // 型号 + Android 版本进 hello 的 label，电脑端配对列表才分得清是哪台。
+      deviceLabel: await resolveDeviceLabel(),
       pairingToken: _pairingToken,
       targetHostId: _targetHostId,
     );
