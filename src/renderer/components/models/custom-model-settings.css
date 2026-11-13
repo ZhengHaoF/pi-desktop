@@ -219,16 +219,15 @@
   font-size: 10px;
   font-weight: 600;
 }
+/* Input row layout comes inline from CustomProviderTree.tsx (shared Input's
+   size presets are inline and would win); colors and focus stay here. */
 .custom-model-tree-search input {
   box-sizing: border-box;
   width: 100%;
-  min-height: 32px;
-  padding: 5px 8px;
   border: 1px solid var(--border);
   border-radius: 5px;
   background: var(--bg);
   color: var(--text);
-  font-size: 11px;
 }
 .custom-model-tree-group {
   margin-bottom: 3px;
@@ -253,6 +252,10 @@
   background: var(--bg-selected);
   color: var(--accent);
 }
+/* Row layout for tree buttons lives inline in CustomProviderTree.tsx: the
+   shared Button injects inline layout presets that beat class rules, so
+   duplicated declarations here would be silently dead. Colors and states
+   stay here. */
 .custom-model-tree-toggle {
   width: 28px;
   height: 36px;
@@ -260,7 +263,6 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  padding: 0;
 }
 .custom-model-tree-toggle:disabled {
   cursor: default;
@@ -268,11 +270,8 @@
 .custom-model-tree-name {
   display: flex;
   align-items: center;
-  gap: 8px;
   min-width: 0;
   flex: 1;
-  min-height: 36px;
-  padding: 5px 8px 5px 0;
   font-size: 12px;
   font-weight: 600;
 }
@@ -294,11 +293,6 @@
   border-left: 1px solid var(--border);
 }
 .custom-model-tree-model {
-  display: block;
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 34px;
-  padding: 7px;
   border-radius: 5px;
 }
 .custom-model-tree-model > span,
@@ -317,9 +311,6 @@
   color: var(--text-dim);
 }
 .custom-model-tree-add {
-  width: 100%;
-  min-height: 34px;
-  padding: 7px;
   font-size: 11px;
 }
 .custom-model-tree button:hover:not(:disabled) {

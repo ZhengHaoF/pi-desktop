@@ -1,8 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import type { ModelsConfigSelection, ProviderEntry } from "@/lib/models-config-state";
+
+// The shared Button injects inline layout presets (inline-flex, centered
+// justify-content, 5px/12px padding) and inline style beats any class rule in
+// custom-model-settings.css, so the tree re-declares its row layout via style
+// per docs/ui-components.md ("布局覆盖走 style").
+const toggleStyle: CSSProperties = { padding: 0 };
+const providerNameStyle: CSSProperties = { gap: 8, minHeight: 36, padding: "5px 8px 5px 0" };
+const modelRowStyle: CSSProperties = {
+  display: "block",
+  width: "100%",
+  boxSizing: "border-box",
+  minHeight: 34,
+  padding: 7,
+};
+const addModelStyle: CSSProperties = { ...modelRowStyle, fontSize: 11 };
+const searchInputStyle: CSSProperties = { minHeight: 32, padding: "5px 8px", fontSize: 11 };
 
 export function CustomProviderTree({
   providers,
@@ -43,6 +59,7 @@ export function CustomProviderTree({
         <Input
           type="search"
           size="sm"
+          style={searchInputStyle}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           aria-label={t("modelSearchCustom", "Search custom providers and models")}
@@ -57,6 +74,7 @@ export function CustomProviderTree({
             <div className="custom-model-tree-provider" data-selected={selected}>
               <Button
                 className="custom-model-tree-toggle"
+                style={toggleStyle}
                 aria-expanded={open}
                 aria-label={(open
                   ? t("modelCollapseProvider", "Collapse models for {provider}")
@@ -80,6 +98,7 @@ export function CustomProviderTree({
               </Button>
               <Button
                 className="custom-model-tree-name"
+                style={providerNameStyle}
                 title={name}
                 aria-current={selected ? "page" : undefined}
                 onClick={() => onSelect({ type: "provider", name })}
@@ -100,6 +119,7 @@ export function CustomProviderTree({
                     <Button
                       key={index}
                       className="custom-model-tree-model"
+                      style={modelRowStyle}
                       data-selected={active}
                       aria-current={active ? "page" : undefined}
                       title={name + "/" + model.id}
@@ -111,7 +131,7 @@ export function CustomProviderTree({
                     </Button>
                   );
                 })}
-                <Button className="custom-model-tree-add" onClick={() => onAddModel(name)}>
+                <Button className="custom-model-tree-add" style={addModelStyle} onClick={() => onAddModel(name)}>
                   {t("modelAddModelAction", "Add model")}
                 </Button>
               </div>
