@@ -5,7 +5,8 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-
+import 'package:flutter/rendering.dart' show ScrollDirection;
+import '../core/chat_scroll_policy.dart';
 import '../core/remote_connection.dart';
 import '../widgets/markdown_text.dart';
 import '../widgets/session_models.dart';
@@ -51,6 +52,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   StreamSubscription<RemoteSessionEvent>? _events;
   Timer? _renderThrottle;
   bool _pendingRender = false;
+  /// 滚动磁吸（对齐桌面端 chat-scroll-policy）：流式输出跟随到底；用户
+  /// 上滚立即脱开，滚回距底 96px 内重新吸附。
+  bool _scrollMagnetEngaged = true;
+  /// 离底状态（驱动悬浮"回到底部"按钮），磁吸脱开且不在底部时为 true。
+  bool _awayFromBottom = false;
   Map<String, String>? _currentModel; // {provider, modelId}
   /// Display names from the PC catalog, keyed by `provider/modelId`.
   Map<String, String> _modelNames = const {};
@@ -514,9 +520,82 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _pendingRender = true;
     _renderThrottle = Timer(const Duration(milliseconds: 50), () {
       _pendingRender = false;
-      if (_scrollController.hasClients) {
+      if (!_scrollController.hasClients) return;
+      // 磁吸脱开时不跟随流式输出——展开思考过程/工具卡后用户才能停在
+      // 原地查看，收起按钮不再被流式滚底拽出视口。
+      if (!_scrollMagnetEngaged) {
+        _syncAwayFromBottom();
+        return;
+      }
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    });
+  }
+
+  /// 依据当前滚动位置更新"离底"标记（驱动悬浮回底按钮）。磁吸吸附中
+  /// 恒为 false（jumpTo 之后必然在底部）。
+  void _syncAwayFromBottom() {
+    final position = _scrollController.position;
+    final away = !isNearChatBottom(maxScrollExtent: position.maxScrollExtent, offset: position.pixels);
+    if (away != _awayFromBottom) setState(() => _awayFromBottom = away);
+  }
+
+  /// 用户滚动手势（ScrollNotification 的 drag/scroll 只来自触摸，jumpTo
+  /// 不产生）：上滚立即脱开磁吸；下滚回到 96px 内重新吸附。
+  bool _onScrollNotification(ScrollNotification notification) {
+    if (notification.depth != 0) return false;
+    if (notification.metrics.axis != Axis.vertical) return false;
+    if (notification is UserScrollNotification) {
+      final direction = notification.direction;
+      if (direction == ScrollDirection.forward) {
+        // 手指下拖（内容向下）= 看更新的内容；回到窗口内即重新吸附。
+        _maybeReattachMagnet(notification.metrics);
+      } else if (direction == ScrollDirection.reverse) {
+        // 上滚（看历史）：立即脱开，优先级最高。
+        if (_scrollMagnetEngaged) setState(() => _scrollMagnetEngaged = false);
+        _syncAwayFromBottom();
+      }
+      return false;
+    }
+    if (notification is ScrollUpdateNotification) {
+      final delta = notification.scrollDelta;
+      if (delta == null) return false;
+      // 惯性滚动（fling）阶段 UserScrollNotification 不再更新，用位移兜底。
+      if (delta < -userScrollMinPx) {
+        if (_scrollMagnetEngaged) setState(() => _scrollMagnetEngaged = false);
+        _syncAwayFromBottom();
+      } else if (delta > userScrollMinPx) {
+        _maybeReattachMagnet(notification.metrics);
+      }
+      return false;
+    }
+    return false;
+  }
+
+  void _maybeReattachMagnet(ScrollMetrics metrics) {
+    final near = isNearChatBottom(maxScrollExtent: metrics.maxScrollExtent, offset: metrics.pixels);
+    if (near != _awayFromBottom) setState(() => _awayFromBottom = !near);
+    if (near && !_scrollMagnetEngaged) setState(() => _scrollMagnetEngaged = true);
+  }
+
+  /// 悬浮"回到底部"：跳到底并重新吸附，后续流式输出继续跟随。
+  void _scrollToBottomAndReattach() {
+    if (!_scrollController.hasClients) return;
+    setState(() => _scrollMagnetEngaged = true);
+    _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    _syncAwayFromBottom();
+  }
+
+  /// 展开/收起思考过程与工具卡后的磁吸协同（对齐桌面端行为）：
+  /// - 吸附中 + 展开：内容立即变高，直接跟随到底（新内容可视）。
+  /// - 脱开中 + 收起：原地不动——用户正在看的位置不能被跳走，否则
+  ///   "收起"按钮会瞬间移位点不到（本任务修复的原始症状）。
+  void _scrollMagnetOnToggle() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      if (_scrollMagnetEngaged) {
         _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
       }
+      _syncAwayFromBottom();
     });
   }
 
@@ -592,6 +671,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         expanded: _expandedTools.contains(callId),
         onToggle: () => setState(() {
           if (!_expandedTools.remove(callId)) _expandedTools.add(callId);
+          // 展开/收起不是"看历史"手势：磁吸状态保持不变，收起后不跳。
+          _scrollMagnetOnToggle();
         }),
       );
     }
@@ -602,6 +683,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         expanded: _expandedThinking.contains(thinkingId),
         onToggle: () => setState(() {
           if (!_expandedThinking.remove(thinkingId)) _expandedThinking.add(thinkingId);
+          _scrollMagnetOnToggle();
         }),
       );
     }
@@ -705,7 +787,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ? const Center(
                     child: Text('向 PC 上的 agent 发送第一条指令…', style: TextStyle(color: Colors.black38)),
                   )
-                : ListView.builder(
+                : Stack(
+                    children: [
+                      NotificationListener<ScrollNotification>(
+                        onNotification: _onScrollNotification,
+                        child: ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     itemCount:
@@ -753,6 +839,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         ),
                       );
                     },
+                  ),
+                      ),
+                      // 悬浮"回到底部"（PC ChatWindow 同款）：磁吸脱开且
+                      // 离底时浮现，一键回底并重新吸附。
+                      if (_awayFromBottom)
+                        Positioned(
+                          right: 12,
+                          bottom: 12,
+                          child: FloatingActionButton.small(
+                            heroTag: 'chat-scroll-to-bottom',
+                            onPressed: _scrollToBottomAndReattach,
+                            tooltip: _turnRunning ? '跳到最新' : '回到底部',
+                            child: const Icon(Icons.arrow_downward, size: 20),
+                          ),
+                        ),
+                    ],
                   ),
           ),
           SafeArea(
