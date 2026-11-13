@@ -157,6 +157,13 @@ class RemoteConnection {
   /// 多 PC：切换目标主机并刷新 hello_ack（后续 RPC 自动路由到新 host）。
   Future<void> selectHost(String hostId) async {
     _preferredHostId = hostId;
+    // Selecting the host we already target must NOT drop the in-memory
+    // credential: right after a scan, the pairing hello_ack races the home
+    // page's restore-selection call into here — clearing _deviceSecret (and
+    // reconnecting before the async saveDeviceSecret lands on disk) discards
+    // a just-issued secret. That 220ms re-hello replaying a consumed token
+    // came from exactly this window.
+    if (hostId == _hostId) return;
     // The credential is per host: point hello at the new target and reload
     // its own deviceSecret before re-handshaking.
     _hostId = hostId;
@@ -233,6 +240,11 @@ class RemoteConnection {
     // connect() 会在下次拨号时清空它们，所以这是"最近一次失败"的快照。
     _lastCloseCode = _channel?.closeCode;
     _lastCloseReason = _channel?.closeReason;
+    // 带着一次性 token 被 4003 拒：该 token 已被消费/过期/不属于本
+    // relay，重试永远不会成功，还会喂远端的失败锁计数——立即停用。
+    if (shouldRetirePairingToken(_lastCloseCode, _lastCloseReason, pairingTokenSpent)) {
+      pairingTokenSpent = true;
+    }
     _helloAcked = false;
     _outbox.clear();
     _failPending(reason);
@@ -288,6 +300,16 @@ class RemoteConnection {
     if (!pairingTokenSpent && pairingToken != null && pairingToken!.isNotEmpty)
       'pairingToken': pairingToken,
   };
+
+  /// 断链后是否应停用一次性配对令牌：只有"带着 token 被 4003 以
+  /// `pairing token rejected` 拒绝"才算——token 已消费/过期/不属于本
+  /// relay，再无重试价值。纯判定便于单测。
+  @visibleForTesting
+  static bool shouldRetirePairingToken(int? closeCode, String? closeReason, bool alreadySpent) {
+    if (alreadySpent) return false;
+    if (closeCode != 4003) return false;
+    return closeReason != null && closeReason.startsWith('pairing token rejected');
+  }
 
   void disconnect() {
     _userDisconnected = true;

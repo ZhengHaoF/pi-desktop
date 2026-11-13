@@ -41,4 +41,26 @@ void main() {
       expect(connection.buildAuth(''), isEmpty);
     });
   });
+
+  group('shouldRetirePairingToken', () {
+    test('retires only on 4003 pairing-token-rejected close', () {
+      expect(
+          RemoteConnection.shouldRetirePairingToken(
+              4003, 'pairing token rejected: pairing consumed', false),
+          isTrue);
+      expect(
+          RemoteConnection.shouldRetirePairingToken(
+              4003, 'pairing token rejected: pairing expired', false),
+          isTrue);
+      expect(RemoteConnection.shouldRetirePairingToken(4003, 'pairing required', false), isFalse,
+          reason: 'plain pairing-required may still succeed once a token arrives');
+      expect(RemoteConnection.shouldRetirePairingToken(4002, 'protocol error', false), isFalse);
+      expect(RemoteConnection.shouldRetirePairingToken(null, null, false), isFalse);
+      expect(
+          RemoteConnection.shouldRetirePairingToken(
+              4003, 'pairing token rejected: pairing consumed', true),
+          isFalse,
+          reason: 'already spent: nothing to retire');
+    });
+  });
 }
