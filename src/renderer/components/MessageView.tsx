@@ -972,13 +972,13 @@ function ThinkingBlock({
         style={{
           display: "flex",
           alignItems: "center",
+          justifyContent: "flex-start",
           gap: 8,
           width: "100%",
           padding: "7px 12px",
           border: "none",
           fontSize: scaledChatFont(11.5),
           fontFamily: "var(--font-mono)",
-          textAlign: "left",
         }}
       >
         <span style={{ fontSize: 10 }}>{expanded ? "▾" : "▸"}</span>
