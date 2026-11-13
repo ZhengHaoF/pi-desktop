@@ -1127,6 +1127,10 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                                 color: "var(--text)",
                                 cursor: "pointer",
                                 textAlign: "left",
+                                /* .pi-btn sets nowrap for single-line labels; these cards
+                                   need wrapping so the name can break and the description
+                                   line-clamp takes effect. */
+                                whiteSpace: "normal",
                                 boxShadow: active
                                   ? "0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent)"
                                   : "none",
