@@ -42,8 +42,25 @@ void main() {
     });
   });
 
-  group('shouldRetirePairingToken', () {
-    test('retires only on 4003 pairing-token-rejected close', () {
+  group('isTerminalFailureFor', () {
+    test('pairing reject and handshake refusal are terminal', () {
+      // 同一份凭证/钉扎记录重连只会得到同一个答案，重试没有意义。
+      expect(RemoteConnection.isTerminalFailureFor(4003, null), isTrue);
+      expect(RemoteConnection.isTerminalFailureFor(null, '主机密钥不符'), isTrue);
+      expect(RemoteConnection.isTerminalFailureFor(4003, '主机密钥不符'), isTrue);
+    });
+
+    test('recoverable failures are not terminal', () {
+      // 协议/版本/频率这类问题靠重连或升级能恢复，列表与缓存应当保留。
+      expect(RemoteConnection.isTerminalFailureFor(4002, null), isFalse);
+      expect(RemoteConnection.isTerminalFailureFor(4000, null), isFalse);
+      expect(RemoteConnection.isTerminalFailureFor(1008, null), isFalse);
+      expect(RemoteConnection.isTerminalFailureFor(null, null), isFalse,
+          reason: 'a plain link drop carries no verdict');
+    });
+  });
+
+  group('shouldRetirePairingToken', () {    test('retires only on 4003 pairing-token-rejected close', () {
       expect(
           RemoteConnection.shouldRetirePairingToken(
               4003, 'pairing token rejected: pairing consumed', false),

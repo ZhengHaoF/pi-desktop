@@ -194,3 +194,10 @@ Future<List<SessionSummary>> loadCachedSessions(String hostId) async {
     return const [];
   }
 }
+
+/// 作废某台电脑的会话快照：配对凭证被拒、主动解绑、删除电脑时调用——
+/// 这份快照属于上一段配对关系，继续渲染只会让用户以为还连着。
+Future<void> deleteCachedSessions(String hostId) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove(_kSessionsCachePrefix + hostId);
+}

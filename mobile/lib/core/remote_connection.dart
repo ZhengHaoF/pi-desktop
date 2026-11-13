@@ -137,6 +137,17 @@ class RemoteConnection {
   /// 而不是让用户对着一成不变的红色横幅干等。
   bool get lastFailureWasPairingReject => _lastCloseCode == 4003;
 
+  /// 失败是否为终态（凭证被拒 / 主机身份不符）：拿同一份材料重连永远是
+  /// 同一个结果，只有重新扫码配对能恢复。此时本机缓存的会话列表也不再
+  /// 可信——它属于上一次配对，首页据此清空列表并作废缓存。
+  bool get isTerminalFailure => isTerminalFailureFor(_lastCloseCode, _handshakeError);
+
+  /// 终态判定（便于单测）：握手拒绝（E2EE 钉扎不符等）与 4003 配对拒绝
+  /// 都不会因为重试而改变；4002/4000/1008 等是环境/协议问题，重连有意义。
+  @visibleForTesting
+  static bool isTerminalFailureFor(int? closeCode, String? handshakeError) =>
+      handshakeError != null || closeCode == 4003;
+
   /// 当前目标主机是否已知且离线（离线时请求会直接失败，不再等 30s 超时）。
   bool get isTargetHostOffline {
     final id = _hostId;
@@ -245,6 +256,9 @@ class RemoteConnection {
     if (shouldRetirePairingToken(_lastCloseCode, _lastCloseReason, pairingTokenSpent)) {
       pairingTokenSpent = true;
     }
+    // 凭证被拒是终态：同一份 deviceSecret 再拨一次还是 4003，热循环只会
+    // 喂远端的失败锁计数。停掉重连，等用户重新扫码（见自愈入口）。
+    if (isTerminalFailure) _userDisconnected = true;
     _helloAcked = false;
     _outbox.clear();
     _failPending(reason);

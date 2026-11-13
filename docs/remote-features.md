@@ -61,7 +61,8 @@ cd mobile && flutter run -d 192.168.31.118:38043 # 真机无线调试
 ### 会话管理（手机）
 - [x] 重命名（sessions.rename，对话框）
 - [x] 删除（sessions.delete，二次确认）
-- [x] **会话列表本地缓存** ✅ 新增：按 hostId 隔离存 shared_preferences（`remote.sessionsCache.<hostId>`），进页/重连先渲染缓存再静默刷新；运行中 dot 不进缓存、以刷新结果为准；损坏数据容错为空。单测 3 项（往返排序 / 多主机隔离 / 坏数据容错）
+- [x] **会话列表本地缓存** ✅ 新增：按 hostId 隔离存 shared_preferences（`remote.sessionsCache.<hostId>`），进页/重连先渲染缓存再静默刷新；运行中 dot 不进缓存、以刷新结果为准；损坏数据容错为空。单测 5 项（往返排序 / 多主机隔离 / 坏数据容错 / 单主机作废不误删 / 未写入即作废）
+- [x] **终态失败作废列表与缓存** ✅ 2026-11-13：凭证被拒（4003）或主机钉扎不符时，列表属于上一段配对关系——清空内存列表 + `deleteCachedSessions` 删磁盘快照，只留整页错误态与「重新扫码配对」出口；`RemoteConnection.isTerminalFailure` 统一判定，4003 同时停掉重连循环（同一份凭证重试只会得到同一个 4003）。离线/超时等瞬态失败仍保留缓存（那正是缓存的价值）。`_rescanPairing`、解绑删除电脑同样清快照，避免重新配对后先闪旧数据；握手成功时无条件清掉旧失败横幅并重新拉取
 
 ### 多 PC 切换（对标 WorkBuddy 设备选择器）
 - [x] Relay：host 可自报**稳定 hostId + 展示名**（重连即覆盖注册）；hello_ack 下发**主机目录**（在线/离线 + lastSeenAt）；信封级 `hosts.list` 控制帧（relay 本地应答，零知识不受影响）

@@ -73,4 +73,31 @@ void main() {
     await prefs.setString('remote.sessionsCache.host-bad', 'not-json{');
     expect(await loadCachedSessions('host-bad'), isEmpty);
   });
+
+  test('deleting one host cache leaves the others untouched', () async {
+    for (final host in ['host-keep', 'host-drop']) {
+      await saveCachedSessions(host, [
+        SessionSummary(
+          id: 's-$host',
+          cwd: 'D:/work/$host',
+          name: null,
+          firstMessage: 'session on $host',
+          messageCount: 1,
+          modified: DateTime.parse('2026-11-09T09:00:00Z'),
+          projectRoot: 'D:/work/$host',
+        ),
+      ]);
+    }
+
+    await deleteCachedSessions('host-drop');
+
+    // 配对作废只作废那一段关系：别的电脑的快照必须还在。
+    expect(await loadCachedSessions('host-drop'), isEmpty);
+    expect((await loadCachedSessions('host-keep')).single.id, 's-host-keep');
+  });
+
+  test('deleting a cache that was never written is a no-op', () async {
+    await deleteCachedSessions('host-never-seen');
+    expect(await loadCachedSessions('host-never-seen'), isEmpty);
+  });
 }

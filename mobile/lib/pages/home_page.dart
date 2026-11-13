@@ -37,22 +37,42 @@ class _HomePageState extends State<HomePage> {
   RemoteHostInfo? _currentHost;
   /// 已配对（本机持有该电脑凭证）的 hostId 集合。
   Set<String> _pairedHostIds = const {};
-
-  bool _wasTargetOffline = false;
+  StreamSubscription<LinkState>? _stateSub;
 
   @override
   void initState() {
     super.initState();
     _restoreHostSelection();
-    widget.connection.onState.listen((state) {
+    _stateSub = widget.connection.onState.listen((state) {
       if (state != LinkState.ready || !mounted) return;
-      setState(() => _syncHostState());
-      final offline = widget.connection.isTargetHostOffline;
-      // 目标电脑从离线恢复为在线时自动拉取会话。
-      if (_wasTargetOffline && !offline) _refresh();
-      _wasTargetOffline = offline;
+      // 每次握手成功都清掉上一次的失败横幅：链路上来了，红字留着只会
+      // 让人以为还断着。
+      setState(() => _error = null);
+      _syncHostState();
+      // 重连/从离线恢复：静默刷新，失败由 _refresh 自己处理。
+      unawaited(_refresh());
     });
     _refresh();
+  }
+
+  @override
+  void dispose() {
+    _stateSub?.cancel();
+    super.dispose();
+  }
+
+  /// 列表与本次配对绑定：凭证被拒或解除绑定后，屏幕上的会话属于上一段
+  /// 关系，既不能继续展示，也不该留在磁盘上等下次冷启动再冒出来。
+  void _discardSessions({String? hostId}) {
+    final id = hostId ?? widget.connection.hostId;
+    if (id != null) unawaited(deleteCachedSessions(id));
+    if (!mounted) return;
+    setState(() {
+      _sessions = [];
+      _runningIds = [];
+      _expanded.clear();
+      _defaultsApplied = false;
+    });
   }
 
   Future<void> _restoreHostSelection() async {
@@ -99,10 +119,15 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _refresh() async {
-    // 断线重连/进页先渲染本机缓存（按 hostId 隔离），随后静默刷新；
-    // 运行中状态不进缓存，永远以刷新结果为准。
     final hostId = widget.connection.hostId;
-    if (hostId != null && _sessions.isEmpty) {
+    // 凭证已被拒/主机身份不符：缓存属于上一段配对，直接作废，不当成
+    // 「本次会话的加速展示」再渲染一遍。
+    final terminal = widget.connection.isTerminalFailure;
+    if (terminal) {
+      _discardSessions(hostId: hostId);
+    } else if (hostId != null && _sessions.isEmpty) {
+      // 断线重连/进页先渲染本机缓存（按 hostId 隔离），随后静默刷新；
+      // 运行中状态不进缓存，永远以刷新结果为准。
       final cached = await loadCachedSessions(hostId);
       if (mounted && cached.isNotEmpty && _sessions.isEmpty) {
         setState(() {
@@ -114,7 +139,10 @@ class _HomePageState extends State<HomePage> {
         });
       }
     }
+    if (!mounted) return;
     setState(() {
+      // 终态下列表已空：保持 loading 直到 request 立刻抛错，避免先闪一下
+      // 「没有匹配的会话」再跳到错误态。
       _loading = _sessions.isEmpty;
       _error = null;
     });
@@ -137,6 +165,7 @@ class _HomePageState extends State<HomePage> {
         _sessions = sessions;
         _runningIds = running is List ? running.map((e) => e.toString()).toList() : [];
         _loading = false;
+        _error = null;
         if (!_defaultsApplied && sessions.isNotEmpty) {
           // Most recent project starts expanded.
           _expanded.add(sessions.first.projectRoot);
@@ -146,6 +175,11 @@ class _HomePageState extends State<HomePage> {
       });
     } catch (err) {
       final message = err is StateError ? err.message.replaceFirst('Bad state: ', '') : err.toString();
+      // 终态失败（凭证被拒/主机身份不符）：列表连同磁盘快照一起作废，
+      // 让整页错误态与「重新扫码配对」成为唯一出口。离线/超时是瞬态，
+      // 保留快照——那正是缓存的价值。
+      if (widget.connection.isTerminalFailure) _discardSessions(hostId: hostId);
+      if (!mounted) return;
       setState(() {
         // 离线是已知状态而非异常：用空态提示，不显示红色超时错误。
         // 但配对被拒/协议违规等服务器主动断链要原样呈现给用户。
@@ -172,6 +206,7 @@ class _HomePageState extends State<HomePage> {
   /// 扫码——一次性 token 已消费时任何重试都无济于事，只有新扫码能重新
   /// 配对并签发凭证。
   Future<void> _rescanPairing() async {
+    _discardSessions();
     widget.connection.disconnect();
     if (!mounted) return;
     await Navigator.of(context).pushAndRemoveUntil(
@@ -659,6 +694,16 @@ class _HomePageState extends State<HomePage> {
       relayUrl: widget.connection.relayUrl,
       hostId: host.id,
     );
+    // 会话快照与凭证同生同灭：留着它，下次配对新凭证时会先闪一遍旧数据。
+    await deleteCachedSessions(host.id);
+    if (wasCurrent && mounted) {
+      setState(() {
+        _sessions = [];
+        _runningIds = [];
+        _expanded.clear();
+        _defaultsApplied = false;
+      });
+    }
     await _reloadPairedHosts();
     // 当前连接用的是刚删掉的凭证，主动断开避免自动重连循环。
     if (wasCurrent) widget.connection.disconnect();
