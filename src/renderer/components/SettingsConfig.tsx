@@ -49,6 +49,12 @@ export type SettingsTab =
   "general" | "herdr" | "browser" | "search" | "channels" | "models" | "tools" | "skills" | "plugins" | "mcp" | "about";
 
 interface SettingsConfigProps {
+  /**
+   * Controlled visibility. The deferred wrapper keeps this panel mounted
+   * through the exit fade and only flips `open`, so the Dialog's close
+   * animation plays instead of the subtree dropping outright.
+   */
+  open: boolean;
   cwd: string | null;
   sessionId: string | null;
   initialTab?: SettingsTab;
@@ -71,6 +77,7 @@ interface SettingsConfigProps {
 }
 
 export function SettingsConfig({
+  open,
   cwd,
   sessionId,
   initialTab = "general",
@@ -119,13 +126,18 @@ export function SettingsConfig({
     // navigationRequestId intentionally retries an externally requested tab after a cancelled dirty-editor prompt.
   }, [initialTab, navigationRequestId, requestSettingsTransition]);
 
+  // Focus follows visibility rather than lifetime: the deferred wrapper keeps
+  // this panel mounted through the exit fade, so cleanup must not steal focus
+  // back while the dialog is still on screen. Restoring runs only once the
+  // dialog is actually gone (open=false and the fade finished).
   useEffect(() => {
+    if (!open) return;
     const returnFocus = returnFocusRef.current;
     closeButtonRef.current?.focus();
     return () => {
-      returnFocus?.focus();
+      if (returnFocus instanceof HTMLElement && document.contains(returnFocus)) returnFocus.focus();
     };
-  }, []);
+  }, [open]);
 
   useEffect(() => {
     const dialog = document.querySelector('[role="dialog"][aria-modal="true"]');
@@ -150,7 +162,7 @@ export function SettingsConfig({
 
   return (
     <Dialog
-      open
+      open={open}
       animateEnter={animateEnter}
       onClose={() => requestSettingsTransition(onClose)}
       ariaLabel={t("settings", "Settings")}

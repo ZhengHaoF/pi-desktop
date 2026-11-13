@@ -1520,24 +1520,26 @@ export function AppShell({
           <line x1="15" y1="3" x2="15" y2="21" />
         </svg>
       </Button>
-      {settingsOpen && (
-        <SettingsConfig
-          cwd={activeCwd ?? selectedSession?.cwd ?? newSessionCwd ?? null}
-          sessionId={authorizationSettingsSessionId ?? selectedSession?.id ?? null}
-          initialTab={settingsInitialTab}
-          navigationRequestId={settingsNavigationRequestId}
-          onClose={() => {
-            setSettingsOpen(false);
-            setSettingsInitialTab("general");
-          }}
-          onModelsChanged={() => setModelsRefreshKey((key) => key + 1)}
-          onPluginsReloaded={() => setSessionKey((key) => key + 1)}
-          onChannelsChanged={setChannelSnapshot}
-          chatAppearance={chatAppearance}
-          chatAppearanceSaving={chatAppearanceSaving}
-          onChatAppearanceChange={onChatAppearanceChange}
-        />
-      )}
+      {/* Persistent through the exit fade: only `open` flips so the closing
+          dialog animates out instead of dropping in one commit. */}
+      <SettingsConfig
+        open={settingsOpen}
+        cwd={activeCwd ?? selectedSession?.cwd ?? newSessionCwd ?? null}
+        sessionId={authorizationSettingsSessionId ?? selectedSession?.id ?? null}
+        initialTab={settingsInitialTab}
+        navigationRequestId={settingsNavigationRequestId}
+        onClose={() => {
+          setSettingsOpen(false);
+          setSettingsInitialTab("general");
+          setSettingsNavigationRequestId((id) => id + 1);
+        }}
+        onModelsChanged={() => setModelsRefreshKey((key) => key + 1)}
+        onPluginsReloaded={() => setSessionKey((key) => key + 1)}
+        onChannelsChanged={setChannelSnapshot}
+        chatAppearance={chatAppearance}
+        chatAppearanceSaving={chatAppearanceSaving}
+        onChatAppearanceChange={onChatAppearanceChange}
+      />
       {browserAuthorization && !settingsOpen && (
         <BrowserAuthorizationDialog
           request={browserAuthorization}
