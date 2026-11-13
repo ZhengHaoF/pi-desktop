@@ -8,6 +8,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:meta/meta.dart';
+import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../protocol/wire.dart';
@@ -48,6 +50,11 @@ class RemoteConnection {
   final String deviceLabel;
   /// 扫码带入的一次性配对令牌（首次配对用，成功后不再携带）。
   final String? pairingToken;
+  /// hello_ack 之后令牌必然已被 relay 消费（或已无意义）：之后的重连不再
+  /// 重放它——重放只会换来 4003 "pairing token rejected"，还会喂远端的
+  /// 失败锁计数。长期凭证（deviceSecret）照常携带，重连靠它免扫码。
+  @visibleForTesting
+  bool pairingTokenSpent = false;
   /// 扫码载荷指定的目标 PC；hello 阶段即携带，配对绑定依赖它。
   final String? targetHostId;
 
@@ -126,6 +133,10 @@ class RemoteConnection {
     }
   }
 
+  /// 最近一次断链是否为配对被拒（4003）：首页据此给出"重新扫码"直达入口，
+  /// 而不是让用户对着一成不变的红色横幅干等。
+  bool get lastFailureWasPairingReject => _lastCloseCode == 4003;
+
   /// 当前目标主机是否已知且离线（离线时请求会直接失败，不再等 30s 超时）。
   bool get isTargetHostOffline {
     final id = _hostId;
@@ -173,7 +184,9 @@ class RemoteConnection {
     if (state == LinkState.ready || state == LinkState.connecting) return;
     _setState(LinkState.connecting);
     final uri = Uri.parse('$relayUrl?role=device');
-    final channel = WebSocketChannel.connect(uri);
+    // 30s 应用层心跳：dart:io 的 ping 无应答会主动断链并触发 onError——
+    // 否则 NAT 超时/对端消失时 socket 半开，重连循环永远等不到 close 事件。
+    final channel = IOWebSocketChannel.connect(uri, pingInterval: const Duration(seconds: 30));
     _channel = channel;
     try {
       await channel.ready;
@@ -205,10 +218,7 @@ class RemoteConnection {
     _handshakeError = null;
     _lastCloseCode = null;
     _lastCloseReason = null;
-    final auth = <String, dynamic>{
-      if (_deviceSecret != null && _deviceSecret!.isNotEmpty) 'deviceSecret': _deviceSecret,
-      if (pairingToken != null && pairingToken!.isNotEmpty) 'pairingToken': pairingToken,
-    };
+    final auth = buildAuth(_deviceSecret);
     // Ready only after the relay confirms the hello and hands us a hostId;
     // queued payloads flush then (see _onFrame / _sendEnvelope).
     _sendEnvelope(helloPayload(role: 'device', label: deviceLabel, auth: auth, e2eePub: _deviceKeys!.publicKey));
@@ -249,11 +259,35 @@ class RemoteConnection {
   void _scheduleReconnect() {
     if (_userDisconnected) return;
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 2), () {
+    // 指数退避：relay 拒绝（如配对失败）时 2s 热循环只会空转并喂远端
+    // 失败锁计数；握手成功后归零（见 hello_ack）。
+    final delay = Duration(milliseconds: reconnectDelayMs(_reconnectAttempts));
+    _reconnectAttempts += 1;
+    _reconnectTimer = Timer(delay, () {
       if (_userDisconnected) return;
       connect().catchError((_) {});
     });
   }
+
+  static const _reconnectBaseMs = 2000;
+  static const _reconnectMaxMs = 60000;
+  int _reconnectAttempts = 0;
+
+  /// 重连退避曲线：2s、4s、8s、16s、32s，60s 封顶（attempt = 连续失败次数）。
+  @visibleForTesting
+  static int reconnectDelayMs(int attempt) {
+    final step = attempt < 0 ? 0 : (attempt > 5 ? 5 : attempt);
+    final ms = _reconnectBaseMs * (1 << step);
+    return ms > _reconnectMaxMs ? _reconnectMaxMs : ms;
+  }
+
+  /// hello 的 auth 材料：长期凭证始终携带；一次性配对令牌只在未消费时带上。
+  @visibleForTesting
+  Map<String, dynamic> buildAuth(String? deviceSecret) => <String, dynamic>{
+    if (deviceSecret != null && deviceSecret.isNotEmpty) 'deviceSecret': deviceSecret,
+    if (!pairingTokenSpent && pairingToken != null && pairingToken!.isNotEmpty)
+      'pairingToken': pairingToken,
+  };
 
   void disconnect() {
     _userDisconnected = true;
@@ -410,6 +444,10 @@ class RemoteConnection {
   void _dispatchPayload(Map<String, dynamic> payload) {
     switch (payload['kind']) {
       case 'hello_ack':
+        // 握手被 relay 接受：令牌已消费（或已被凭证回退取代），重连退避
+        // 归零。此后的重连只带 deviceSecret，不再重放一次性 token。
+        pairingTokenSpent = true;
+        _reconnectAttempts = 0;
         // Handshake confirmed. The relay tells us which host to address
         // (spec §4); every routed envelope must carry this hostId or the
         // relay closes the link with "missing target id". 多 PC：ack 还带

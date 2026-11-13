@@ -37,6 +37,7 @@ dependencies:
   mobile_scanner: ^7.5.0
   flutter_foreground_task: ^11.0.3
   cryptography: ^2.7.0
+  meta: ^1.19.0
 
 dev_dependencies:
   flutter_test:

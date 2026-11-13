@@ -18,6 +18,8 @@ function testConfig(overrides: Partial<RelayConfig> = {}): RelayConfig {
     rateLimitWindowMs: 60_000,
     pairingTtlMs: 60_000,
     pairingMaxAttempts: 3,
+    // 心跳对既有用例保持无感（60s 不会在测试窗口内触发）。
+    heartbeatIntervalMs: 60_000,
     ...overrides,
   };
 }
@@ -963,7 +965,8 @@ test("relay: pair.devices marks a live device online and offline after disconnec
       listed.map((device) => device.deviceId),
       ["dev-online"],
     );
-    assert.equal(listed[0].online, false);
+    const stored = listed.find((device) => device.deviceId === "dev-online");
+    assert.equal(stored?.online, false);
 
     // Live connection addressing this host → online.
     const device = await connect(relay.url, "device");
@@ -1019,6 +1022,108 @@ test("relay: pair.devices reports offline when the device addresses another PC",
     device.close();
     hostA.close();
     hostB.close();
+  } finally {
+    await relay.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Re-pair rotation: a new credential activates only once the device presents
+// it, so a lost pairing hello_ack can't lock a previously paired phone out.
+// ---------------------------------------------------------------------------
+
+test("pairing: re-pair stages the rotation; old secret valid until the new one is used", () => {
+  const audit = new AuditLog();
+  const service = new PairingService(testConfig(), audit);
+  const first = service.pairDevice("host-rot", "dev-rot", "Phone", "pub-1");
+  assert.equal(service.verifyReason("dev-rot", first.secret, "host-rot"), "ok");
+
+  // Re-pair issues a fresh secret but must not retire the old one yet.
+  const second = service.pairDevice("host-rot", "dev-rot", "Phone-2", "pub-2");
+  assert.notEqual(first.secret, second.secret);
+  assert.equal(
+    service.verifyReason("dev-rot", first.secret, "host-rot"),
+    "ok",
+    "the previous credential must keep authenticating until the rotation is confirmed",
+  );
+  assert.equal(service.verifyReason("dev-rot", "garbage", "host-rot"), "secret-mismatch");
+
+  // Presenting the staged secret promotes it and retires the old one.
+  const promoted = service.verifyDevice("dev-rot", second.secret, "host-rot");
+  assert.equal(promoted?.secretHash, PairingService.hashToken(second.secret));
+  assert.equal(promoted?.pending, undefined, "confirmation clears the staged rotation");
+  assert.equal(service.verifyReason("dev-rot", second.secret, "host-rot"), "ok");
+  assert.equal(
+    service.verifyReason("dev-rot", first.secret, "host-rot"),
+    "secret-mismatch",
+    "after confirmation only the rotated credential works",
+  );
+});
+
+test(
+  "relay: re-paired device keeps access with the old secret until it uses the new one",
+  { timeout: 20000 },
+  async () => {
+    const relay = await startRelay(testConfig({ pairingRequired: true }));
+    try {
+      const { ws: host } = await helloHostWithId(relay.url, "host-rot-live");
+      const oldSecret = await pairDeviceWithToken(
+        relay.url,
+        "dev-rot-live",
+        "host-rot-live",
+        await requestPairToken(host, "pc-rot-1"),
+      );
+
+      // Re-pair: the phone scanned again but the ack may never have arrived.
+      const newSecret = await pairDeviceWithToken(
+        relay.url,
+        "dev-rot-live",
+        "host-rot-live",
+        await requestPairToken(host, "pc-rot-2"),
+      );
+
+      // The phone still holds the old credential (ack lost): must get in.
+      assert.equal(await reconnectWithSecret(relay.url, "dev-rot-live", "host-rot-live", oldSecret), "ok");
+
+      // Now the phone presents the rotated credential: it activates and the
+      // old one stops working from this point on.
+      assert.equal(await reconnectWithSecret(relay.url, "dev-rot-live", "host-rot-live", newSecret), "ok");
+      assert.equal(await reconnectWithSecret(relay.url, "dev-rot-live", "host-rot-live", oldSecret), "rejected");
+      assert.equal(await reconnectWithSecret(relay.url, "dev-rot-live", "host-rot-live", newSecret), "ok");
+      host.close();
+    } finally {
+      await relay.close();
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Heartbeat: clients that stop answering pings are terminated instead of
+// lingering as ghost "online" peers (phone left WiFi, killed process).
+// ---------------------------------------------------------------------------
+
+test("relay: heartbeat terminates clients that miss pongs", { timeout: 15000 }, async () => {
+  const relay = await startRelay(testConfig({ heartbeatIntervalMs: 500 }));
+  try {
+    const host = await connect(relay.url, "host");
+    host.send(helloEnvelope("host"));
+    await nextMessage(host);
+
+    // Simulate a missed pong: the server-side socket stays flagged dead.
+    const serverSocket = [...relay.hub.wss.clients][0];
+    assert.ok(serverSocket, "host registered on the hub");
+    (serverSocket as WebSocket & { isAlive?: boolean }).isAlive = false;
+
+    const closed = nextClose(host);
+    const result = await closed;
+    assert.equal(result.code, 1006, "termination surfaces as an abnormal close");
+    // Server-side unregister lands on its own close event: poll briefly.
+    const deadline = Date.now() + 2000;
+    while (relay.hub.registry.onlineHosts().length > 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.equal(relay.hub.registry.onlineHosts().length, 0, "ghost peer is unregistered");
+    host.close();
   } finally {
     await relay.close();
   }

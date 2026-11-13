@@ -16,6 +16,8 @@ export interface RelayConfig {
   /** Pairing token TTL and max failed attempts. */
   pairingTtlMs: number;
   pairingMaxAttempts: number;
+  /** Client heartbeat cadence; a client missing a pong is terminated. */
+  heartbeatIntervalMs: number;
   /** JSON file for device-binding persistence (unset: in-memory only). */
   statePath?: string;
   /** JSONL diagnostic log for hello/pairing forensics (unset: disabled). */
@@ -50,6 +52,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayConfig {
     rateLimitWindowMs: num("RELAY_RATE_LIMIT_WINDOW_MS", 60_000, 1_000),
     pairingTtlMs: num("RELAY_PAIRING_TTL_MS", 10 * 60_000, 10_000),
     pairingMaxAttempts: num("RELAY_PAIRING_MAX_ATTEMPTS", 5, 1),
+    heartbeatIntervalMs: num("RELAY_HEARTBEAT_MS", 30_000, 1_000),
     ...(env.RELAY_STATE_PATH ? { statePath: env.RELAY_STATE_PATH } : {}),
     ...(env.RELAY_DEBUG_LOG ? { debugLogPath: env.RELAY_DEBUG_LOG } : {}),
   };

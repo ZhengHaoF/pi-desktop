@@ -19,6 +19,7 @@ function testConfig(overrides: Partial<RelayConfig> = {}): RelayConfig {
     rateLimitWindowMs: 60_000,
     pairingTtlMs: 60_000,
     pairingMaxAttempts: 3,
+    heartbeatIntervalMs: 60_000,
     ...overrides,
   };
 }

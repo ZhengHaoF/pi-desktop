@@ -48,6 +48,10 @@ module.exports = {
     env: {
       RELAY_PORT: "8788",
       RELAY_STATE_PATH: "/home/ubuntu/pi-relay/data/relay-pairings.json",
+      RELAY_DEBUG_LOG: "/home/ubuntu/pi-relay/data/relay-debug.log",
+      // 可选：客户端心跳间隔（默认 30_000ms）。失联客户端（离开 WiFi、
+      // 进程被杀）在一个周期后被 terminate，不再有幽灵"在线"设备。
+      // RELAY_HEARTBEAT_MS: "30000",
     },
     max_memory_restart: "300M",
     time: true,
@@ -102,7 +106,8 @@ export RELAY_DEBUG_LOG=/home/ubuntu/pi-relay/data/relay-debug.log
 判读速查：
 
 - `tokenVerdict: "unknown pairing token"` → 这个 token 不是**当前这个 relay 进程**签发的（换过 relay、端口/机器不同，或 relay 重启过——待配对 token 只在内存里，只有设备绑定会落盘）。
-- `tokenVerdict: "pairing consumed"` → 手机在重放一个已经用掉的一次性 token；同一个 `pairingTokenDigest` 能在 `pair.create` 里找到就是这种情况。
+- `tokenVerdict: "pairing consumed"` → 手机在重放一个已经用掉的一次性 token；同一个 `pairingTokenDigest` 能在 `pair.create` 里找到就是这种情况。手机端在 hello_ack 后不再重放 token（2026-11 起）；见到这条且手机仍在重放，说明手机端是旧版本，重新扫码即可。
+- 重配对（re-pair）采用**确认后生效**：新签发的凭证在手机首次使用前以 pending 态暂存，期间**旧凭证一直可用**——配对 ack 丢失不会再把已配对的手机锁死；手机拿新凭证连上的一次即完成轮换，旧凭证随之作废。
 - `credentialVerdict: "no-binding"` + `bindingHostIds: []` → relay 侧没有这台设备的绑定（`statePath` 不对/被清）；`bindingHostIds` 里有别的 hostId → 手机寻址的 PC 身份变了（多 PC 或重装后 hostId 重新生成）。
 - `credentialVerdict: "secret-mismatch"` → 绑定存在但凭证不对（手机端 `remote.deviceSecret.*` 与本 relay 的 secret 不是同一份）。
 - `onlineHostIds: []` + `device.hello` 被拒 → 顺带说明 PC 的 gateway 根本没连上这个 relay，光修配对也拉不到数据。

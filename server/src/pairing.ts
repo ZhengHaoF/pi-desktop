@@ -19,7 +19,21 @@ export interface PairingRecord {
   devicePublicKey?: string;
 }
 
-/** One host binding for a device; the secret never leaves the relay hashed. */
+/** Device's X25519 public key captured at pairing time (metadata only). */
+export interface PendingRotation {
+  secretHash: string;
+  publicKey?: string;
+  label?: string;
+  pairedAt: number;
+}
+
+/**
+ * One host binding for a device; the secret never leaves the relay hashed.
+ * `pending` stages a re-pair: the rotated credential activates only once the
+ * device presents it (verifyDevice promotes it). Until then the previous
+ * secret keeps authenticating — a lost pairing hello_ack can no longer lock
+ * a previously paired phone out.
+ */
 export interface DeviceBinding {
   deviceId: string;
   hostId: string;
@@ -28,6 +42,7 @@ export interface DeviceBinding {
   /** Device's X25519 public key captured at pairing time (metadata only). */
   publicKey?: string;
   pairedAt: number;
+  pending?: PendingRotation;
 }
 
 export class PairingService {
@@ -61,13 +76,14 @@ export class PairingService {
       if (!Array.isArray(parsed.devices)) return;
       for (const item of parsed.devices) {
         if (!item || typeof item !== "object") continue;
-        const record = item as Partial<DeviceBinding>;
+        const record = item as Partial<DeviceBinding> & { pending?: Partial<PendingRotation> };
         if (
           typeof record.deviceId !== "string" ||
           typeof record.hostId !== "string" ||
           typeof record.secretHash !== "string"
         )
           continue;
+        const pending = record.pending;
         this.devices.set(this.bindingKey(record.deviceId, record.hostId), {
           deviceId: record.deviceId,
           hostId: record.hostId,
@@ -75,6 +91,16 @@ export class PairingService {
           ...(record.label ? { label: record.label } : {}),
           ...(record.publicKey ? { publicKey: record.publicKey } : {}),
           pairedAt: typeof record.pairedAt === "number" ? record.pairedAt : Date.now(),
+          ...(pending && typeof pending.secretHash === "string"
+            ? {
+                pending: {
+                  secretHash: pending.secretHash,
+                  ...(pending.publicKey ? { publicKey: pending.publicKey } : {}),
+                  ...(pending.label ? { label: pending.label } : {}),
+                  pairedAt: typeof pending.pairedAt === "number" ? pending.pairedAt : Date.now(),
+                },
+              }
+            : {}),
         });
       }
     } catch {
@@ -208,7 +234,12 @@ export class PairingService {
   /**
    * Bind a device to one host and issue its credential. Called after a
    * successful token submit + approve. Other host bindings for the same
-   * device are kept; re-pairing only replaces this (device, host) pair.
+   * device are kept.
+   *
+   * First binding for (device, host): active immediately — the phone holds
+   * nothing else, so it must authenticate right away.
+   * Re-pair: the new secret is staged as `pending` and activates only when
+   * the device first presents it; the previous secret stays valid meanwhile.
    */
   pairDevice(
     hostId: string,
@@ -217,15 +248,38 @@ export class PairingService {
     publicKey?: string,
   ): { secret: string; binding: DeviceBinding } {
     const secret = randomBytes(24).toString("base64url");
+    const key = this.bindingKey(deviceId, hostId);
+    const existing = this.devices.get(key);
+    if (!existing) {
+      const binding: DeviceBinding = {
+        deviceId,
+        hostId,
+        secretHash: PairingService.hashToken(secret),
+        ...(label ? { label } : {}),
+        ...(publicKey ? { publicKey } : {}),
+        pairedAt: Date.now(),
+      };
+      this.devices.set(key, binding);
+      this.persist();
+      this.audit.append({
+        actor: hostId,
+        action: "pair.approve",
+        targetDigest: this.audit.digest(hostId, deviceId),
+        outcome: "ok",
+        traceId: "pair",
+      });
+      return { secret, binding };
+    }
     const binding: DeviceBinding = {
-      deviceId,
-      hostId,
-      secretHash: PairingService.hashToken(secret),
-      ...(label ? { label } : {}),
-      ...(publicKey ? { publicKey } : {}),
-      pairedAt: Date.now(),
+      ...existing,
+      pending: {
+        secretHash: PairingService.hashToken(secret),
+        ...(publicKey ? { publicKey } : {}),
+        ...(label ? { label } : {}),
+        pairedAt: Date.now(),
+      },
     };
-    this.devices.set(this.bindingKey(deviceId, hostId), binding);
+    this.devices.set(key, binding);
     this.persist();
     this.audit.append({
       actor: hostId,
@@ -237,12 +291,41 @@ export class PairingService {
     return { secret, binding };
   }
 
+  /**
+   * Check a device credential and return the binding it authenticates.
+   * Accepts the active secret; a staged `pending` secret promotes itself to
+   * active on first use (the device just proved it received the rotation).
+   */
+  private matchBinding(deviceId: string, secret: string, hostId: string): DeviceBinding | undefined {
+    const key = this.bindingKey(deviceId, hostId);
+    const binding = this.devices.get(key);
+    if (!binding) return undefined;
+    if (PairingService.verifyToken(secret, binding.secretHash)) return binding;
+    const pending = binding.pending;
+    if (!pending || !PairingService.verifyToken(secret, pending.secretHash)) return undefined;
+    const promoted: DeviceBinding = {
+      deviceId: binding.deviceId,
+      hostId: binding.hostId,
+      secretHash: pending.secretHash,
+      ...((pending.label ?? binding.label) ? { label: pending.label ?? binding.label } : {}),
+      ...((pending.publicKey ?? binding.publicKey) ? { publicKey: pending.publicKey ?? binding.publicKey } : {}),
+      pairedAt: pending.pairedAt,
+    };
+    this.devices.set(key, promoted);
+    this.persist();
+    this.audit.append({
+      actor: deviceId,
+      action: "pair.approve",
+      targetDigest: this.audit.digest(hostId, deviceId),
+      outcome: "ok",
+      traceId: "pair",
+    });
+    return promoted;
+  }
+
   /** Reconnect credential check: the secret must belong to this exact host. */
   verifyDevice(deviceId: string, secret: string, hostId: string): DeviceBinding | undefined {
-    const binding = this.devices.get(this.bindingKey(deviceId, hostId));
-    if (!binding) return undefined;
-    if (!PairingService.verifyToken(secret, binding.secretHash)) return undefined;
-    return binding;
+    return this.matchBinding(deviceId, secret, hostId);
   }
 
   /**
@@ -254,7 +337,7 @@ export class PairingService {
   verifyReason(deviceId: string, secret: string, hostId: string): "ok" | "no-binding" | "secret-mismatch" {
     const binding = this.devices.get(this.bindingKey(deviceId, hostId));
     if (!binding) return "no-binding";
-    return PairingService.verifyToken(secret, binding.secretHash) ? "ok" : "secret-mismatch";
+    return this.matchBinding(deviceId, secret, hostId) ? "ok" : "secret-mismatch";
   }
 
   /** Hosts this device holds a binding for (diagnostics: spot hostId mismatches). */
@@ -301,13 +384,14 @@ export class PairingService {
     return true;
   }
 
-  /** Host-scoped device list (secrets excluded). */
-  listDevices(hostId: string): Array<Omit<DeviceBinding, "secretHash">> {
+  /** Host-scoped device list (secrets excluded, staged rotations included as plain rows). */
+  listDevices(hostId: string): Array<Omit<DeviceBinding, "secretHash" | "pending">> {
     return [...this.devices.values()]
       .filter((binding) => binding.hostId === hostId)
       .map((binding) => {
-        const { secretHash, ...rest } = binding;
+        const { secretHash, pending, ...rest } = binding;
         void secretHash;
+        void pending;
         return rest;
       });
   }

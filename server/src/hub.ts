@@ -65,6 +65,7 @@ export class RelayHub {
     this.registry = new ConnectionRegistry(config, this.audit);
     this.wss = new WebSocketServer({ noServer: true });
     this.diag = new RelayDiagLog(config.debugLogPath);
+    this.startHeartbeat();
     this.diag.record("relay.start", {
       port: config.port,
       cipherRequired: config.cipherRequired,
@@ -93,6 +94,12 @@ export class RelayHub {
     let peer: PeerMeta | undefined;
     let hostE2eePub: string | undefined;
     let helloDone = false;
+
+    // Heartbeat bookkeeping: the interval below pings; any pong marks the
+    // socket alive again.
+    ws.on("pong", () => {
+      (ws as WebSocket & { isAlive?: boolean }).isAlive = true;
+    });
 
     ws.on("message", (raw: Buffer) => {
       if (!helloDone) {
@@ -124,6 +131,26 @@ export class RelayHub {
         this.registry.unregister(peer);
       }
     });
+  }
+
+  /**
+   * Heartbeat: terminate clients that miss a pong. Half-open links (a phone
+   * leaving WiFi, a client process killed without a close frame) otherwise
+   * linger as ghost "online" peers and poison routing and pair.devices.
+   */
+  private startHeartbeat(): void {
+    const heartbeat = setInterval(() => {
+      for (const client of this.wss.clients) {
+        const marked = client as WebSocket & { isAlive?: boolean };
+        if (marked.isAlive === false) {
+          marked.terminate();
+          continue;
+        }
+        marked.isAlive = false;
+        marked.ping();
+      }
+    }, this.config.heartbeatIntervalMs);
+    if (typeof heartbeat.unref === "function") heartbeat.unref();
   }
 
   private fail(

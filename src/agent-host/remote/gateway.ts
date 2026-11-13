@@ -59,6 +59,11 @@ export interface GatewaySocket {
   on(event: "message", listener: (data: unknown) => void): void;
   on(event: "close", listener: (code: number, reason: Buffer) => void): void;
   on(event: "error", listener: (err: Error) => void): void;
+  on(event: "pong", listener: () => void): void;
+  /** WS-level heartbeat ping (ws provides it; minimal test fakes may omit). */
+  ping?(data?: Buffer): void;
+  /** Immediate teardown without a close frame (dead-link fast path). */
+  terminate?(): void;
 }
 
 export type GatewayState = "stopped" | "connecting" | "ready";
@@ -78,6 +83,8 @@ interface PendingControl {
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const CONTROL_TIMEOUT_MS = 5_000;
+/** Liveness probe cadence; a missed pong kills the link on the next tick. */
+const HEARTBEAT_INTERVAL_MS = 30_000;
 
 /** Per-device E2EE contexts; re-derived when the device rotates its key. */
 interface DeviceCipher {
@@ -98,6 +105,7 @@ export class RemoteGateway {
   private readonly approvalBridge: ApprovalBridge;
   private socket: GatewaySocket | undefined;
   private state: GatewayState = "stopped";
+  private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
   private readonly options: GatewayOptions;
   /** Restored key objects (null until start with an E2EE key pair). */
   private hostKeys:
@@ -163,13 +171,16 @@ export class RemoteGateway {
       this.socket = socket;
       socket.on("message", (data: unknown) => this.onRelayMessage(data));
       socket.on("close", () => {
+        this.stopHeartbeat();
         this.socket = undefined;
         this.state = "stopped";
       });
       socket.on("error", () => {
+        this.stopHeartbeat();
         this.socket = undefined;
         this.state = "stopped";
       });
+      this.startHeartbeat(socket);
       socket.on("open", () => {
         this.state = "ready";
         // hello is consumed by the relay itself (no routing), so it is sent
@@ -198,6 +209,7 @@ export class RemoteGateway {
   }
 
   stop(): void {
+    this.stopHeartbeat();
     this.approvalBridge.abortAll("gateway stopped");
     for (const [id, pending] of this.pending) {
       clearTimeout(pending.timer);
@@ -220,6 +232,40 @@ export class RemoteGateway {
     this.server.detachPort(this.channel.port1 as unknown as AnyMessagePort);
     this.channel.port1.close();
     this.channel.port2.close();
+  }
+
+  /**
+   * Liveness heartbeat. On a silently dead link (NAT timeout, relay restart
+   * whose FIN never arrives) the socket stays "open" forever and the gateway
+   * sits "ready" on a zombie — no close event, no reconnect. Ping every
+   * interval; a ping left unanswered by the next tick means the link is dead:
+   * tear it down so the controller's reconnect loop takes over.
+   */
+  private startHeartbeat(socket: GatewaySocket): void {
+    const ping = socket.ping?.bind(socket);
+    if (!ping) return; // minimal test fakes
+    let awaitingPong = false;
+    socket.on("pong", () => {
+      awaitingPong = false;
+    });
+    this.heartbeatTimer = setInterval(() => {
+      if (this.socket !== socket || this.state !== "ready") return;
+      if (awaitingPong) {
+        if (typeof socket.terminate === "function") socket.terminate();
+        else socket.close(4000, "heartbeat timeout");
+        return;
+      }
+      awaitingPong = true;
+      ping();
+    }, HEARTBEAT_INTERVAL_MS);
+    if (typeof this.heartbeatTimer.unref === "function") this.heartbeatTimer.unref();
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = undefined;
+    }
   }
 
   /** Test/diagnostic hook: subscribe to the approval mirror topic. */

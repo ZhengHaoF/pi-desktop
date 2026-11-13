@@ -12,6 +12,7 @@ import '../core/host_store.dart';
 import '../core/remote_connection.dart';
 import '../widgets/session_models.dart';
 import 'chat_page.dart';
+import 'connect_page.dart';
 import 'settings_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -165,6 +166,18 @@ class _HomePageState extends State<HomePage> {
       ),
     );
     _refresh();
+  }
+
+  /// 配对被拒（4003）的自救入口：停掉本连接的重连循环，回到连接页重新
+  /// 扫码——一次性 token 已消费时任何重试都无济于事，只有新扫码能重新
+  /// 配对并签发凭证。
+  Future<void> _rescanPairing() async {
+    widget.connection.disconnect();
+    if (!mounted) return;
+    await Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const ConnectPage()),
+      (route) => false,
+    );
   }
 
   Future<void> _renameSession(SessionSummary session, String name) async {
@@ -386,6 +399,10 @@ class _HomePageState extends State<HomePage> {
                       Text(_error!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
                       const SizedBox(height: 12),
                       FilledButton(onPressed: _refresh, child: const Text('重试')),
+                      if (widget.connection.lastFailureWasPairingReject) ...[
+                        const SizedBox(height: 8),
+                        OutlinedButton(onPressed: _rescanPairing, child: const Text('重新扫码配对')),
+                      ],
                     ],
                   ),
                 )
@@ -399,7 +416,17 @@ class _HomePageState extends State<HomePage> {
                       if (_error != null)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+                              if (widget.connection.lastFailureWasPairingReject)
+                                TextButton(
+                                  onPressed: _rescanPairing,
+                                  child: const Text('重新扫码配对'),
+                                ),
+                            ],
+                          ),
                         ),
                       if (projects.isEmpty)
                         Padding(
