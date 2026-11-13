@@ -25,6 +25,7 @@ import type {
   UserMessage,
   AssistantMessage,
   CustomMessage,
+  LoadDeferredContent,
   ToolResultMessage,
   AssistantContentBlock,
   TextContent,
@@ -50,7 +51,7 @@ interface Props {
   onEditContent?: (content: string) => void;
   showTimestamp?: boolean;
   prevTimestamp?: number;
-  onLoadDeferredContent?: (entryId: string, blockIndex?: number) => Promise<void>;
+  onLoadDeferredContent?: LoadDeferredContent;
   thinkingExpansionStore?: ThinkingExpansionStore;
 }
 
@@ -118,7 +119,11 @@ export const MessageView = memo(function MessageView({
       return (
         <>
           <CompactionMessageView message={message as CustomMessage} />
-          <DeferredContentActions content={message.content} onLoad={onLoadDeferredContent} />
+          <DeferredContentActions
+            content={message.content}
+            details={(message as CustomMessage).deferredDetails}
+            onLoad={onLoadDeferredContent}
+          />
         </>
       );
     }
@@ -155,7 +160,7 @@ function UserMessageView({
   onNavigate?: (entryId: string) => void;
   prevAssistantEntryId?: string;
   onEditContent?: (content: string) => void;
-  onLoadDeferredContent?: (entryId: string, blockIndex?: number) => Promise<void>;
+  onLoadDeferredContent?: LoadDeferredContent;
 }) {
   const { t } = useI18n();
   const { isDark } = useTheme();
@@ -502,7 +507,7 @@ function AssistantMessageView({
   onOpenFile?: (filePath: string) => void;
   showTimestamp?: boolean;
   prevTimestamp?: number;
-  onLoadDeferredContent?: (entryId: string, blockIndex?: number) => Promise<void>;
+  onLoadDeferredContent?: LoadDeferredContent;
   entryId?: string;
   thinkingExpansionStore?: ThinkingExpansionStore;
 }) {
@@ -768,7 +773,7 @@ function BlockView({
   runningToolCallIds?: ReadonlySet<string>;
   cwd?: string;
   onOpenFile?: (filePath: string) => void;
-  onLoadDeferredContent?: (entryId: string, blockIndex?: number) => Promise<void>;
+  onLoadDeferredContent?: LoadDeferredContent;
   thinkingStateKey: string;
   thinkingExpansionStore?: ThinkingExpansionStore;
 }) {
@@ -931,9 +936,10 @@ function ToolCallBlock({
   result?: ToolResultMessage;
   duration?: number;
   running?: boolean;
-  onLoadDeferredContent?: (entryId: string, blockIndex?: number) => Promise<void>;
+  onLoadDeferredContent?: LoadDeferredContent;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
   const { t } = useI18n();
   const inputStr = JSON.stringify(block.input, null, 2);
   const isEditTool = isEditToolName(block.toolName);
@@ -1062,7 +1068,58 @@ function ToolCallBlock({
           <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
         ))}
       {expanded && result && <ToolResultImages content={result.content} />}
-      {expanded && result && <DeferredContentActions content={result.content} onLoad={onLoadDeferredContent} />}
+      {expanded && result && result.details !== undefined && !resultDiff && (
+        <div style={{ borderTop: "1px solid var(--tool-border)" }}>
+          <Button
+            variant="link"
+            aria-expanded={detailsExpanded}
+            onClick={() => setDetailsExpanded((value) => !value)}
+            style={{
+              width: "100%",
+              justifyContent: "flex-start",
+              padding: "6px 12px",
+              color: "var(--tool-fg)",
+              fontSize: scaledChatFont(11),
+              textAlign: "left",
+            }}
+          >
+            {detailsExpanded ? t("toolResultDetailsHide", "Hide details") : t("toolResultDetailsShow", "Show details")}
+          </Button>
+          {detailsExpanded && (
+            <pre
+              aria-label={t("toolResultDetails", "Tool result details")}
+              tabIndex={0}
+              style={{
+                margin: 0,
+                padding: "8px 12px",
+                color: "var(--tool-fg)",
+                fontSize: scaledChatFont(12),
+                lineHeight: 1.5,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                maxHeight: 360,
+                overflow: "auto",
+              }}
+            >
+              {safeJson(result.details)}
+            </pre>
+          )}
+        </div>
+      )}
+      {expanded && result && (
+        <DeferredContentActions
+          content={result.content}
+          details={result.deferredDetails}
+          onLoad={
+            onLoadDeferredContent
+              ? async (entryId, blockIndex, part) => {
+                  await onLoadDeferredContent(entryId, blockIndex, part);
+                  if (part === "details") setDetailsExpanded(true);
+                }
+              : undefined
+          }
+        />
+      )}
       {expanded && browserTabId && (
         <Button
           type="button"
@@ -1559,7 +1616,7 @@ function CustomMessageView({
   message: CustomMessage;
   cwd?: string;
   onOpenFile?: (filePath: string) => void;
-  onLoadDeferredContent?: (entryId: string, blockIndex?: number) => Promise<void>;
+  onLoadDeferredContent?: LoadDeferredContent;
 }) {
   const isHiddenDisplay = message.display === false;
   const [contentExpanded, setContentExpanded] = useState(!isHiddenDisplay);
@@ -1647,7 +1704,11 @@ function CustomMessageView({
             ) : (
               <span style={{ color: "var(--text-dim)", fontSize: scaledChatFont(12) }}>(no message)</span>
             )}
-            <DeferredContentActions content={message.content} onLoad={onLoadDeferredContent} />
+            <DeferredContentActions
+              content={message.content}
+              details={message.deferredDetails}
+              onLoad={onLoadDeferredContent}
+            />
           </div>
         ) : (
           <Button

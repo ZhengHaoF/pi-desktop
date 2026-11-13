@@ -9,6 +9,7 @@ import type {
   CredentialMutationResult,
   DirEntry,
   EntryContentResult,
+  EntryDetailsResult,
   FileContent,
   FileMeta,
   HistoryWindow,
@@ -249,6 +250,10 @@ export interface Api {
   "sessions.entryContent": {
     params: { id: string; entryId: string; blockIndex?: number };
     result: EntryContentResult;
+  };
+  "sessions.entryDetails": {
+    params: { id: string; entryId: string };
+    result: EntryDetailsResult;
   };
   "sessions.export": {
     params: { id: string; format?: "md" | "json" | "bundle" };

@@ -217,13 +217,14 @@ function renderCollapsedToolResult(result) {
 
 // A collapsed card keeps only its header, so result assertions render the card
 // expanded by clicking its header — the same interaction a user performs.
-function renderExpandedToolResult(result) {
+function renderExpandedToolResult(result, props = {}) {
   let renderer;
   act(() => {
     renderer = create(
       createElement(MessageView, {
         message: toolCallMessage(result),
         toolResults: new Map([[result.toolCallId, result]]),
+        ...props,
       }),
     );
   });
@@ -366,6 +367,58 @@ test("deferred generated images keep the tool entry reference for automatic hist
   );
   assert.match(html, /Loading image/);
   assert.doesNotMatch(html, /Load full content/);
+});
+
+test("omitted tool result and custom message details offer a separate load action", () => {
+  const deferredDetails = { entryId: "result-entry", originalBytes: 300 * 1024, contentType: "details" };
+  const result = {
+    role: "toolResult",
+    toolCallId: "edit",
+    toolName: "edit",
+    content: [{ type: "text", text: "edited" }],
+    deferredDetails,
+  };
+  // A collapsed card keeps only its header row, so the load action is reached
+  // the same way a user reaches it: by expanding the card.
+  const html = renderExpandedToolResult(result, { onLoadDeferredContent: async () => {} });
+  assert.match(html, /Load full details \(300(\.0)? KB\)/);
+  assert.doesNotMatch(html, /Load full content/);
+  assert.doesNotMatch(renderToolResult(result), /Load full details/, "no loader, no action");
+  const custom = renderToStaticMarkup(
+    createElement(MessageView, {
+      message: { role: "custom", customType: "report", content: "report", display: true, deferredDetails },
+      onLoadDeferredContent: async () => {},
+    }),
+  );
+  assert.match(custom, /Load full details/);
+});
+
+test("inline structured tool details start collapsed while diffs retain their dedicated view", () => {
+  const result = {
+    role: "toolResult",
+    toolCallId: "lookup",
+    toolName: "mcp_search",
+    content: [{ type: "text", text: "result summary" }],
+    details: { structuredContent: { status: "structured result content" } },
+  };
+  const html = renderToolResult(result);
+  assert.match(html, /Show details/);
+  assert.match(html, /"aria-expanded":false/);
+  assert.doesNotMatch(html, /structured result content/);
+  assert.match(html, /result summary/);
+
+  const diff = renderToolResult({
+    ...result,
+    toolName: "edit",
+    details: { diff: "@@ -1 +1 @@\n-before\n+after" },
+  });
+  // The dedicated diff view renders each line's sign and content as separate
+  // spans, so the JSON output never contains the raw "-before"/"+after" text.
+  assert.match(diff, /"children":\["-"\]/);
+  assert.match(diff, /"children":\["before"\]/);
+  assert.match(diff, /"children":\["\+"\]/);
+  assert.match(diff, /"children":\["after"\]/);
+  assert.doesNotMatch(diff, /Show details|Tool result details/);
 });
 
 test("persisted Herdr results show a neutral history notice without changing the stored message", () => {
