@@ -388,6 +388,7 @@ function ComposerToolbarView({
                               cursor: modelRefreshing ? "wait" : "pointer",
                               fontSize: scaledChatFont(12),
                               textAlign: "left",
+                              justifyContent: "flex-start",
                             }}
                           >
                             {modelRefreshing
@@ -454,6 +455,7 @@ function ComposerToolbarView({
                                   color: isActive ? "var(--text)" : undefined,
                                   fontSize: scaledChatFont(12),
                                   textAlign: "left",
+                                  justifyContent: "flex-start",
                                   fontWeight: isActive ? 600 : undefined,
                                   whiteSpace: "nowrap",
                                 }}
