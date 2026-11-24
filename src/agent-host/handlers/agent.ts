@@ -70,6 +70,13 @@ export function createAgentHandlers({
         return { sessionId: realSessionId, data: null };
       }
 
+      // 没有 type、也没有正文时只是想开一个会话：按 ensure_session 处理。
+      // 兜底成空 prompt 会跑一轮只有项目上下文的回合，模型凭空回一句
+      // 「已加载这个项目…还没收到具体任务」并落盘（手机端曾这样复现）。
+      if (!rest.type && !(typeof body.message === "string" && body.message.trim())) {
+        return { sessionId: realSessionId, data: null };
+      }
+
       const command = rest.type ? rest : { type: "prompt", message: body.message ?? "" };
       const data = await session.send(command as Record<string, unknown>);
       await emitIndexedSessionChange(server, realSessionId, cwd);
