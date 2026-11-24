@@ -32,7 +32,6 @@ class _HomePageState extends State<HomePage> {
   String _query = '';
   final Set<String> _expanded = {};
   bool _defaultsApplied = false;
-  String? _creatingFor;
   List<RemoteHostInfo> _hosts = const [];
   RemoteHostInfo? _currentHost;
   /// 已配对（本机持有该电脑凭证）的 hostId 集合。
@@ -335,38 +334,22 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// 新建任务：不在点按这一下就建会话。与桌面端一致，先进一个空对话页，
+  /// 首条消息发出时才 ensure_session —— 否则 agent.new 会走默认的
+  /// `{type:'prompt', message:''}`，一进页面就凭空跑一轮空回合。
   Future<void> _newTask(String projectRoot, {String? provider, String? modelId}) async {
-    if (_creatingFor != null) return;
-    setState(() => _creatingFor = projectRoot);
-    try {
-      final params = <String, dynamic>{'cwd': projectRoot};
-      if (provider != null && modelId != null) {
-        params['provider'] = provider;
-        params['modelId'] = modelId;
-        params['modelSelectionExplicit'] = true;
-      }
-      final result = await widget.connection.request('agent.new', params);
-      final sessionId = result['sessionId'] as String?;
-      if (!mounted) return;
-      if (sessionId == null || sessionId.isEmpty) {
-        setState(() => _error = 'agent.new 未返回 sessionId');
-        return;
-      }
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ChatPage(
-            connection: widget.connection,
-            sessionId: sessionId,
-            title: '${projectName(projectRoot)} · 新任务',
-          ),
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChatPage(
+          connection: widget.connection,
+          title: '${projectName(projectRoot)} · 新任务',
+          newTaskCwd: projectRoot,
+          newTaskModel:
+              provider != null && modelId != null ? {'provider': provider, 'modelId': modelId} : null,
         ),
-      );
-      _refresh();
-    } catch (err) {
-      setState(() => _error = err.toString());
-    } finally {
-      if (mounted) setState(() => _creatingFor = null);
-    }
+      ),
+    );
+    _refresh();
   }
 
   /// 模型选择 sheet：默认模型 + 桌面端启用的模型列表，选择后创建新任务。
@@ -536,7 +519,6 @@ class _HomePageState extends State<HomePage> {
                           sessions: grouped[root]!,
                           runningIds: _runningIds,
                           expanded: _query.isNotEmpty || _expanded.contains(root),
-                          creating: _creatingFor == root,
                           onToggle: () => setState(() {
                             if (!_expanded.remove(root)) _expanded.add(root);
                           }),
@@ -749,7 +731,6 @@ class _ProjectGroup extends StatelessWidget {
   final List<SessionSummary> sessions;
   final List<String> runningIds;
   final bool expanded;
-  final bool creating;
   final VoidCallback onToggle;
   final VoidCallback onNewTask;
   final void Function(SessionSummary) onOpenSession;
@@ -763,7 +744,6 @@ class _ProjectGroup extends StatelessWidget {
     required this.sessions,
     required this.runningIds,
     required this.expanded,
-    required this.creating,
     required this.onToggle,
     required this.onNewTask,
     required this.onOpenSession,
@@ -819,9 +799,9 @@ class _ProjectGroup extends StatelessWidget {
                   Text('${sessions.length}', style: const TextStyle(fontSize: 13, color: Colors.black54)),
                   const SizedBox(width: 4),
                   _IconAction(
-                    icon: creating ? Icons.hourglass_top : Icons.add,
-                    tooltip: creating ? '正在创建…' : '新建任务',
-                    onTap: creating ? null : onNewTask,
+                    icon: Icons.add,
+                    tooltip: '新建任务',
+                    onTap: onNewTask,
                   ),
                   PopupMenuButton<String>(
                     icon: const Icon(Icons.more_horiz, size: 20, color: Colors.black54),

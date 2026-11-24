@@ -31,14 +31,22 @@ bool turnRunningFromAgentState(Object? agentState) {
 class ChatPage extends StatefulWidget {
   const ChatPage({
     required this.connection,
-    required this.sessionId,
     required this.title,
+    this.sessionId,
+    this.newTaskCwd,
+    this.newTaskModel,
     super.key,
-  });
+  }) : assert(sessionId != null || newTaskCwd != null, "ChatPage 需要 sessionId 或 newTaskCwd");
 
   final RemoteConnection connection;
-  final String sessionId;
+  /// 已存在的会话；null 表示「新任务」页，PC 上还没有会话文件。
+  final String? sessionId;
   final String title;
+  /// 新任务的目标项目目录。与桌面端 useAgentSession 同序：进页不建会话、
+  /// 不发回合，第一条消息发出时才 ensure_session，再把这句 prompt 送过去。
+  final String? newTaskCwd;
+  /// 新任务时用户显式选择的模型；null 表示跟随 PC 的默认模型。
+  final Map<String, String>? newTaskModel;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -85,6 +93,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Map<String, String> _modelNames = const {};
   Timer? _modelRefreshDebounce;
   bool _switchingModel = false;
+  /// 新任务页上用户手动挑过模型：首条消息建会话时按显式选择处理。
+  bool _newTaskModelExplicit = false;
   String? _sendingText;
   bool _awaitingFirst = false;
   bool _slashOpen = false;
@@ -103,13 +113,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     {'name': 'session', 'desc': '查看会话消息/token/费用统计', 'source': '内置'},
     {'name': 'copy', 'desc': '复制最后一条助手回复', 'source': '内置'},
   ];
-  late final String _sessionId = widget.sessionId;
+  String? _sessionId;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _attach();
+    _sessionId = widget.sessionId;
+    if (_sessionId == null) {
+      // 新任务：PC 上还没有会话文件可读，直接进空态。会话在首条消息发出
+      // 时才创建（ensure_session），因此这里不能触发任何 agent 回合。
+      _loadingHistory = false;
+      _currentModel = widget.newTaskModel;
+      unawaited(_loadModelNames());
+    } else {
+      _attach(_sessionId!);
+    }
   }
 
   @override
@@ -119,23 +138,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) _scheduleModelRefresh();
   }
 
-  Future<void> _attach() async {
-    _events = widget.connection.onEvent.listen(_onEvent);
+  Future<void> _attach(String sessionId, {bool loadHistory = true}) async {
+    _events ??= widget.connection.onEvent.listen(_onEvent);
     try {
-      await widget.connection.subscribe('agent.events', _sessionId);
-      await widget.connection.subscribe('agent.running', _sessionId);
+      await widget.connection.subscribe('agent.events', sessionId);
+      await widget.connection.subscribe('agent.running', sessionId);
       // PC writes model_change / messages into the session file; the watcher
       // broadcasts sessions.changed. Use it to keep the model chip in sync.
-      await widget.connection.subscribe('sessions.changed', _sessionId);
+      await widget.connection.subscribe('sessions.changed', sessionId);
       // Mirrored dialogs; subscribing also replays requests still pending at
       // the PC (the host answers this subscribe with the unresolved ones).
-      await widget.connection.subscribe('remote.approval', _sessionId);
+      await widget.connection.subscribe('remote.approval', sessionId);
       unawaited(_loadModelNames());
+      if (!loadHistory) return;
       // includeState is required or the PC omits agentState entirely,
       // which would break the running-mirror restore below.
       final detail = await widget.connection.request(
         'sessions.get',
-        {'id': _sessionId, 'includeState': true},
+        {'id': sessionId, 'includeState': true},
       );
       setState(() {
         _lines
@@ -200,11 +220,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// a failure here must not break the page, the snapshot restore above is
   /// already a reasonable fallback.
   Future<void> _reconcileTurnRunning() async {
+    final sessionId = _sessionId;
+    if (sessionId == null) return;
     try {
       final result = await widget.connection.request('sessions.list', null);
       final ids = result['runningSessionIds'];
       if (ids is! List) return;
-      final running = ids.map((e) => e.toString()).contains(_sessionId);
+      final running = ids.map((e) => e.toString()).contains(sessionId);
       if (running != _turnRunning) _applyTurnRunning(running);
     } catch (_) {
       // Keep the value restored from the session snapshot.
@@ -259,11 +281,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// Re-read only the session's selected model, without rebuilding the
   /// transcript, so scroll position and the draft survive PC-side switches.
   Future<void> _refreshCurrentModel() async {
-    if (!mounted) return;
+    final sessionId = _sessionId;
+    if (!mounted || sessionId == null) return;
     try {
       final detail = await widget.connection.request(
         'sessions.get',
-        {'id': _sessionId, 'includeState': true},
+        {'id': sessionId, 'includeState': true},
       );
       final model = _modelFromDetail(detail);
       if (!mounted || model == null) return;
@@ -289,9 +312,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   Future<void> _setModel(String provider, String modelId, BuildContext sheetContext) async {
     if (_switchingModel) return;
+    final sessionId = _sessionId;
+    if (sessionId == null) {
+      // 新任务还没建会话：不向 PC 发命令，只把这个选择记在本地，首条消息的
+      // ensure_session 会带着它一起建会话。
+      setState(() {
+        _currentModel = {'provider': provider, 'modelId': modelId};
+        _newTaskModelExplicit = true;
+        _error = null;
+      });
+      if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已选择 $modelId，首条指令发出时生效')));
+      return;
+    }
     setState(() => _switchingModel = true);
     try {
-      await widget.connection.agentCommand(_sessionId, {'type': 'set_model', 'provider': provider, 'modelId': modelId});
+      await widget.connection.agentCommand(sessionId, {'type': 'set_model', 'provider': provider, 'modelId': modelId});
       if (!mounted) return;
       setState(() {
         _currentModel = {'provider': provider, 'modelId': modelId};
@@ -458,8 +494,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Future<void> _pollQueueOnce() async {
+    final sessionId = _sessionId;
+    if (sessionId == null) return;
     try {
-      final state = await widget.connection.request('agent.state', {'sessionId': _sessionId});
+      final state = await widget.connection.request('agent.state', {'sessionId': sessionId});
       final agentState = state['state'] is Map ? state['state'] as Map : state;
       final queued = agentState['queuedMessages'];
       if (!mounted) return;
@@ -483,10 +521,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Future<void> _clearQueue() async {
-    if (_clearingQueue) return;
+    final sessionId = _sessionId;
+    if (_clearingQueue || sessionId == null) return;
     setState(() => _clearingQueue = true);
     try {
-      final result = await widget.connection.agentCommand(_sessionId, {'type': 'clear_queue'});
+      final result = await widget.connection.agentCommand(sessionId, {'type': 'clear_queue'});
       final steeringList = result['steering'];
       final followUpList = result['followUp'];
       if (!mounted) return;
@@ -676,8 +715,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// Flat extension_ui_response body — the Host's ExtensionUiResponse shape.
   Future<void> _sendUiResponse(String requestId, Map<String, dynamic> body) async {
+    final sessionId = _sessionId;
+    if (sessionId == null) return;
     try {
-      await widget.connection.agentCommand(_sessionId, {
+      await widget.connection.agentCommand(sessionId, {
         'type': 'extension_ui_response',
         'id': requestId,
         ...body,
@@ -750,10 +791,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _promptController.clear();
     _throttledScroll();
     try {
+      var sessionId = await _ensureSession();
+      if (sessionId == null) throw StateError('agent.new 未返回 sessionId');
       // PC parity: while a turn is running, Enter steers (queued into the
       // current turn); when idle the message starts a fresh turn.
       final type = _turnRunning ? 'steer' : 'prompt';
-      await widget.connection.agentCommand(_sessionId, {'type': type, 'message': text});
+      await widget.connection.agentCommand(sessionId, {'type': type, 'message': text});
     } catch (err) {
       setState(() {
         _sendingText = null;
@@ -763,9 +806,37 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 新任务页到首条消息之间：按桌面端顺序先 ensure_session（只建会话、
+  /// 不发回合），再把这句 prompt 交给 agent.command。已有会话直接返回。
+  Future<String?> _ensureSession() async {
+    final existing = _sessionId;
+    if (existing != null) return existing;
+    final cwd = widget.newTaskCwd;
+    if (cwd == null) throw StateError('新建任务缺少项目目录');
+    final model = _currentModel;
+    final created = await widget.connection.request('agent.new', {
+      'cwd': cwd,
+      'type': 'ensure_session',
+      if (model != null) ...{
+        'provider': model['provider'],
+        'modelId': model['modelId'],
+        'modelSelectionExplicit': widget.newTaskModel != null || _newTaskModelExplicit,
+      },
+    });
+    final sessionId = created['sessionId'] as String?;
+    if (sessionId == null || sessionId.isEmpty) return null;
+    _sessionId = sessionId;
+    // 刚建的会话磁盘上还没有文件（pi 在第一条消息后才落盘），这里不能走
+    // sessions.get 读历史，只订阅事件流即可。
+    await _attach(sessionId, loadHistory: false);
+    return sessionId;
+  }
+
   Future<void> _abort() async {
+    final sessionId = _sessionId;
+    if (sessionId == null) return;
     try {
-      await widget.connection.agentCommand(_sessionId, {'type': 'abort'});
+      await widget.connection.agentCommand(sessionId, {'type': 'abort'});
       setState(() => _lines.add(ChatLine.text(role: 'system', text: '— 已发送中止 —', done: true)));
     } catch (err) {
       setState(() => _error = err.toString());
@@ -778,10 +849,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _stopQueuePolling();
     _modelRefreshDebounce?.cancel();
     _events?.cancel();
-    widget.connection.unsubscribe('agent.events', _sessionId);
-    widget.connection.unsubscribe('agent.running', _sessionId);
-    widget.connection.unsubscribe('sessions.changed', _sessionId);
-    widget.connection.unsubscribe('remote.approval', _sessionId);
+    final sessionId = _sessionId;
+    if (sessionId != null) {
+      widget.connection.unsubscribe('agent.events', sessionId);
+      widget.connection.unsubscribe('agent.running', sessionId);
+      widget.connection.unsubscribe('sessions.changed', sessionId);
+      widget.connection.unsubscribe('remote.approval', sessionId);
+    }
     WidgetsBinding.instance.removeObserver(this);
     _promptController.dispose();
     _scrollController.dispose();
