@@ -316,6 +316,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return level is String && level.isNotEmpty ? level : null;
   }
 
+  /// 新任务页还没选过模型时，档位列表按 PC 的默认模型取。
+  Map<String, String>? _defaultModelFromPrefs(Map<String, dynamic> prefs) {
+    final raw = prefs['defaultModel'];
+    if (raw is! Map) return null;
+    final provider = raw['provider'];
+    final modelId = raw['modelId'];
+    if (provider is! String || modelId is! String) return null;
+    return {'provider': provider, 'modelId': modelId};
+  }
+
   /// Thinking levels this model accepts, from the levels map the PC now
   /// projects inside `models.preferences.get` (`provider:id`, same shape as
   /// `models.list`). Only models with a real choice get a picker; a
@@ -344,10 +354,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 会话级档位。新任务页还没有会话：先记在本地，ensure_session 之后立刻
+  /// 写进会话（与选模型的时序一致），这样新任务也能在发首条消息前定档位。
   Future<void> _setThinkingLevel(String level) async {
+    setState(() => _thinkingLevel = level);
     final sessionId = _sessionId;
     if (sessionId == null) return;
-    setState(() => _thinkingLevel = level);
     try {
       await widget.connection.agentCommand(sessionId, {'type': 'set_thinking_level', 'level': level});
     } catch (err) {
@@ -368,9 +380,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           prefs: prefs,
           current: _currentModel,
           thinkingLevel: _thinkingLevel,
-          thinkingLevels: _levelsForModel(prefs, _currentModel),
-          // 新任务页还没有会话：PC 上没有可写的会话级设置，先不显示这一栏。
-          onThinkingLevel: _sessionId == null ? null : _setThinkingLevel,
+          thinkingLevels: _levelsForModel(
+            prefs,
+            _currentModel ?? _defaultModelFromPrefs(prefs),
+          ),
+          onThinkingLevel: _setThinkingLevel,
           onPick: _setModel,
         ),
       );
@@ -900,6 +914,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 刚建的会话磁盘上还没有文件（pi 在第一条消息后才落盘），这里不能走
     // sessions.get 读历史，只订阅事件流即可。
     await _attach(sessionId, loadHistory: false);
+    // 新任务页上选过的档位要赶在首条 prompt 之前落到这个新会话里，否则
+    // 用户的选择会静默丢失（ensure_session 不支持带档位）。
+    final level = _thinkingLevel;
+    if (level != null) {
+      try {
+        await widget.connection.agentCommand(sessionId, {'type': 'set_thinking_level', 'level': level});
+      } catch (_) {
+        // 档位写不进去不该拦住用户的首条消息。
+      }
+    }
     return sessionId;
   }
 

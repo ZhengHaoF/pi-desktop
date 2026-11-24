@@ -47,7 +47,10 @@ class FakeConnection extends RemoteConnection {
             {'id': 'glm', 'name': 'GLM-5.3', 'provider': 'zhipu'},
           ],
           'defaultModel': {'provider': 'zhipu', 'modelId': 'glm'},
-          'thinkingLevels': {'deepseek:v4-flash': levels},
+          'thinkingLevels': {
+            'deepseek:v4-flash': levels,
+            'zhipu:glm': levels,
+          },
         };
       case 'agent.new':
         return {'sessionId': 'new-session-1'};
@@ -122,5 +125,37 @@ void main() {
     await tester.tap(find.text('DeepSeek-V4.1-Flash'));
     await tester.pumpAndSettle();
     expect(find.text('思考强度'), findsNothing);
+  });
+
+  testWidgets('新任务页也能先选档位，建会话后立刻写进会话', (tester) async {
+    final connection = newConnection();
+    await pumpFrames(
+      tester,
+      ChatPage(connection: connection, title: 'carhome · 新任务', newTaskCwd: 'D:/work/carhome'),
+    );
+
+    await tester.tap(find.text('选择模型'));
+    await tester.pumpAndSettle();
+    expect(find.text('思考强度'), findsOneWidget, reason: '没选模型时按 PC 默认模型的档位列表');
+    await tester.tap(find.text('高').last);
+    await tester.pump();
+    expect(connection.calls.map((c) => c.$1), isNot(contains('agent.command')),
+        reason: '还没有会话，命令无处可发');
+
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '看看转向灯为什么闪得快');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('composer-send')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final commands = [
+      for (final call in connection.calls)
+        if (call.$1 == 'agent.command') (call.$2 as Map)['command'] as Map,
+    ];
+    expect(commands.first['type'], 'set_thinking_level', reason: '档位要在首条 prompt 之前生效');
+    expect(commands.first['level'], 'high');
+    expect(commands.last['type'], 'prompt');
   });
 }
