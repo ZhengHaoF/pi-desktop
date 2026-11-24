@@ -90,6 +90,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 离底状态（驱动悬浮"回到底部"按钮），磁吸脱开且不在底部时为 true。
   bool _awayFromBottom = false;
   Map<String, String>? _currentModel; // {provider, modelId}
+  /// Last successful `models.preferences.get`, so the picker opens instantly
+  /// instead of waiting for a PC round trip (the PC rebuilds session services
+  /// and re-checks provider availability on every call).
+  Map<String, dynamic>? _modelPrefs;
   /// Session thinking level from `get_state`; null until the PC answers (and
   /// always null on a new-task page, which has no session yet).
   String? _thinkingLevel;
@@ -278,7 +282,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         }
       }
     }
-    if (mounted) setState(() => _modelNames = names);
+    if (mounted) {
+      setState(() {
+        _modelNames = names;
+        // 缓存整份结果，弹层可以不等网络直接秒开。
+        _modelPrefs = prefs;
+      });
+    }
     return prefs;
   }
 
@@ -375,28 +385,48 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 两层弹层。用同步置位的标志把第二下吃掉。
     if (_modelSheetOpen) return;
     _modelSheetOpen = true;
+    if (!mounted) {
+      _modelSheetOpen = false;
+      return;
+    }
+    // 弹层不等网络：先用缓存的数据秒开，`models.preferences.get` 在后台跑，
+    // 回来后原地补进同一层弹层（PC 侧这个调用要重建 services + 查可用性，
+    // 走 relay 往返通常是几百毫秒到一两秒，等它再弹就是用户说的“这么慢”）。
+    final prefs = ValueNotifier<Map<String, dynamic>?>(_modelPrefs);
+    var closed = false;
+    unawaited(
+      _loadModelNames()
+          .then((fresh) {
+            if (!closed) prefs.value = fresh;
+          })
+          .catchError((Object err) {
+            if (!closed && mounted) setState(() => _error = err.toString());
+          }),
+    );
     try {
-      final prefs = await _loadModelNames();
-      if (!mounted) return;
       await showModalBottomSheet<void>(
         context: context,
         backgroundColor: Colors.white,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-        builder: (sheetContext) => _ModelPickerSheet(
-          prefs: prefs,
-          current: _currentModel,
-          thinkingLevel: _thinkingLevel,
-          thinkingLevels: _levelsForModel(
-            prefs,
-            _currentModel ?? _defaultModelFromPrefs(prefs),
+        builder: (sheetContext) => ValueListenableBuilder<Map<String, dynamic>?>(
+          valueListenable: prefs,
+          builder: (context, data, _) => _ModelPickerSheet(
+            prefs: data,
+            current: _currentModel,
+            thinkingLevel: _thinkingLevel,
+            thinkingLevels: data == null
+                ? const []
+                : _levelsForModel(data, _currentModel ?? _defaultModelFromPrefs(data)),
+            onThinkingLevel: _setThinkingLevel,
+            onPick: _setModel,
           ),
-          onThinkingLevel: _setThinkingLevel,
-          onPick: _setModel,
         ),
       );
     } catch (err) {
       if (mounted) setState(() => _error = err.toString());
     } finally {
+      closed = true;
+      prefs.dispose();
       _modelSheetOpen = false;
     }
   }
@@ -1728,7 +1758,8 @@ const Map<String, String> thinkingLevelLabels = {
 /// selection and the PC-side default, and — when the PC projects the model's
 /// supported levels — offers the per-session thinking level on top.
 class _ModelPickerSheet extends StatefulWidget {
-  final Map<String, dynamic> prefs;
+  /// null 表示首次打开、缓存还没暖起来：先显示加载占位，数据到了原地刷新。
+  final Map<String, dynamic>? prefs;
   final Map<String, String>? current;
   /// Live level from `get_state`; null means the session follows the PC default.
   final String? thinkingLevel;
@@ -1760,7 +1791,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
   }
 
   List<Map<String, dynamic>> _models() {
-    final raw = widget.prefs['models'];
+    final raw = widget.prefs?['models'];
     return <Map<String, dynamic>>[
       if (raw is List)
         for (final m in raw)
@@ -1778,7 +1809,8 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final models = _models();
-    final defaultModel = widget.prefs['defaultModel'];
+    final prefs = widget.prefs;
+    final defaultModel = prefs?['defaultModel'];
     bool isDefault(Map<String, dynamic> m) {
       if (defaultModel is! Map) return false;
       return defaultModel['provider'] == m['provider'] && defaultModel['modelId'] == m['id'];
@@ -1840,7 +1872,25 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
               ),
             const Divider(height: 1),
             Flexible(
-              child: models.isEmpty
+              child: prefs == null
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 40),
+                      child: Center(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            SizedBox(width: 10),
+                            Text('正在加载模型列表…', style: TextStyle(fontSize: 13, color: Colors.black45)),
+                          ],
+                        ),
+                      ),
+                    )
+                  : models.isEmpty
                   ? const Padding(
                       padding: EdgeInsets.all(24),
                       child: Center(child: Text('没有可用模型', style: TextStyle(color: Colors.black38))),

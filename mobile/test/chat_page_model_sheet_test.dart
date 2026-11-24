@@ -2,6 +2,8 @@
 /// 以及模型弹层的大行样式 + 会话级思考强度。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pi_remote/core/remote_connection.dart';
@@ -13,10 +15,13 @@ class FakeConnection extends RemoteConnection {
     required super.deviceId,
     required super.deviceLabel,
     this.levels = const ['off', 'low', 'medium', 'high'],
+    this.preferencesGate,
   });
 
   final List<String> levels;
   final calls = <(String, Object?)>[];
+  /// 模拟 PC 侧慢响应（重建 services + 查可用性）时用。
+  final Completer<void>? preferencesGate;
 
   @override
   bool get isReady => true;
@@ -41,6 +46,7 @@ class FakeConnection extends RemoteConnection {
       case 'sessions.list':
         return {'runningSessionIds': <dynamic>[]};
       case 'models.preferences.get':
+        if (preferencesGate != null) await preferencesGate!.future;
         return {
           'models': [
             {'id': 'v4-flash', 'name': 'DeepSeek-V4.1-Flash', 'provider': 'deepseek'},
@@ -60,12 +66,16 @@ class FakeConnection extends RemoteConnection {
   }
 }
 
-FakeConnection newConnection({List<String> levels = const ['off', 'low', 'medium', 'high']}) =>
+FakeConnection newConnection({
+  List<String> levels = const ['off', 'low', 'medium', 'high'],
+  Completer<void>? preferencesGate,
+}) =>
     FakeConnection(
       relayUrl: 'ws://relay.example:8788/ws',
       deviceId: 'dev-1',
       deviceLabel: 'phone',
       levels: levels,
+      preferencesGate: preferencesGate,
     );
 
 Future<void> pumpFrames(WidgetTester tester, Widget child) async {
@@ -139,6 +149,26 @@ void main() {
 
     expect(find.text('选择模型'), findsOneWidget, reason: '第二下点击要在 await 之前被挡掉');
     expect(find.byType(ChoiceChip), findsNWidgets(4), reason: '只有一层弹层，档位 chip 就该只有一组');
+  });
+
+  testWidgets('弹层不等 PC 响应，先出现加载态再补齐内容', (tester) async {
+    final gate = Completer<void>();
+    final connection = newConnection(preferencesGate: gate);
+    await pumpFrames(tester, ChatPage(connection: connection, sessionId: 's1', title: '会话'));
+
+    // PC 还在算模型列表，chip 先退回原始 modelId。
+    await tester.tap(find.text('v4-flash'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('选择模型'), findsOneWidget, reason: '点击后必须立刻出弹层');
+    expect(find.text('正在加载模型列表…'), findsOneWidget);
+    expect(find.text('DeepSeek-V4.1-Flash'), findsNothing);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('正在加载模型列表…'), findsNothing, reason: '数据回来后原地补齐，不叠第二层');
+    expect(find.text('GLM-5.3'), findsOneWidget);
   });
 
   testWidgets('新任务页也能先选档位，建会话后立刻写进会话', (tester) async {
