@@ -580,9 +580,9 @@ export function resolveRendererEntry(isDev: boolean, mainDirectory = __dirname):
   if (fs.existsSync(builtIndex)) {
     return "app://bundle/index.html";
   }
-  // Dev without prior build: expect Vite on 5173
+  // Dev without prior build: expect Vite on 5714
   if (isDev) {
-    return "http://localhost:5173";
+    return "http://localhost:5714";
   }
   return "app://bundle/index.html";
 }

@@ -6,7 +6,7 @@ import { waitForViteReady } from "./dev.mjs";
 test("Vite readiness retries failures until an OK health response", async () => {
   let clock = 0;
   let calls = 0;
-  await waitForViteReady("http://127.0.0.1:5173", {
+  await waitForViteReady("http://127.0.0.1:5714", {
     fetch: async () => {
       calls += 1;
       if (calls === 1) throw new Error("ECONNREFUSED");
@@ -26,7 +26,7 @@ test("Vite readiness retries failures until an OK health response", async () => 
 test("Vite readiness has a total timeout with the last failure", async () => {
   let clock = 0;
   await assert.rejects(
-    waitForViteReady("http://127.0.0.1:5173", {
+    waitForViteReady("http://127.0.0.1:5714", {
       fetch: async () => ({ ok: false, status: 503 }),
       now: () => clock,
       sleep: async (delay) => {
