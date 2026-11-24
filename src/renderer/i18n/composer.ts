@@ -1,6 +1,7 @@
 // Translation entries owned by the composer domain.
 export const enUS: Record<string, string> = {
   attachLocalFiles: "Add images or local file references",
+  attachedImagePreview: "View attached image",
   attachLocalFilesDescription:
     "Add images or local file references. The agent reads absolute paths on this computer; moved files, remote agents, or sandboxes may not be able to access them.",
   draftPersistenceFailed:
@@ -37,6 +38,17 @@ export const enUS: Record<string, string> = {
   remove: "Remove",
   someImagesAttachFailed: "{failed} of {total} images could not be attached",
   slashCommandsWithCount: "Slash commands · {count}",
+  slashGroupBuiltin: "Built-in",
+  slashGroupExtension: "Extensions",
+  slashGroupPrompt: "Prompts",
+  slashGroupSkill: "Skills",
+  slashCommandCompact: "Compress context, optionally with instructions",
+  slashCommandReload: "Reload extensions, skills, prompts, and tools",
+  slashCommandName: "Set the session display name",
+  slashCommandSession: "Show session message, token, and cost stats",
+  slashCommandCopy: "Copy the last assistant message",
+  slashCommandGoal: "Work toward a goal with acceptance criteria until verified",
+  slashCommandMcp: "Manage MCP servers in Desktop Settings",
   changePermission: "Change permission settings",
   changeThinkingLevel: "Change reasoning level",
   compact: "Compact context",
@@ -81,6 +93,7 @@ export const enUS: Record<string, string> = {
 
 export const zhCN: Record<string, string> = {
   attachLocalFiles: "添加图片或本地文件引用",
+  attachedImagePreview: "查看附件图片大图",
   attachLocalFilesDescription:
     "添加图片或本地文件引用。Agent 会读取本机绝对路径；文件移动后、远程 Agent 或沙箱环境可能无法访问。",
   draftPersistenceFailed: "草稿未能保存到此设备。当前内容仍保留在页面中，请检查可用存储空间。",
@@ -115,6 +128,17 @@ export const zhCN: Record<string, string> = {
   remove: "移除",
   someImagesAttachFailed: "{total} 张图片中有 {failed} 张无法添加",
   slashCommandsWithCount: "斜杠命令 · {count}",
+  slashGroupBuiltin: "内置",
+  slashGroupExtension: "扩展",
+  slashGroupPrompt: "提示词",
+  slashGroupSkill: "技能",
+  slashCommandCompact: "压缩上下文，可附加指令",
+  slashCommandReload: "重载扩展、技能、提示词与工具",
+  slashCommandName: "设置会话显示名称",
+  slashCommandSession: "查看会话消息、token 与费用统计",
+  slashCommandCopy: "复制最后一条助手回复",
+  slashCommandGoal: "描述目标与验收标准，Agent 自主执行并自检直到验收",
+  slashCommandMcp: "在桌面设置中管理 MCP 服务",
   changePermission: "更改权限设置",
   changeThinkingLevel: "更改推理强度",
   compact: "压缩上下文",
@@ -159,6 +183,7 @@ export const zhCN: Record<string, string> = {
 
 export const zhTW: Record<string, string> = {
   attachLocalFiles: "新增圖片或本機檔案參考",
+  attachedImagePreview: "檢視附件圖片大圖",
   attachLocalFilesDescription:
     "新增圖片或本機檔案參考。Agent 會讀取本機絕對路徑；檔案移動後、遠端 Agent 或沙盒環境可能無法存取。",
   draftPersistenceFailed: "草稿未能儲存到此裝置。目前內容仍保留在頁面中，請檢查可用的儲存空間。",
@@ -193,6 +218,17 @@ export const zhTW: Record<string, string> = {
   remove: "移除",
   someImagesAttachFailed: "{total} 張圖片中有 {failed} 張無法新增",
   slashCommandsWithCount: "斜線命令 · {count}",
+  slashGroupBuiltin: "內建",
+  slashGroupExtension: "擴充",
+  slashGroupPrompt: "提示詞",
+  slashGroupSkill: "技能",
+  slashCommandCompact: "壓縮上下文，可附加指令",
+  slashCommandReload: "重新載入擴充、技能、提示詞與工具",
+  slashCommandName: "設定工作階段顯示名稱",
+  slashCommandSession: "檢視工作階段訊息、token 與費用統計",
+  slashCommandCopy: "複製最後一則助理回覆",
+  slashCommandGoal: "描述目標與驗收標準，Agent 自主執行並自檢直到驗收",
+  slashCommandMcp: "在桌面設定中管理 MCP 服務",
   changePermission: "變更權限設定",
   changeThinkingLevel: "變更推理強度",
   compact: "壓縮上下文",
