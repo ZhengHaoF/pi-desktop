@@ -1087,6 +1087,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
                     child: TextField(
@@ -1094,6 +1095,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       enabled: ready,
                       onChanged: _onPromptChanged,
                       onSubmitted: (_) => _send(),
+                      // 长指令不再挤在一行里横向滚动：随正文换行长高，
+                      // 到 5 行封顶后框内滚动，键盘回车键仍作发送。
+                      minLines: 1,
+                      maxLines: 5,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.send,
                       decoration: InputDecoration(
                         hintText: _turnRunning ? '回合进行中，发送将插队…' : '发送指令到 PC 会话…（/ 唤起命令）',
                         border: OutlineInputBorder(
