@@ -6,6 +6,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import 'text_selection_menu.dart';
+
 class AskOptionData {
   const AskOptionData({required this.label, this.description});
 
@@ -287,6 +289,7 @@ class _QuestionBlock extends StatelessWidget {
             padding: const EdgeInsets.only(top: 6),
             child: TextField(
               autofocus: true,
+              contextMenuBuilder: buildChineseTextSelectionMenu,
               decoration: const InputDecoration(
                 isDense: true,
                 border: OutlineInputBorder(),

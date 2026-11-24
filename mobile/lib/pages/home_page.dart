@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import '../core/host_store.dart';
 import '../core/remote_connection.dart';
 import '../widgets/session_models.dart';
+import '../widgets/text_selection_menu.dart';
 import 'chat_page.dart';
 import 'connect_page.dart';
 import 'settings_page.dart';
@@ -318,6 +319,7 @@ class _HomePageState extends State<HomePage> {
         content: TextField(
           controller: controller,
           autofocus: true,
+          contextMenuBuilder: buildChineseTextSelectionMenu,
           decoration: const InputDecoration(hintText: '输入新名称', border: OutlineInputBorder()),
         ),
         actions: [
@@ -707,6 +709,7 @@ class _HomePageState extends State<HomePage> {
   Widget _searchField() {
     return TextField(
       onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+      contextMenuBuilder: buildChineseTextSelectionMenu,
       decoration: InputDecoration(
         hintText: '搜索会话…',
         prefixIcon: const Icon(Icons.search, size: 20),

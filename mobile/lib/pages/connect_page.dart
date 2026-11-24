@@ -8,6 +8,7 @@ import '../core/host_store.dart';
 import '../core/keep_alive.dart';
 import '../core/navigation.dart';
 import '../core/remote_connection.dart';
+import '../widgets/text_selection_menu.dart';
 import 'home_page.dart';
 import 'scan_page.dart';
 
@@ -115,6 +116,7 @@ class _ConnectPageState extends State<ConnectPage> {
           children: [
             TextField(
               controller: _urlController,
+              contextMenuBuilder: buildChineseTextSelectionMenu,
               decoration: InputDecoration(
                 labelText: 'Relay 地址',
                 hintText: 'ws://192.168.x.x:8788/ws',
@@ -135,6 +137,7 @@ class _ConnectPageState extends State<ConnectPage> {
             const SizedBox(height: 12),
             TextField(
               controller: _deviceController,
+              contextMenuBuilder: buildChineseTextSelectionMenu,
               decoration: const InputDecoration(labelText: '设备标识', border: OutlineInputBorder()),
             ),
             const SizedBox(height: 20),

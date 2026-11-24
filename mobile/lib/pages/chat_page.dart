@@ -12,6 +12,7 @@ import '../core/remote_connection.dart';
 import '../widgets/ask_sheet.dart';
 import '../widgets/markdown_text.dart';
 import '../widgets/session_models.dart';
+import '../widgets/text_selection_menu.dart';
 import '../widgets/tool_action_title.dart';
 import '../widgets/transcript_groups.dart';
 
@@ -1101,6 +1102,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       maxLines: 5,
                       keyboardType: TextInputType.multiline,
                       textInputAction: TextInputAction.send,
+                      contextMenuBuilder: buildChineseTextSelectionMenu,
                       decoration: InputDecoration(
                         hintText: _turnRunning ? '回合进行中，发送将插队…' : '发送指令到 PC 会话…（/ 唤起命令）',
                         border: OutlineInputBorder(
