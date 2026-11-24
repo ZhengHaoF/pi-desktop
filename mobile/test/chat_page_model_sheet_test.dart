@@ -127,6 +127,20 @@ void main() {
     expect(find.text('思考强度'), findsNothing);
   });
 
+  testWidgets('连点模型 chip 只弹出一层弹层', (tester) async {
+    final connection = newConnection();
+    await pumpFrames(tester, ChatPage(connection: connection, sessionId: 's1', title: '会话'));
+
+    final chip = find.text('DeepSeek-V4.1-Flash');
+    await tester.tap(chip);
+    // 第二下和第一下发生在同一帧内（真实连点就是这样），此时弹层还没出现。
+    await tester.tap(chip, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(find.text('选择模型'), findsOneWidget, reason: '第二下点击要在 await 之前被挡掉');
+    expect(find.byType(ChoiceChip), findsNWidgets(4), reason: '只有一层弹层，档位 chip 就该只有一组');
+  });
+
   testWidgets('新任务页也能先选档位，建会话后立刻写进会话', (tester) async {
     final connection = newConnection();
     await pumpFrames(

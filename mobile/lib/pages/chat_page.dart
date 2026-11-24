@@ -97,6 +97,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Map<String, String> _modelNames = const {};
   Timer? _modelRefreshDebounce;
   bool _switchingModel = false;
+  /// 模型弹层是否已经开着：连点 chip 的第二下必须被吃掉，否则会叠两层弹层。
+  bool _modelSheetOpen = false;
   /// 新任务页上用户手动挑过模型：首条消息建会话时按显式选择处理。
   bool _newTaskModelExplicit = false;
   String? _sendingText;
@@ -369,6 +371,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Future<void> _pickModel() async {
+    // 连点两下 chip 会进两次 _pickModel，await 之前两次都能通过，于是弹出
+    // 两层弹层。用同步置位的标志把第二下吃掉。
+    if (_modelSheetOpen) return;
+    _modelSheetOpen = true;
     try {
       final prefs = await _loadModelNames();
       if (!mounted) return;
@@ -389,7 +395,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ),
       );
     } catch (err) {
-      setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = err.toString());
+    } finally {
+      _modelSheetOpen = false;
     }
   }
 
