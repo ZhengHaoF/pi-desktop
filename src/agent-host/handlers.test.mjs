@@ -866,6 +866,32 @@ test("model preferences project the persisted default and keep it enabled", asyn
   assert.deepEqual(unfiltered.defaultModel, { provider: "fixture", modelId: "beta" });
   assert.equal(unfiltered.defaultThinkingLevel, "high");
   assert.deepEqual(unfiltered.modelThinkingLevels, { "fixture/alpha": "low" });
+  // Level capability travels with the preferences too, since clients that may
+  // only call models.preferences.get cannot reach models.list. Non-reasoning
+  // models accept "off" alone; "xhigh"/"max" need an explicit mapping.
+  assert.deepEqual(unfiltered.thinkingLevels, { "fixture:alpha": ["off"], "fixture:beta": ["off"] });
+  const reasoning = projectModelPreferences(
+    [{ id: "gamma", name: "Gamma", provider: "fixture", reasoning: true, thinkingLevelMap: { max: "high" } }],
+    undefined,
+    settings,
+  );
+  assert.deepEqual(reasoning.thinkingLevels, {
+    "fixture:gamma": ["off", "minimal", "low", "medium", "high", "max"],
+  });
+  const mapped = projectModelPreferences(
+    [
+      {
+        id: "delta",
+        name: "Delta",
+        provider: "fixture",
+        reasoning: true,
+        thinkingLevelMap: { minimal: null, high: "high" },
+      },
+    ],
+    undefined,
+    settings,
+  );
+  assert.deepEqual(mapped.thinkingLevels, { "fixture:delta": ["off", "low", "medium", "high"] });
 
   // The desktop picker lists every available model, so a default is projected
   // whether or not enabledModels scopes it (Pi's own picker still honors that list).

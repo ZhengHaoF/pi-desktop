@@ -184,6 +184,13 @@ export interface ModelPreferencesResult {
    * (Pi global settings). An entry wins over defaultThinkingLevel.
    */
   modelThinkingLevels: Record<string, string>;
+  /**
+   * Thinking levels each available model accepts, keyed by "provider:id"
+   * (same key shape as ModelsListResult.thinkingLevels). Projected here so
+   * clients that may only call models.preferences.get (the mobile app)
+   * can offer a per-session level picker without models.list.
+   */
+  thinkingLevels: Record<string, string[]>;
 }
 
 export interface DiscoveredModel {

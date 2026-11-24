@@ -1,6 +1,6 @@
 import { statSync } from "node:fs";
 import { getAgentDir, type ModelRuntime, type SettingsManager } from "@earendil-works/pi-coding-agent";
-import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
+import { getSupportedThinkingLevels, type Api, type Model } from "@earendil-works/pi-ai";
 import type { ApiHandler } from "../../contract/rpc";
 import {
   RpcError,
@@ -57,7 +57,15 @@ export function includeDefaultModelInEnabled(
   return [...enabledModels, `${provider}/${modelId}`];
 }
 
-export function projectModelPreferences<T extends { id: string; name: string; provider: string }>(
+export function projectModelPreferences<
+  T extends {
+    id: string;
+    name: string;
+    provider: string;
+    reasoning?: boolean;
+    thinkingLevelMap?: Record<string, string | null>;
+  },
+>(
   available: readonly T[],
   enabledModels: string[] | undefined,
   settings: Pick<
@@ -69,6 +77,12 @@ export function projectModelPreferences<T extends { id: string; name: string; pr
     .map((model) => ({ id: model.id, name: model.name, provider: model.provider }))
     .sort((a, b) => a.name.localeCompare(b.name) || a.provider.localeCompare(b.provider) || a.id.localeCompare(b.id));
   const normalized = [...new Set((enabledModels ?? []).map(stripThinkingSuffix).filter(Boolean))];
+  // Level capability comes from the same SDK rule models.list uses. Only the
+  // capability fields are consulted, so the widened stub type is safe here.
+  const thinkingLevels: Record<string, string[]> = {};
+  for (const model of available) {
+    thinkingLevels[`${model.provider}:${model.id}`] = getSupportedThinkingLevels(model as unknown as Model<Api>);
+  }
   return {
     models,
     // Still reported for Pi's own scoped picker and model cycling; the desktop
@@ -77,6 +91,7 @@ export function projectModelPreferences<T extends { id: string; name: string; pr
     defaultModel: resolveDefaultModel(settings),
     defaultThinkingLevel: settings.getDefaultThinkingLevel() ?? null,
     modelThinkingLevels: settings.getAllModelThinkingLevels(),
+    thinkingLevels,
   };
 }
 
