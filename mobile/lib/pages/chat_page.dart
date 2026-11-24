@@ -90,6 +90,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 离底状态（驱动悬浮"回到底部"按钮），磁吸脱开且不在底部时为 true。
   bool _awayFromBottom = false;
   Map<String, String>? _currentModel; // {provider, modelId}
+  /// Session thinking level from `get_state`; null until the PC answers (and
+  /// always null on a new-task page, which has no session yet).
+  String? _thinkingLevel;
   /// Display names from the PC catalog, keyed by `provider/modelId`.
   Map<String, String> _modelNames = const {};
   Timer? _modelRefreshDebounce;
@@ -166,6 +169,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // fold into the last historical group's key.
         _liveMessageIndex = historyMessageCount(detail) - 1;
         _currentModel = _modelFromDetail(detail);
+        // sessions.get already asked the PC for get_state; reuse it instead of
+        // firing a second command just to learn the thinking level.
+        _thinkingLevel = _thinkingLevelFromDetail(detail) ?? _thinkingLevel;
         _loadingHistory = false;
         // Restore the turn mirror from the runtime snapshot so the
         // steer-vs-prompt choice is correct right after opening the page.
@@ -291,9 +297,62 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
       final model = _modelFromDetail(detail);
       if (!mounted || model == null) return;
-      setState(() => _currentModel = model);
+      setState(() {
+        _currentModel = model;
+        _thinkingLevel = _thinkingLevelFromDetail(detail) ?? _thinkingLevel;
+      });
     } catch (_) {
       // Keep the last known selection; transient relay errors are harmless.
+    }
+  }
+
+  /// `sessions.get` 的 agentState 就是 PC 的 get_state 快照，档位直接取这里。
+  String? _thinkingLevelFromDetail(Map<String, dynamic> detail) {
+    final agentState = detail['agentState'];
+    if (agentState is! Map) return null;
+    final state = agentState['state'];
+    if (state is! Map) return null;
+    final level = state['thinkingLevel'];
+    return level is String && level.isNotEmpty ? level : null;
+  }
+
+  /// Thinking levels this model accepts, from the levels map the PC now
+  /// projects inside `models.preferences.get` (`provider:id`, same shape as
+  /// `models.list`). Only models with a real choice get a picker; a
+  /// non-reasoning model reports just `off` and hides the section.
+  List<String> _levelsForModel(Map<String, dynamic> prefs, Map<String, String>? model) {
+    final raw = prefs['thinkingLevels'];
+    final m = model;
+    if (m == null || raw is! Map) return const [];
+    final entry = raw['${m['provider']}:${m['modelId']}'];
+    if (entry is! List) return const [];
+    final levels = [for (final level in entry) if (level is String) level];
+    return levels.length > 1 ? levels : const [];
+  }
+
+  /// Read the live thinking level so the picker shows the PC's real value
+  /// instead of a stale default. Best-effort: a failure keeps the last value.
+  Future<void> _loadThinkingLevel() async {
+    final sessionId = _sessionId;
+    if (!mounted || sessionId == null) return;
+    try {
+      final state = await widget.connection.agentCommand(sessionId, {'type': 'get_state'});
+      final level = state['thinkingLevel'];
+      if (mounted && level is String) setState(() => _thinkingLevel = level);
+    } catch (_) {
+      // Host not ready / session gone: the next attach retries.
+    }
+  }
+
+  Future<void> _setThinkingLevel(String level) async {
+    final sessionId = _sessionId;
+    if (sessionId == null) return;
+    setState(() => _thinkingLevel = level);
+    try {
+      await widget.connection.agentCommand(sessionId, {'type': 'set_thinking_level', 'level': level});
+    } catch (err) {
+      final message = err is StateError ? err.message.replaceFirst('Bad state: ', '') : err.toString();
+      if (mounted) setState(() => _error = message);
     }
   }
 
@@ -303,8 +362,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       if (!mounted) return;
       await showModalBottomSheet<void>(
         context: context,
+        backgroundColor: Colors.white,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-        builder: (sheetContext) => _ModelPickerSheet(prefs: prefs, current: _currentModel, onPick: _setModel),
+        builder: (sheetContext) => _ModelPickerSheet(
+          prefs: prefs,
+          current: _currentModel,
+          thinkingLevel: _thinkingLevel,
+          thinkingLevels: _levelsForModel(prefs, _currentModel),
+          // 新任务页还没有会话：PC 上没有可写的会话级设置，先不显示这一栏。
+          onThinkingLevel: _sessionId == null ? null : _setThinkingLevel,
+          onPick: _setModel,
+        ),
       );
     } catch (err) {
       setState(() => _error = err.toString());
@@ -798,6 +866,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // current turn); when idle the message starts a fresh turn.
       final type = _turnRunning ? 'steer' : 'prompt';
       await widget.connection.agentCommand(sessionId, {'type': type, 'message': text});
+      // 会话刚建出来时还没有快照可读，发完首条消息再补一次档位。
+      if (_thinkingLevel == null) unawaited(_loadThinkingLevel());
     } catch (err) {
       setState(() {
         _sendingText = null;
@@ -934,12 +1004,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       appBar: AppBar(
         title: Text(widget.title, overflow: TextOverflow.ellipsis),
         actions: [
-          _ModelChip(
-            model: _currentModel,
-            modelNames: _modelNames,
-            busy: _switchingModel,
-            onTap: _pickModel,
-          ),
           IconButton(
             tooltip: '中止当前回合',
             onPressed: _abort,
@@ -1086,12 +1150,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: TextField(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+              // 卡片式输入区（对齐参考稿）：整块白卡承载输入 + 工具条，
+              // 模型选择从标题栏挪到卡片底部，发送键做成圆形，空输入时置灰。
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: _turnRunning ? const Color(0xFFEAB836) : const Color(0xFFE6E6E9),
+                    width: _turnRunning ? 1.4 : 1,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x0D000000), blurRadius: 10, offset: Offset(0, 2)),
+                  ],
+                ),
+                padding: const EdgeInsets.fromLTRB(14, 4, 10, 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
                       controller: _promptController,
                       enabled: ready,
                       onChanged: _onPromptChanged,
@@ -1103,30 +1181,35 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       keyboardType: TextInputType.multiline,
                       textInputAction: TextInputAction.send,
                       contextMenuBuilder: buildChineseTextSelectionMenu,
+                      style: const TextStyle(fontSize: 15, height: 1.35),
                       decoration: InputDecoration(
-                        hintText: _turnRunning ? '回合进行中，发送将插队…' : '发送指令到 PC 会话…（/ 唤起命令）',
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(
-                            color: _turnRunning ? const Color(0xFFEAB836) : Colors.black12,
-                            width: _turnRunning ? 1.4 : 1,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                            color: _turnRunning ? const Color(0xFFEAB836) : Colors.black12,
-                            width: _turnRunning ? 1.4 : 1,
-                          ),
-                        ),
+                        hintText: _turnRunning ? '回合进行中，发送将插队…' : '发消息…（/ 唤起命令）',
+                        hintStyle: const TextStyle(fontSize: 15, color: Color(0xFF9A9AA2)),
+                        border: InputBorder.none,
                         isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: _send,
-                    icon: const Icon(Icons.send),
-                  ),
-                ],
+                    Row(
+                      children: [
+                        _ModelChip(
+                          model: _currentModel,
+                          modelNames: _modelNames,
+                          busy: _switchingModel,
+                          onTap: _pickModel,
+                        ),
+                        const Spacer(),
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _promptController,
+                          builder: (context, value, _) => _ComposerSendButton(
+                            enabled: ready && value.text.trim().isNotEmpty,
+                            onTap: _send,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1498,7 +1581,9 @@ class _ProcessGroupCard extends StatelessWidget {
   }
 }
 
-/// Compact current-model chip shown in the AppBar; opens the picker sheet.
+/// Compact current-model chip shown in the composer toolbar; opens the picker
+/// sheet. Speech / attach buttons are deliberately absent: the mobile
+/// allowlist has no upload or voice channel, so they would be dead controls.
 class _ModelChip extends StatelessWidget {
   final Map<String, String>? model;
   final Map<String, String> modelNames;
@@ -1525,32 +1610,68 @@ class _ModelChip extends StatelessWidget {
         label = modelNames['${m['provider']}/${m['modelId']}'] ?? m['modelId'] ?? label;
       }
     }
-    return Padding(
-      padding: const EdgeInsets.only(right: 4),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 140),
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F3F5),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.memory, size: 14, color: Color(0xFF7A7A82)),
+            const SizedBox(width: 5),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 150),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF3C3C42)),
               ),
-              const SizedBox(width: 2),
-              const Icon(Icons.expand_more, size: 16),
-            ],
+            ),
+            const SizedBox(width: 1),
+            const Icon(Icons.expand_more, size: 15, color: Color(0xFF7A7A82)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Circular send button. Empty draft keeps it grey and inert, matching the
+/// reference composer instead of always offering a live send arrow.
+class _ComposerSendButton extends StatelessWidget {
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _ComposerSendButton({required this.enabled, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: '发送',
+      child: Material(
+        color: enabled ? primary : const Color(0xFFE9E9EC),
+        shape: const CircleBorder(),
+        child: InkWell(
+          key: const Key('composer-send'),
+          customBorder: const CircleBorder(),
+          onTap: enabled ? onTap : null,
+          child: SizedBox(
+            width: 38,
+            height: 38,
+            child: Icon(
+              Icons.arrow_upward,
+              size: 20,
+              color: enabled ? Colors.white : const Color(0xFFAFAFB6),
+            ),
           ),
         ),
       ),
@@ -1558,19 +1679,56 @@ class _ModelChip extends StatelessWidget {
   }
 }
 
+/// Pi 的档位标识 → 中文显示名（off/minimal/low/medium/high/xhigh/max）。
+const Map<String, String> thinkingLevelLabels = {
+  'off': '关闭',
+  'minimal': '极简',
+  'low': '低',
+  'medium': '中',
+  'high': '高',
+  'xhigh': '极高',
+  'max': '最大',
+};
+
 /// Bottom-sheet model picker backed by models.preferences.get. Shows the full
 /// PC catalog (same set as the desktop picker); `enabledModels` is Pi's own
 /// scoped-picker filter and must not narrow this list. Marks the current
-/// selection and the PC-side default.
-class _ModelPickerSheet extends StatelessWidget {
+/// selection and the PC-side default, and — when the PC projects the model's
+/// supported levels — offers the per-session thinking level on top.
+class _ModelPickerSheet extends StatefulWidget {
   final Map<String, dynamic> prefs;
   final Map<String, String>? current;
+  /// Live level from `get_state`; null means the session follows the PC default.
+  final String? thinkingLevel;
+  final List<String> thinkingLevels;
   final Future<void> Function(String provider, String modelId, BuildContext) onPick;
+  /// null on a new-task page: there is no session to write the level to yet.
+  final Future<void> Function(String level)? onThinkingLevel;
 
-  const _ModelPickerSheet({required this.prefs, required this.current, required this.onPick});
+  const _ModelPickerSheet({
+    required this.prefs,
+    required this.current,
+    required this.thinkingLevel,
+    required this.thinkingLevels,
+    required this.onPick,
+    this.onThinkingLevel,
+  });
+
+  @override
+  State<_ModelPickerSheet> createState() => _ModelPickerSheetState();
+}
+
+class _ModelPickerSheetState extends State<_ModelPickerSheet> {
+  String? _level;
+
+  @override
+  void initState() {
+    super.initState();
+    _level = widget.thinkingLevel;
+  }
 
   List<Map<String, dynamic>> _models() {
-    final raw = prefs['models'];
+    final raw = widget.prefs['models'];
     return <Map<String, dynamic>>[
       if (raw is List)
         for (final m in raw)
@@ -1578,26 +1736,33 @@ class _ModelPickerSheet extends StatelessWidget {
     ];
   }
 
+  Future<void> _chooseLevel(String level) async {
+    final onThinkingLevel = widget.onThinkingLevel;
+    if (onThinkingLevel == null) return;
+    setState(() => _level = level);
+    await onThinkingLevel(level);
+  }
+
   @override
   Widget build(BuildContext context) {
     final models = _models();
-    final defaultModel = prefs['defaultModel'];
-    bool isDefault(Map<String, dynamic>? m) {
-      if (m == null || defaultModel is! Map) return false;
+    final defaultModel = widget.prefs['defaultModel'];
+    bool isDefault(Map<String, dynamic> m) {
+      if (defaultModel is! Map) return false;
       return defaultModel['provider'] == m['provider'] && defaultModel['modelId'] == m['id'];
     }
 
     bool isCurrent(Map<String, dynamic> m) =>
-        current?['provider'] == m['provider'] && current?['modelId'] == m['id'];
+        widget.current?['provider'] == m['provider'] && widget.current?['modelId'] == m['id'];
     return SafeArea(
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.62),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+              padding: const EdgeInsets.fromLTRB(16, 14, 8, 6),
               child: Row(
                 children: [
                   const Text('选择模型', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -1606,6 +1771,41 @@ class _ModelPickerSheet extends StatelessWidget {
                 ],
               ),
             ),
+            if (widget.thinkingLevels.isNotEmpty && widget.onThinkingLevel != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text('思考强度', style: TextStyle(fontSize: 13, color: Color(0xFF6B6B73))),
+                        const Spacer(),
+                        Text(
+                          _level == null ? '跟随默认' : (thinkingLevelLabels[_level] ?? _level!),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final level in widget.thinkingLevels)
+                          ChoiceChip(
+                            label: Text(thinkingLevelLabels[level] ?? level),
+                            selected: _level == level,
+                            showCheckmark: false,
+                            visualDensity: VisualDensity.compact,
+                            labelStyle: const TextStyle(fontSize: 12.5),
+                            onSelected: (_) => _chooseLevel(level),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             const Divider(height: 1),
             Flexible(
               child: models.isEmpty
@@ -1615,46 +1815,95 @@ class _ModelPickerSheet extends StatelessWidget {
                     )
                   : ListView.builder(
                       shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(vertical: 6),
                       itemCount: models.length,
-                      itemBuilder: (context, index) {
-                        final m = models[index];
-                        final currentHere = isCurrent(m);
-                        return ListTile(
-                          dense: true,
-                          title: Text(
-                            m['name'] as String? ?? m['id'] as String? ?? '',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: currentHere ? FontWeight.bold : FontWeight.w500,
-                            ),
-                          ),
-                          subtitle: Text(
-                            '${m['provider']}/${m['id']}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 11, color: Colors.black45),
-                          ),
-                          trailing: currentHere
-                              ? Icon(Icons.check_circle, size: 20, color: Theme.of(context).colorScheme.primary)
-                              : isDefault(m)
-                                  ? Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green.shade50,
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Text('默认', style: TextStyle(fontSize: 11, color: Colors.green.shade700)),
-                                    )
-                                  : null,
-                          onTap: currentHere
-                              ? null
-                              : () => onPick(m['provider'] as String, m['id'] as String, context),
-                        );
-                      },
+                      itemBuilder: (context, index) => _modelRow(
+                        context,
+                        models[index],
+                        isCurrent: isCurrent(models[index]),
+                        isDefault: isDefault(models[index]),
+                      ),
                     ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 高行条目（对齐参考稿）：品牌色首字母块 + 模型名 + provider/id 小字，
+  /// 右侧勾选当前项，PC 默认模型给一个淡色「默认」标；不再显示倍率。
+  Widget _modelRow(
+    BuildContext context,
+    Map<String, dynamic> m, {
+    required bool isCurrent,
+    required bool isDefault,
+  }) {
+    final provider = m['provider'] as String? ?? '';
+    final hue = provider.hashCode.abs() % 360;
+    final avatarBg = HSLColor.fromAHSL(1, hue.toDouble(), 0.4, 0.94).toColor();
+    final avatarFg = HSLColor.fromAHSL(1, hue.toDouble(), 0.5, 0.36).toColor();
+    final label = (m['name'] as String?)?.trim().isNotEmpty == true
+        ? m['name'] as String
+        : (m['id'] as String? ?? '');
+    final initial = label.isEmpty ? '?' : label.substring(0, 1).toUpperCase();
+    return InkWell(
+      onTap: isCurrent
+          ? null
+          : () => widget.onPick(m['provider'] as String, m['id'] as String, context),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: avatarBg, borderRadius: BorderRadius.circular(10)),
+              child: Text(
+                initial,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: avatarFg),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$provider / ${m['id']}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF9A9AA2)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (isCurrent)
+              Icon(Icons.check_circle, size: 20, color: Theme.of(context).colorScheme.primary)
+            else if (isDefault)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('默认', style: TextStyle(fontSize: 11, color: Colors.green.shade700)),
+              )
+            else
+              const SizedBox(width: 20),
           ],
         ),
       ),

@@ -87,7 +87,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField), '看看转向灯为什么闪得快');
     await tester.pump();
-    await tester.tap(find.byIcon(Icons.send));
+    await tester.tap(find.byKey(const Key('composer-send')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
