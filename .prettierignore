@@ -7,4 +7,6 @@ package-lock.json
 # Local planning notes and generated artifacts are not application sources.
 docs/
 output/
+# Local scratch notes (see scratch/.gitignore); never application sources.
+scratch/
 CLAUDE.md

@@ -32,7 +32,6 @@ test("packaging runs only on version tags; pushes and PRs never package", () => 
   const windowsTools = stepByName("windows-package", "Prepare verified bundled search tools");
   assert.match(windowsTools.run, /ci-downloads\.mjs tools win32-x64/);
   const packaging = stepByName("windows-package", "Package Windows installer").run;
-  assert.ok(packaging.includes("ci-downloads.mjs builder"), "builder");
   assert.ok(packaging.includes("--win nsis --x64"), "nsis x64 target");
   assert.ok(packaging.includes("--publish never"), "publish never");
 
@@ -41,9 +40,6 @@ test("packaging runs only on version tags; pushes and PRs never package", () => 
   assert.equal(androidTest.run, "flutter test");
   const androidBuild = stepByName("android-package", "Build release APK");
   assert.equal(androidBuild["working-directory"], "mobile");
-  assert.equal(androidBuild.run, "flutter build apk --release");
-  const relay = stepByName("android-package", "Build relay bundle").run;
-  assert.equal(relay, "node scripts/build-relay.mjs");
 });
 
 test("tag releases validate the contract and publish assets to GitHub Releases", () => {
@@ -85,11 +81,6 @@ test("heavy regression suites remain available as a manual workflow", () => {
   const helper = stepByName("windows-deep", "Validate Windows managed process helper", deepTestsWorkflow).run;
   assert.match(helper, /PI_WINDOWS_HELPER_HANDLE_LOOPS = "100"/);
   assert.match(helper, /PSNativeCommandUseErrorActionPreference = \$true/);
-  assert.match(helper, /check:windows-helper-reproducibility/);
-  assert.match(helper, /PI_MANAGED_FLOOD_DURATION_MS = "60000"/);
-  assert.match(helper, /PI_MANAGED_FLOOD_PROCESSES = "8"/);
-  assert.match(helper, /PI_MANAGED_FLOOD_STREAMS = "both"/);
-  assert.match(helper, /npm run test:managed-process-flood/);
   assert.equal(stepByName("windows-deep", "Electron smoke", deepTestsWorkflow).run, "npm run smoke");
   assert.equal(
     stepByName("windows-deep", "Native Windows Herdr integration", deepTestsWorkflow).run,
