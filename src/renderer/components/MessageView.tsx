@@ -172,7 +172,6 @@ function UserMessageView({
 }) {
   const { t } = useI18n();
   const { isDark } = useTheme();
-  const [hovered, setHovered] = useState(false);
   const { copied, copy } = useCopyFeedback();
 
   const content =
@@ -214,9 +213,8 @@ function UserMessageView({
 
   return (
     <div
+      className="message-hover-scope"
       style={{ marginBottom: 14, display: "flex", flexDirection: "column", alignItems: "flex-end" }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
       <div
         style={{
@@ -292,22 +290,13 @@ function UserMessageView({
           marginTop: 3,
         }}
       >
-        <div
-          className="message-hover-actions"
-          style={{
-            display: "flex",
-            gap: 3,
-            opacity: hovered ? 1 : 0,
-            pointerEvents: hovered ? "auto" : "none",
-            transition: "opacity 0.12s",
-          }}
-        >
+        <div className="message-hover-actions" style={{ display: "flex", gap: 3 }}>
           <Button
             type="button"
             variant="ghost"
             onClick={copyContent}
             disabled={!copyableContent}
-            title={copyableContent ? "Copy message" : "Nothing to copy"}
+            title={copyableContent ? t("chatCopyMessage", "Copy message") : t("chatNothingToCopy", "Nothing to copy")}
             style={{
               display: "flex",
               alignItems: "center",
@@ -323,19 +312,14 @@ function UserMessageView({
             }}
           >
             {copied ? <Check size={11} strokeWidth={1.8} /> : <Copy size={11} strokeWidth={1.8} />}
-            {copied ? "Copied" : "Copy"}
+            {copied ? t("copied", "Copied") : t("chatCopy", "Copy")}
           </Button>
         </div>
         {(canFork || canNavigate) && (
           <div
             className="message-hover-actions"
-            style={{
-              display: "flex",
-              gap: 3,
-              opacity: hovered || forking ? 1 : 0,
-              pointerEvents: hovered || forking ? "auto" : "none",
-              transition: "opacity 0.12s",
-            }}
+            data-visible={forking ? "true" : undefined}
+            style={{ display: "flex", gap: 3 }}
           >
             {canNavigate && (
               <Button
@@ -345,7 +329,7 @@ function UserMessageView({
                   onNavigate!(prevAssistantEntryId!);
                   onEditContent?.(editableContent);
                 }}
-                title="Edit from here — branches within this session"
+                title={t("chatEditFromHereHint", "Edit from here — branches within this session")}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -360,7 +344,7 @@ function UserMessageView({
                 }}
               >
                 <CornerUpRight size={11} strokeWidth={1.8} />
-                Edit from here
+                {t("chatEditFromHere", "Edit from here")}
               </Button>
             )}
             {canFork && (
@@ -371,7 +355,11 @@ function UserMessageView({
                   onFork!(entryId!);
                 }}
                 disabled={forking}
-                title={forking ? "Creating new session…" : "New session — creates an independent copy from here"}
+                title={
+                  forking
+                    ? t("chatForkCreatingSession", "Creating new session…")
+                    : t("chatForkNewSessionHint", "New session — creates an independent copy from here")
+                }
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -387,7 +375,7 @@ function UserMessageView({
                 }}
               >
                 <GitBranch size={11} strokeWidth={1.8} />
-                {forking ? "Creating…" : "New session"}
+                {forking ? t("creating", "Creating…") : t("chatForkNewSession", "New session")}
               </Button>
             )}
           </div>
@@ -524,7 +512,7 @@ function AssistantMessageView({
     .map((block, originalIndex) => ({ block, originalIndex }))
     .filter(({ block }) => !isEmptyThinkingBlock(block, { isStreaming }) && !isEmptyTextBlock(block, { isStreaming }));
   const blocks = blockItems.map(({ block }) => block);
-  const [hovered, setHovered] = useState(false);
+  const { t } = useI18n();
   const { copied, copy } = useCopyFeedback();
   const [tps, setTps] = useState<number | null>(null);
   const streamRateRef = useRef(createStreamRateState());
@@ -592,12 +580,7 @@ function AssistantMessageView({
         return changed ? next : prev;
       });
 
-      let chars = 0;
-      for (const b of bs) {
-        if (b.type === "text") chars += (b as TextContent).text?.length ?? 0;
-        else if (b.type === "thinking") chars += (b as ThinkingContent).thinking?.length ?? 0;
-        else if (b.type === "toolCall") chars += estimateToolInputChars((b as ToolCallContent).input);
-      }
+      const chars = countStreamedChars(bs);
       if (chars === 0) return;
       // Sliding-window rate: immune to mid-stream remounts (session switch and
       // back), unlike a cumulative total divided by wall time.
@@ -611,9 +594,8 @@ function AssistantMessageView({
 
   return (
     <div
+      className="message-hover-scope"
       style={{ marginBottom: 14, maxWidth: "var(--chat-assistant-max-width, 68ch)" }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
       {/* Model label */}
       <div
@@ -634,19 +616,13 @@ function AssistantMessageView({
         )}
         {isStreaming &&
           (() => {
-            let chars = 0;
-            for (const b of blocks) {
-              if (b.type === "text") chars += (b as TextContent).text?.length ?? 0;
-              else if (b.type === "thinking") chars += (b as ThinkingContent).thinking?.length ?? 0;
-              else if (b.type === "toolCall") chars += estimateToolInputChars((b as ToolCallContent).input);
-            }
-            const est = Math.round(chars / 4);
+            const est = Math.round(countStreamedChars(blocks) / 4);
             return (
               <>
                 {est > 0 && (
                   <span
                     style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text)" }}
-                    title="Estimated token count while streaming"
+                    title={t("chatStreamingTokenEstimate", "Estimated token count while streaming")}
                   >
                     <span
                       style={{
@@ -662,15 +638,16 @@ function AssistantMessageView({
                     </span>
                     {tps !== null &&
                       (() => {
-                        const bg = tps >= 50 ? "#53b3cb" : tps >= 30 ? "#9bc53d" : tps >= 15 ? "#f9c22e" : "#e01a4f";
+                        const tone = tps >= 50 ? "info" : tps >= 30 ? "success" : tps >= 15 ? "warning" : "danger";
                         return (
                           <span
                             style={{
                               marginLeft: 6,
-                              padding: "1px 6px",
+                              padding: "0 6px",
                               borderRadius: 4,
-                              background: bg,
-                              color: "#fff",
+                              background: `var(--${tone}-soft)`,
+                              border: `1px solid var(--${tone}-border)`,
+                              color: `var(--${tone})`,
                               fontSize: scaledChatFont(11),
                               fontWeight: 400,
                             }}
@@ -730,7 +707,7 @@ function AssistantMessageView({
             className="message-hover-action"
             variant="ghost"
             onClick={copyContent}
-            title="Copy message"
+            title={t("chatCopyMessage", "Copy message")}
             style={{
               display: "flex",
               alignItems: "center",
@@ -743,13 +720,10 @@ function AssistantMessageView({
               fontSize: scaledChatFont(12),
               fontWeight: 400,
               whiteSpace: "nowrap",
-              opacity: hovered ? 1 : 0,
-              pointerEvents: hovered ? "auto" : "none",
-              transition: "opacity 0.12s, color 0.12s",
             }}
           >
             {copied ? <Check size={11} strokeWidth={1.8} /> : <Copy size={11} strokeWidth={1.8} />}
-            {copied ? "Copied" : "Copy"}
+            {copied ? t("copied", "Copied") : t("chatCopy", "Copy")}
           </Button>
         )}
         {time && !isStreaming && (
@@ -1204,6 +1178,7 @@ function PairedDiffResult({ diff }: { diff: ResultDiff }) {
 }
 
 function SplitPatchView({ text }: { text: string }) {
+  const { t } = useI18n();
   const files = useMemo(() => parseUnifiedPatch(text), [text]);
   if (!files) return <PatchTextView text={text} />;
   const showFileHeaders = files.length > 1;
@@ -1233,8 +1208,8 @@ function SplitPatchView({ text }: { text: string }) {
                 borderBottom: "1px solid var(--border)",
               }}
             >
-              <SplitDiffHeader title={file.oldPath || "Before"} side="left" />
-              <SplitDiffHeader title={file.newPath || "After"} side="right" />
+              <SplitDiffHeader title={file.oldPath || t("chatDiffBefore", "Before")} side="left" />
+              <SplitDiffHeader title={file.newPath || t("chatDiffAfter", "After")} side="right" />
             </div>
           )}
 
@@ -1482,6 +1457,7 @@ function PairedResult({ text, isEmpty, isError }: { text: string; isEmpty: boole
 }
 
 function CompactionMessageView({ message }: { message: CustomMessage }) {
+  const { t } = useI18n();
   const summary = getMessageText(message.content);
   const parsedSummary = useMemo(() => parseCompactionSummary(summary), [summary]);
   const [expanded, setExpanded] = useState(false);
@@ -1502,7 +1478,11 @@ function CompactionMessageView({ message }: { message: CustomMessage }) {
           className="compaction-summary-toggle"
           aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
-          title={expanded ? "Collapse compaction summary" : "Expand compaction summary"}
+          title={
+            expanded
+              ? t("chatCompactionCollapse", "Collapse compaction summary")
+              : t("chatCompactionExpand", "Expand compaction summary")
+          }
           style={{
             display: "flex",
             alignItems: "center",
@@ -1527,7 +1507,7 @@ function CompactionMessageView({ message }: { message: CustomMessage }) {
             compaction
           </span>
           <span style={{ color: "var(--text)", fontSize: scaledChatFont(12), fontWeight: 600 }}>
-            Conversation compacted
+            {t("chatConversationCompacted", "Conversation compacted")}
           </span>
           {time && (
             <span style={{ marginLeft: "auto", color: "var(--text-dim)", fontSize: scaledChatFont(10) }}>{time}</span>
@@ -1553,18 +1533,27 @@ function CompactionMessageView({ message }: { message: CustomMessage }) {
 }
 
 function CompactionFileMetadata({ readFiles, modifiedFiles }: { readFiles: string[]; modifiedFiles: string[] }) {
+  const { t } = useI18n();
   const total = readFiles.length + modifiedFiles.length;
   if (total === 0) return null;
 
-  const parts = [];
-  if (readFiles.length > 0) parts.push(`${readFiles.length} read`);
-  if (modifiedFiles.length > 0) parts.push(`${modifiedFiles.length} modified`);
+  const readLabel = formatBrowserSummary(t("chatCompactionFilesRead", "{count} read"), { count: readFiles.length });
+  const modifiedLabel = formatBrowserSummary(t("chatCompactionFilesModified", "{count} modified"), {
+    count: modifiedFiles.length,
+  });
+  const parts = [readFiles.length > 0 ? readLabel : "", modifiedFiles.length > 0 ? modifiedLabel : ""].filter(Boolean);
 
   return (
     <details className="compaction-file-details">
-      <summary>File context: {parts.join(", ")}</summary>
-      {modifiedFiles.length > 0 && <CompactionFileList title="Modified files" files={modifiedFiles} />}
-      {readFiles.length > 0 && <CompactionFileList title="Read files" files={readFiles} />}
+      <summary>
+        {formatBrowserSummary(t("chatCompactionFileContext", "File context: {parts}"), { parts: parts.join(", ") })}
+      </summary>
+      {modifiedFiles.length > 0 && (
+        <CompactionFileList title={t("chatCompactionModifiedFiles", "Modified files")} files={modifiedFiles} />
+      )}
+      {readFiles.length > 0 && (
+        <CompactionFileList title={t("chatCompactionReadFiles", "Read files")} files={readFiles} />
+      )}
     </details>
   );
 }
@@ -1596,6 +1585,7 @@ function CustomMessageView({
   const isHiddenDisplay = message.display === false;
   const [contentExpanded, setContentExpanded] = useState(!isHiddenDisplay);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const { t } = useI18n();
   const { copied, copy } = useCopyFeedback();
   const text = getMessageText(message.content);
   const images = getMessageImages(message.content);
@@ -1723,7 +1713,7 @@ function CustomMessageView({
                 fontSize: scaledChatFont(11),
               }}
             >
-              {copied ? "Copied" : "Copy"}
+              {copied ? t("copied", "Copied") : t("chatCopy", "Copy")}
             </Button>
           ) : null}
           {(hasDetails || isHiddenDisplay) && (
@@ -1774,6 +1764,16 @@ function CustomMessageView({
       </div>
     </div>
   );
+}
+
+function countStreamedChars(blocks: AssistantContentBlock[]): number {
+  let chars = 0;
+  for (const b of blocks) {
+    if (b.type === "text") chars += (b as TextContent).text?.length ?? 0;
+    else if (b.type === "thinking") chars += (b as ThinkingContent).thinking?.length ?? 0;
+    else if (b.type === "toolCall") chars += estimateToolInputChars((b as ToolCallContent).input);
+  }
+  return chars;
 }
 
 function getMessageText(content: CustomMessage["content"] | UserMessage["content"]): string {

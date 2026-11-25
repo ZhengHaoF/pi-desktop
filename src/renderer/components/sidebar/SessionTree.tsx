@@ -1,6 +1,6 @@
 import { call } from "@/lib/api-client";
+import { memo, useEffect, useState, useCallback, useRef, type CSSProperties } from "react";
 import { Input } from "@/components/ui/Input";
-import { useEffect, useState, useCallback, useRef, type CSSProperties } from "react";
 import type { SessionInfo } from "@/lib/types";
 import { useI18n } from "@/i18n";
 import { ChevronDown, EllipsisVertical, GitBranch, Pencil, Trash2 } from "lucide-react";
@@ -80,6 +80,10 @@ export function SessionTreeItem({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const hasChildren = node.children.length > 0;
+  // Stable handlers let the memoized row skip rendering when another session's state changes.
+  const { session } = node;
+  const selectSession = useCallback(() => onSelectSession(session), [onSelectSession, session]);
+  const toggleCollapse = useCallback(() => setCollapsed((v) => !v), []);
 
   return (
     <div>
@@ -103,13 +107,13 @@ export function SessionTreeItem({
           isSelected={node.session.id === selectedSessionId}
           isRunning={runningSessionIds.has(node.session.id)}
           isUnread={unreadSessionIds.has(node.session.id)}
-          onClick={() => onSelectSession(node.session)}
+          onClick={selectSession}
           onRenamed={onRenamed}
-          onDeleted={(id) => onSessionDeleted?.(id)}
+          onDeleted={onSessionDeleted}
           depth={depth}
           hasChildren={hasChildren}
           collapsed={collapsed}
-          onToggleCollapse={() => setCollapsed((v) => !v)}
+          onToggleCollapse={toggleCollapse}
         />
       </div>
       {hasChildren && !collapsed && (
@@ -206,7 +210,7 @@ const sessionMenuItemStyle: CSSProperties = {
   textAlign: "left",
 };
 
-function SessionItem({
+const SessionItem = memo(function SessionItem({
   session,
   isSelected,
   isRunning,
@@ -703,4 +707,4 @@ function SessionItem({
       )}
     </div>
   );
-}
+});

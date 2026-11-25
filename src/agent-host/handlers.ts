@@ -238,6 +238,7 @@ export function registerHandlers(
 
     "sessions.entryContent": guard(sessionHandlers.entryContent),
     "sessions.entryDetails": guard(sessionHandlers.entryDetails),
+    "sessions.forkToDirectory": guard(sessionHandlers.forkToDirectory),
     "sessions.executions": guard(sessionHandlers.executions),
     "sessions.executionContent": guard(sessionHandlers.executionContent),
 

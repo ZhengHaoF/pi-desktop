@@ -679,7 +679,14 @@ export function AppShell({
   }, [sessionList, selectedSession?.id]);
 
   const handleSessionForked = useCallback(
-    (newSessionId: string) => {
+    (fork: string | SessionInfo) => {
+      if (typeof fork !== "string") {
+        suppressCwdBumpRef.current = activeCwd !== fork.cwd;
+        sessionList.ensureIndexed(fork.id);
+        handleSelectSession(fork);
+        return;
+      }
+      const newSessionId = fork;
       setSessionKey((k) => k + 1);
       setNewSessionCwd(null);
       setSelectedSession((prev) => ({
@@ -689,7 +696,7 @@ export function AppShell({
       hydrateSelectedSession(newSessionId);
       router.replace(`?session=${encodeURIComponent(newSessionId)}`, { scroll: false });
     },
-    [router, hydrateSelectedSession],
+    [activeCwd, handleSelectSession, hydrateSelectedSession, router, sessionList],
   );
 
   const handleInitialRestoreDone = useCallback(() => {

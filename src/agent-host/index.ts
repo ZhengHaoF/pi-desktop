@@ -18,6 +18,7 @@ import { applyManagedProcessOwnerIdentity } from "./managed-process/owner-identi
 import type { HerdrRuntimeDescriptor } from "../contract/herdr";
 import { herdrRuntimeController } from "./herdr/runtime-controller";
 import { initializeWebSearchRuntime } from "./web-search/runtime";
+import { recoverInterruptedDirectoryForks } from "./session-fork-workspace";
 
 const piRuntimeVersion = readPiRuntimeVersion();
 
@@ -57,6 +58,9 @@ const remoteControl = new RemoteControlController({
 const stopHandlers = registerHandlers(server, { remoteControl });
 const stopWatcher = startSessionWatcher(server);
 process.parentPort?.postMessage({ type: "remote-config-request" });
+void recoverInterruptedDirectoryForks().catch((error) =>
+  console.warn("[agent-host] failed to recover directory forks:", error),
+);
 
 function log(message: string): void {
   try {

@@ -28,6 +28,7 @@ const { SessionIndex, getSessionContentSnapshot, invalidateSessionContent, reads
             resolveDir: import.meta.dirname,
             contents: `
       import { readSessionSnapshot as read } from ${JSON.stringify(path.join(import.meta.dirname, "session-readonly.ts"))};
+      export { readSessionFileHeader } from ${JSON.stringify(path.join(import.meta.dirname, "session-readonly.ts"))};
       export const reads = [];
       export function readSessionSnapshot(file) { reads.push(file); return read(file); }
     `,

@@ -17,6 +17,12 @@ import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 import { resolveLocalFileHref } from "@/lib/file-links";
 import { useMarkdownPlugins } from "@/lib/markdown";
 import { shouldHighlightCode } from "@/lib/code-highlight-policy";
+import {
+  parseOpenFenceTail,
+  resolveStreamingDefinitions,
+  splitStreamingMarkdown,
+  STREAMING_TAIL_PARSE_LIMIT,
+} from "@/lib/streaming-markdown";
 import { mermaidCacheKey, renderMermaidSvg } from "@/lib/mermaid-renderer";
 import { SessionProfiler } from "./SessionProfiler";
 import { EnlargableImage } from "./ImageLightbox";
@@ -164,6 +170,55 @@ const fileAwareUrlTransform: UrlTransform = (url, key, node) => {
   return (defaultUrlTransform as UrlTransform)(url, key, node);
 };
 
+/** `definitions` carries link definitions from other streaming blocks; it renders nothing itself. */
+const MarkdownDocument = memo(function MarkdownDocument({
+  source,
+  definitions = "",
+}: {
+  source: string;
+  definitions?: string;
+}) {
+  const normalizedMarkdown = useMemo(() => normalizeDisplayMath(source + definitions), [source, definitions]);
+  const { remarkPlugins, rehypePlugins } = useMarkdownPlugins(normalizedMarkdown);
+  return (
+    <ReactMarkdown
+      remarkPlugins={remarkPlugins}
+      rehypePlugins={rehypePlugins}
+      urlTransform={fileAwareUrlTransform}
+      components={markdownComponents}
+    >
+      {normalizedMarkdown}
+    </ReactMarkdown>
+  );
+});
+
+/** The unfinished last block: re-rendered on every streaming update, so it stays bounded. */
+const StreamingTailBlock = memo(function StreamingTailBlock({
+  source,
+  definitions,
+}: {
+  source: string;
+  definitions: string;
+}) {
+  const openFence = useMemo(() => parseOpenFenceTail(source), [source]);
+  if (openFence) {
+    return openFence.lang === "mermaid" ? (
+      <MermaidBlock code={openFence.code} isStreaming />
+    ) : (
+      <CodeBlock code={openFence.code} lang={openFence.lang} isStreaming />
+    );
+  }
+  if (source.trim() === "") return null;
+  if (source.length > STREAMING_TAIL_PARSE_LIMIT) {
+    return (
+      <div data-streaming-preview style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+        {source}
+      </div>
+    );
+  }
+  return <MarkdownDocument source={source} definitions={definitions} />;
+});
+
 export const MarkdownBody = memo(function MarkdownBody({
   children,
   className,
@@ -173,38 +228,50 @@ export const MarkdownBody = memo(function MarkdownBody({
   sourceSessionId,
   onOpenFile,
 }: MarkdownBodyProps) {
-  // Bound synchronous parsing while content grows; settlement renders the original source in full.
-  const lightweightPreview = isStreaming && children.length > 2048;
-  const normalizedMarkdown = useMemo(
-    () => (lightweightPreview ? "" : normalizeDisplayMath(children)),
-    [children, lightweightPreview],
+  // While content grows, finished blocks keep their rendered output and only the
+  // unfinished tail is parsed again; settlement renders the original source in full.
+  const streamingBlocks = useMemo(
+    () => (isStreaming ? splitStreamingMarkdown(children) : null),
+    [children, isStreaming],
   );
-  const { remarkPlugins, rehypePlugins } = useMarkdownPlugins(normalizedMarkdown);
+  const blockDefinitions = useMemo(
+    () => (streamingBlocks ? resolveStreamingDefinitions(streamingBlocks) : null),
+    [streamingBlocks],
+  );
   const renderContext = useMemo(
     () => ({ isStreaming, cwd, imageBasePath, sourceSessionId, onOpenFile }),
     [cwd, imageBasePath, isStreaming, onOpenFile, sourceSessionId],
   );
+  // Finished blocks are final, so their code can be highlighted before the message settles.
+  const finishedBlockContext = useMemo(
+    () => ({ isStreaming: false, cwd, imageBasePath, sourceSessionId, onOpenFile }),
+    [cwd, imageBasePath, onOpenFile, sourceSessionId],
+  );
 
   return (
     <SessionProfiler id="MarkdownBody">
-      <MarkdownRenderContext.Provider value={renderContext}>
-        <div className={["markdown-body", className].filter(Boolean).join(" ")}>
-          {lightweightPreview ? (
-            <div data-streaming-preview style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
-              {children}
-            </div>
-          ) : (
-            <ReactMarkdown
-              remarkPlugins={remarkPlugins}
-              rehypePlugins={rehypePlugins}
-              urlTransform={fileAwareUrlTransform}
-              components={markdownComponents}
-            >
-              {normalizedMarkdown}
-            </ReactMarkdown>
-          )}
-        </div>
-      </MarkdownRenderContext.Provider>
+      <div className={["markdown-body", className].filter(Boolean).join(" ")}>
+        {streamingBlocks ? (
+          <>
+            <MarkdownRenderContext.Provider value={finishedBlockContext}>
+              {streamingBlocks.slice(0, -1).map((block, index) => (
+                <MarkdownDocument key={index} source={block} definitions={blockDefinitions?.[index]} />
+              ))}
+            </MarkdownRenderContext.Provider>
+            <MarkdownRenderContext.Provider value={renderContext}>
+              <StreamingTailBlock
+                key={streamingBlocks.length - 1}
+                source={streamingBlocks[streamingBlocks.length - 1]}
+                definitions={blockDefinitions?.[streamingBlocks.length - 1] ?? ""}
+              />
+            </MarkdownRenderContext.Provider>
+          </>
+        ) : (
+          <MarkdownRenderContext.Provider value={renderContext}>
+            <MarkdownDocument source={children} />
+          </MarkdownRenderContext.Provider>
+        )}
+      </div>
     </SessionProfiler>
   );
 });
@@ -231,6 +298,7 @@ function MarkdownImage({
   );
   const [previewSrc, setPreviewSrc] = useState<string | null>(localPath ? null : typeof src === "string" ? src : null);
   const [failed, setFailed] = useState(false);
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!localPath) {
@@ -273,7 +341,7 @@ function MarkdownImage({
   }
 
   if (!previewSrc) {
-    return <span className="markdown-image-loading" aria-label={alt || "Loading image"} />;
+    return <span className="markdown-image-loading" aria-label={alt || t("replyImageLoading", "Loading image…")} />;
   }
 
   return <EnlargableImage src={previewSrc} alt={alt ?? ""} loading="lazy" referrerPolicy="no-referrer" {...props} />;
@@ -314,6 +382,7 @@ function normalizeDisplayMath(markdown: string): string {
 function MermaidBlock({ code, isStreaming }: { code: string; isStreaming?: boolean }) {
   const { isDark } = useTheme();
   const [showPreview, setShowPreview] = useState(true);
+  const { t } = useI18n();
   const [svg, setSvg] = useState<string | null>(null);
   const [renderedKey, setRenderedKey] = useState("");
   const [failedKey, setFailedKey] = useState<string | null>(null);
@@ -348,14 +417,14 @@ function MermaidBlock({ code, isStreaming }: { code: string; isStreaming?: boole
       disabled={isStreaming}
       title={
         isStreaming
-          ? "Preview available after streaming"
+          ? t("chatMermaidPreviewAfterStreaming", "Preview available after streaming")
           : showPreview
-            ? "Show Mermaid source"
-            : "Preview Mermaid diagram"
+            ? t("chatMermaidShowSource", "Show Mermaid source")
+            : t("chatMermaidShowPreview", "Preview Mermaid diagram")
       }
       className={["markdown-code-action", showPreview ? "is-active" : ""].filter(Boolean).join(" ")}
     >
-      {showPreview ? "Source" : "Preview"}
+      {showPreview ? t("chatMermaidSource", "Source") : t("chatMermaidPreview", "Preview")}
     </Button>
   );
 
@@ -365,9 +434,12 @@ function MermaidBlock({ code, isStreaming }: { code: string; isStreaming?: boole
 
   const body =
     failedKey === currentKey ? (
-      <div className="mermaid-block mermaid-block-error">Invalid Mermaid diagram</div>
+      <div className="mermaid-block mermaid-block-error">{t("chatMermaidInvalid", "Invalid Mermaid diagram")}</div>
     ) : !svg || renderedKey !== currentKey ? (
-      <div className="mermaid-block mermaid-block-loading" aria-label="Rendering Mermaid diagram" />
+      <div
+        className="mermaid-block mermaid-block-loading"
+        aria-label={t("chatMermaidRendering", "Rendering Mermaid diagram")}
+      />
     ) : (
       <div className="mermaid-block" dangerouslySetInnerHTML={{ __html: svg }} />
     );
@@ -395,6 +467,7 @@ const CodeBlock = memo(function CodeBlock({
   isStreaming?: boolean;
 }) {
   const { isDark } = useTheme();
+  const { t } = useI18n();
   const { copied, copy } = useCopyFeedback();
 
   return (
@@ -404,7 +477,7 @@ const CodeBlock = memo(function CodeBlock({
         <div className="markdown-code-actions">
           {headerAction}
           <Button onClick={() => void copy(code)} className="markdown-code-action">
-            {copied ? "copied" : "copy"}
+            {copied ? t("copied", "Copied") : t("chatCopy", "Copy")}
           </Button>
         </div>
       </div>

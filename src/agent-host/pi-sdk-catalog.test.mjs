@@ -18,10 +18,10 @@ const CONTEXT_WINDOWS = [
   ["openai", "gpt-6-luna", 272_000],
   ["openai-codex", "gpt-6-luna", 272_000],
   ["openai", "gpt-6.1-sol", 272_000],
-  ["azure", "gpt-6.1-sol", 272_000],
+  ["azure", "gpt-6.1-sol", 1_050_000],
   ["openai-codex", "gpt-6.1-sol", 500_000],
   ["openai", "gpt-6.1-terra", 272_000],
-  ["azure", "gpt-6.1-terra", 272_000],
+  ["azure", "gpt-6.1-terra", 1_050_000],
   ["openai-codex", "gpt-6.1-terra", 500_000],
   ["xai", "grok-4.7", 500_000],
 ];

@@ -1,6 +1,6 @@
 {
   "name": "@dlyzzt/pi-desktop",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "private": true,
   "description": "Pi Agent Desktop — pure Electron desktop app for the pi coding agent",
   "homepage": "https://github.com/DLYZZT/pi-desktop#readme",
@@ -70,10 +70,10 @@
     "test:windows-powershell": "node --test scripts/test-windows-powershell.mjs"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "1.5.0",
-    "@earendil-works/pi-coding-agent": "1.5.0",
-    "@earendil-works/pi-mcp": "1.5.0",
-    "@earendil-works/pi-telemetry": "1.5.0",
+    "@earendil-works/pi-ai": "1.5.2",
+    "@earendil-works/pi-coding-agent": "1.5.2",
+    "@earendil-works/pi-mcp": "1.5.2",
+    "@earendil-works/pi-telemetry": "1.5.2",
     "@larksuiteoapi/node-sdk": "^1.71.1",
     "@lobehub/icons": "^5.6.0",
     "@rc-component/qrcode": "^2.0.0",
@@ -103,11 +103,11 @@
     "yauzl": "3.4.0"
   },
   "overrides": {
-    "@earendil-works/pi-agent-core": "1.5.0",
-    "@earendil-works/pi-codemode": "1.5.0",
-    "@earendil-works/pi-schema": "1.5.0",
-    "@earendil-works/pi-telemetry": "1.5.0",
-    "@earendil-works/pi-tui": "1.5.0",
+    "@earendil-works/pi-agent-core": "1.5.2",
+    "@earendil-works/pi-codemode": "1.5.2",
+    "@earendil-works/pi-schema": "1.5.2",
+    "@earendil-works/pi-telemetry": "1.5.2",
+    "@earendil-works/pi-tui": "1.5.2",
     "@xmldom/xmldom": "0.8.15"
   },
   "devDependencies": {
