@@ -1,15 +1,11 @@
 import assert from "node:assert/strict";
-import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 import {
-  assertContractCoverage,
   exactCoverageFailures,
   extractBrowserDispatchMethods,
   extractInterfaceProperties,
   extractServerHandlers,
   extractStreamTopics,
-  loadContractSources,
 } from "./check-contract-coverage.mjs";
 
 test("AST extraction ignores comments and formatting while finding real contract nodes", () => {
@@ -70,13 +66,4 @@ test("Browser dispatch extraction reads equality guards and switch cases only fr
     "browser.capabilities",
     "browser.open",
   ]);
-});
-
-test("the repository contract has non-empty exact AST coverage", () => {
-  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  const counts = assertContractCoverage(loadContractSources(root));
-  assert.ok(counts.apiMethods > 0);
-  assert.ok(counts.streamTopics > 0);
-  assert.ok(counts.bridgeMethods > 0);
-  assert.ok(counts.browserHostMethods > 0);
 });

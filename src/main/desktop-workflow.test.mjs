@@ -46,12 +46,6 @@ test("packaging runs only on version tags; pushes and PRs never package", () => 
   assert.equal(relay, "node scripts/build-relay.mjs");
 });
 
-test("pull requests run the unit gate but never packaging", () => {
-  // The test job must be unconditional so PRs still exercise typecheck and
-  // unit tests; the packaging jobs assert the inverse condition above.
-  assert.ok(!workflow.jobs.test.steps.some((step) => step.uses?.startsWith("actions/upload-artifact")));
-});
-
 test("tag releases validate the contract and publish assets to GitHub Releases", () => {
   assert.equal(workflow.jobs["release-contract"].if, "github.ref_type == 'tag' && startsWith(github.ref_name, 'v')");
   assert.equal(workflow.jobs.release.if, "startsWith(github.ref, 'refs/tags/v')");

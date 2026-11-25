@@ -42,6 +42,7 @@
     "check:desktop-security": "node scripts/check-desktop-security.mjs",
     "check:i18n": "node scripts/check-renderer-i18n.mjs",
     "check:browser-i18n": "node scripts/check-renderer-i18n.mjs",
+    "check:renderer-theme": "node scripts/check-renderer-theme.mjs",
     "check:production-artifacts": "node scripts/check-production-artifacts.mjs",
     "check:dependencies": "node scripts/check-dependency-contract.mjs",
     "check:architecture": "node scripts/check-architecture.mjs",
