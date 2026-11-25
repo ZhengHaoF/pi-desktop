@@ -1,6 +1,6 @@
 import { importTestBundle } from "#test-bundle";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -11,8 +11,6 @@ const {
   splitChannelText,
   evaluateInboundPolicy,
   parseChannelCommand,
-  redactChannelValue,
-  safeChannelError,
 } = await importTestBundle("src/agent-host/channels/channel-core", {
   packages: "external",
   stdin: {
@@ -66,34 +64,6 @@ function envelope(overrides = {}) {
   };
 }
 
-test("channel config persists normalized accounts and bindings", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "pi-channels-config-"));
-  const file = path.join(dir, "channels.json");
-  const store = new ChannelConfigStore(file);
-  const saved = store.upsertAccount(account({ allowFrom: [" user ", "user"] }));
-  assert.deepEqual(saved.allowFrom, ["user"]);
-  assert.equal(saved.commandsEnabled, false);
-  const binding = store.upsertBinding({
-    id: "binding",
-    channel: "weixin",
-    accountId: saved.id,
-    peerKind: "dm",
-    peerId: "user",
-    cwd: path.join(dir, "workspace"),
-    toolNames: [],
-    createdAt: saved.createdAt,
-    lastUsedAt: saved.createdAt,
-  });
-  assert.equal(binding.peerId, "user");
-  store.upsertAccount({ ...saved, commandsEnabled: true });
-
-  const reopened = new ChannelConfigStore(file);
-  assert.equal(reopened.listAccounts().length, 1);
-  assert.equal(reopened.listAccounts()[0].commandsEnabled, true);
-  assert.equal(reopened.listBindings()[0].id, "binding");
-  assert.equal(JSON.parse(readFileSync(file, "utf8")).version, 1);
-});
-
 test("channel config preserves Feishu App ID and normalizes the Feishu/Lark domain", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "pi-feishu-config-"));
   const file = path.join(dir, "channels.json");
@@ -129,31 +99,6 @@ test("channel command parser recognizes only the additive built-in command set",
   assert.equal(parseChannelCommand("/unknown"), null);
   assert.equal(parseChannelCommand("please /help"), null);
   assert.equal(parseChannelCommand("/help/extra"), null);
-});
-
-test("versionless config migrates and corrupt config is quarantined", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "pi-channels-migrate-"));
-  const file = path.join(dir, "channels.json");
-  writeFileSync(
-    file,
-    JSON.stringify({
-      accounts: [account({ id: "tg-one", channel: "telegram", name: "", groupIds: undefined })],
-      bindings: [],
-    }),
-  );
-  const migrated = new ChannelConfigStore(file).listAccounts();
-  assert.equal(migrated.length, 1);
-  assert.equal(migrated[0].channel, "telegram");
-  assert.equal(migrated[0].name, "Telegram");
-  assert.deepEqual(migrated[0].groupIds, []);
-  assert.equal(JSON.parse(readFileSync(file, "utf8")).version, 1);
-
-  writeFileSync(file, "{not-json");
-  assert.equal(new ChannelConfigStore(file).listAccounts().length, 0);
-  assert.equal(
-    readdirSync(dir).some((name) => name.startsWith("channels.json.corrupt-")),
-    true,
-  );
 });
 
 test("state checkpoints cursor, context, dedupe, pairing, and redacted activity", () => {
@@ -264,42 +209,6 @@ test("lane scheduler bounds concurrency across independent routes", async () => 
   release();
   await Promise.all(tasks);
   assert.equal(peak, 2);
-});
-
-test("channel redaction removes structured and inline credentials", () => {
-  assert.deepEqual(redactChannelValue({ token: "abc", nested: { contextToken: "def", ok: 1 } }), {
-    token: "[REDACTED]",
-    nested: { contextToken: "[REDACTED]", ok: 1 },
-  });
-  assert.equal(safeChannelError(new Error("Authorization: Bearer abcdef")), "Authorization: Bearer [REDACTED]");
-  assert.equal(
-    safeChannelError(new Error("request failed: https://api.telegram.org/bot123456:secret/getMe")),
-    "request failed: https://api.telegram.org/bot[REDACTED]/getMe",
-  );
-  assert.equal(
-    safeChannelError(new Error('request failed?appSecret=abc123 body={"app_secret":"def456"}')),
-    'request failed?appSecret=[REDACTED] body={"app_secret":"[REDACTED]"}',
-  );
-  assert.deepEqual(
-    redactChannelValue({
-      device_code: "device-secret",
-      verificationUri: "https://accounts.feishu.cn/private",
-      qrContent: "https://accounts.feishu.cn/qr-private",
-    }),
-    { device_code: "[REDACTED]", verificationUri: "[REDACTED]", qrContent: "[REDACTED]" },
-  );
-  assert.equal(
-    safeChannelError(
-      new Error(
-        'request?device_code=device-secret&user_code=user-secret body={"verification_uri":"https://accounts.feishu.cn/private"}',
-      ),
-    ),
-    'request?device_code=[REDACTED]&user_code=[REDACTED] body={"verification_uri":"[REDACTED]"}',
-  );
-  assert.equal(
-    safeChannelError(new Error('{"qrContent":"https://accounts.feishu.cn/private"}')),
-    '{"qrContent":"[REDACTED]"}',
-  );
 });
 
 test("outbound text splitting preserves Unicode and readable boundaries", () => {

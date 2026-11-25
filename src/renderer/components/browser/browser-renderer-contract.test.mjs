@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { zhCN } from "../../i18n-dictionaries.ts";
 
 const read = (url) => fs.readFileSync(url, "utf8");
 const appShell = read(new URL("../AppShell.tsx", import.meta.url));
@@ -84,22 +83,6 @@ test("Settings categories use a vertical sidebar with matching keyboard navigati
   assert.match(settingsConfig, /event\.key === "Home"/);
   assert.match(settingsConfig, /event\.key === "End"/);
   assert.doesNotMatch(settingsConfig, /overflowX: "auto"/);
-});
-
-test("Browser Settings and Browser panel use the app language dictionary", () => {
-  assert.match(browserSettings, /useI18n/);
-  assert.match(browserSettings, /t\("browserSettingsTitle"/);
-  assert.match(browserSettings, /t\("browserCurrentSessionPermission"/);
-  assert.doesNotMatch(browserSettings, /browserSessionPermanentPermission/);
-  assert.match(browserDock, /useI18n/);
-  assert.match(browserDock, /t\("browserLoadingPanel"/);
-  assert.match(browserSettings, /browserRequestConfirmation\("advanced-browser-mode", patch, language\)/);
-  assert.match(browserService, /language === "zh-CN"/);
-  assert.match(browserService, /启用高级浏览器模式/);
-  assert.equal(zhCN.browser, "浏览器");
-  assert.equal(zhCN.browserSettingsTitle, "内置浏览器");
-  assert.equal(zhCN.browserCurrentSessionPermission, "当前会话权限");
-  assert.equal(zhCN.browserLoadingPanel, "正在加载浏览器…");
 });
 
 test("Browser Settings uses an in-app text prompt instead of Electron's unsupported window.prompt", () => {

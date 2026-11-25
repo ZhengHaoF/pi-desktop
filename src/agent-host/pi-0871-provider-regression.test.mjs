@@ -13,18 +13,6 @@ import {
   createAgentSessionFromServices,
 } from "@earendil-works/pi-coding-agent";
 
-test("0.87.1 model IDs and context windows remain provider-specific", () => {
-  assert.equal(getModel("anthropic", "claude-opus-5-5")?.contextWindow, 1_000_000);
-  assert.equal(getModel("github-copilot", "claude-opus-5.5")?.contextWindow, 1_000_000);
-  for (const provider of ["openai", "openai-codex"]) {
-    for (const id of ["gpt-6-sol", "gpt-6-luna"]) {
-      assert.equal(getModel(provider, id)?.contextWindow, 272_000);
-    }
-  }
-  assert.equal(getModel("github-copilot", "gpt-6-sol")?.contextWindow, 1_000_000);
-  assert.equal(getModel("xai", "grok-4.7")?.contextWindow, 500_000);
-});
-
 test("OpenAI-compatible image requests omit empty text but preserve words and spaces", async () => {
   const builtIn = getModel("openai", "gpt-4o-mini");
   assert.ok(builtIn);

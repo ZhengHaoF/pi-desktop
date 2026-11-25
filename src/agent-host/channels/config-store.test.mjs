@@ -51,8 +51,32 @@ test("channel config persists normalized accounts and cascades account deletion"
   assert.equal(new ChannelConfigStore(file).listBindings()[0].id, "binding");
   if (process.platform !== "win32") assert.equal(fs.statSync(file).mode & 0o777, 0o600);
 
+  // A command toggle persists across a reopen, and the file stays at version 1.
+  store.upsertAccount({ ...saved, commandsEnabled: true });
+  assert.equal(new ChannelConfigStore(file).listAccounts()[0].commandsEnabled, true);
+  assert.equal(JSON.parse(fs.readFileSync(file, "utf8")).version, 1);
+
   store.deleteAccount(saved.id);
   assert.deepEqual(new ChannelConfigStore(file).listBindings(), []);
+});
+
+test("versionless config migrates to the current version in place", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "pi-channel-config-migrate-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const file = path.join(directory, "channels.json");
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      accounts: [account({ id: "tg-one", channel: "telegram", name: "", groupIds: undefined })],
+      bindings: [],
+    }),
+  );
+  const migrated = new ChannelConfigStore(file).listAccounts();
+  assert.equal(migrated.length, 1);
+  assert.equal(migrated[0].channel, "telegram");
+  assert.equal(migrated[0].name, "Telegram");
+  assert.deepEqual(migrated[0].groupIds, []);
+  assert.equal(JSON.parse(fs.readFileSync(file, "utf8")).version, 1);
 });
 
 test("corrupt configs are quarantined while unsupported versions fail closed", (t) => {

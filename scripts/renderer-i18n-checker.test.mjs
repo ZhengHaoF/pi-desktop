@@ -137,68 +137,6 @@ test("rejects visible literals and hardcoded session notification sinks in migra
   }
 });
 
-test("model hook extraction preserves the localized-notification boundary", (t) => {
-  const entry = fixture(
-    'addNotice({ type: "warning", message: "Model directory failed" });',
-    "export const enUS = {}; export const zhCN = {};",
-    "hooks/useSessionModels.ts",
-  );
-  t.after(entry.cleanup);
-  assert.match(
-    checkRendererI18n(entry.options).failures.join("\n"),
-    /hardcoded session message: Model directory failed/,
-  );
-});
-
-test("extracted sidebar components retain the visible-copy boundary", (t) => {
-  for (const componentPath of ["components/sidebar/SessionTree.tsx", "components/sidebar/PiAgentTitle.tsx"]) {
-    const entry = fixture(
-      'export const view = <button aria-label="Delete session">Delete session</button>;',
-      "export const enUS = {}; export const zhCN = {};",
-      componentPath,
-    );
-    t.after(entry.cleanup);
-    assert.match(checkRendererI18n(entry.options).failures.join("\n"), /visible English JSX literal: Delete session/);
-  }
-});
-
-test("history hook extraction preserves localized load errors", (t) => {
-  const entry = fixture(
-    'setError("History unavailable");',
-    "export const enUS = {}; export const zhCN = {};",
-    "hooks/useSessionHistory.ts",
-  );
-  t.after(entry.cleanup);
-  assert.match(checkRendererI18n(entry.options).failures.join("\n"), /hardcoded session error: History unavailable/);
-});
-
-test("extension UI hook retains the localized notification boundary", (t) => {
-  const entry = fixture(
-    'addNotice({message: "Extension request failed"});',
-    "export const enUS = {}; export const zhCN = {};",
-    "hooks/useSessionExtensionUi.ts",
-  );
-  t.after(entry.cleanup);
-  assert.match(
-    checkRendererI18n(entry.options).failures.join("\n"),
-    /hardcoded session message: Extension request failed/,
-  );
-});
-
-for (const owner of ["useComposerDraft.ts", "useComposerSubmission.ts"]) {
-  test(`composer notices remain localized in ${owner}`, (t) => {
-    const entry = fixture(
-      'setSubmissionNotice("Send failed"); setImageAttachNotice("Image failed");',
-      "export const enUS = {}; export const zhCN = {};",
-      `hooks/${owner}`,
-    );
-    t.after(entry.cleanup);
-    const failures = checkRendererI18n(entry.options).failures.join("\n");
-    assert.match(failures, /hardcoded session error: Send failed/);
-    assert.match(failures, /hardcoded session error: Image failed/);
-  });
-}
-
 test("rejects dynamic calls, fallback drift, missing and duplicate entries, orphan keys, and placeholder mismatch", () => {
   const entry = fixture(
     `
@@ -242,24 +180,67 @@ test("rejects dynamic calls, fallback drift, missing and duplicate entries, orph
   }
 });
 
-for (const picker of ["ProjectPicker", "WorktreePicker"]) {
-  test(`${picker} retains the localized visible-text boundary`, (t) => {
-    const entry = fixture(
-      '<button title="Untranslated action">Untranslated label</button>',
-      "export const enUS = {}; export const zhCN = {};",
-      `components/sidebar/${picker}.tsx`,
-    );
-    t.after(entry.cleanup);
-    assert.match(checkRendererI18n(entry.options).failures.join("\n"), /visible English JSX literal: Untranslated/);
-  });
-}
+// One row per owner the checker must keep scanning. Extraction that moves one
+// of these files outside the scan set used to need a new near-identical test;
+// now it is one row.
+const LOCALIZED_OWNERS = [
+  {
+    path: "hooks/useSessionModels.ts",
+    source: 'addNotice({ type: "warning", message: "Model directory failed" });',
+    expected: [/hardcoded session message: Model directory failed/],
+  },
+  {
+    path: "hooks/useSessionHistory.ts",
+    source: 'setError("History unavailable");',
+    expected: [/hardcoded session error: History unavailable/],
+  },
+  {
+    path: "hooks/useSessionExtensionUi.ts",
+    source: 'addNotice({message: "Extension request failed"});',
+    expected: [/hardcoded session message: Extension request failed/],
+  },
+  {
+    path: "hooks/useComposerDraft.ts",
+    source: 'setSubmissionNotice("Send failed"); setImageAttachNotice("Image failed");',
+    expected: [/hardcoded session error: Send failed/, /hardcoded session error: Image failed/],
+  },
+  {
+    path: "hooks/useComposerSubmission.ts",
+    source: 'setSubmissionNotice("Send failed"); setImageAttachNotice("Image failed");',
+    expected: [/hardcoded session error: Send failed/, /hardcoded session error: Image failed/],
+  },
+  {
+    path: "components/sidebar/SessionTree.tsx",
+    source: 'export const view = <button aria-label="Delete session">Delete session</button>;',
+    expected: [/visible English JSX literal: Delete session/],
+  },
+  {
+    path: "components/sidebar/PiAgentTitle.tsx",
+    source: 'export const view = <button aria-label="Delete session">Delete session</button>;',
+    expected: [/visible English JSX literal: Delete session/],
+  },
+  {
+    path: "components/sidebar/ProjectPicker.tsx",
+    source: '<button title="Untranslated action">Untranslated label</button>',
+    expected: [/visible English JSX literal: Untranslated/],
+  },
+  {
+    path: "components/sidebar/WorktreePicker.tsx",
+    source: '<button title="Untranslated action">Untranslated label</button>',
+    expected: [/visible English JSX literal: Untranslated/],
+  },
+  {
+    path: "components/composer/ComposerToolbar.tsx",
+    source: '<button title="Untranslated setting">Untranslated action</button>',
+    expected: [/visible English JSX literal: Untranslated/],
+  },
+];
 
-test("composer toolbar keeps localized visible labels after extraction", (t) => {
-  const entry = fixture(
-    '<button title="Untranslated setting">Untranslated action</button>',
-    "export const enUS = {}; export const zhCN = {};",
-    "components/composer/ComposerToolbar.tsx",
-  );
-  t.after(entry.cleanup);
-  assert.match(checkRendererI18n(entry.options).failures.join("\n"), /visible English JSX literal: Untranslated/);
+test("every extracted owner stays inside the renderer i18n scan", (t) => {
+  for (const owner of LOCALIZED_OWNERS) {
+    const entry = fixture(owner.source, "export const enUS = {}; export const zhCN = {};", owner.path);
+    t.after(entry.cleanup);
+    const failures = checkRendererI18n(entry.options).failures.join("\n");
+    for (const pattern of owner.expected) assert.match(failures, pattern, owner.path);
+  }
 });

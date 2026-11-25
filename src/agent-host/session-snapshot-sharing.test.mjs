@@ -5,35 +5,38 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { importTestBundle } from "#test-bundle";
 
-const { SessionIndex, getSessionContentSnapshot, reads } = await importTestBundle("session-snapshot-sharing", {
-  packages: "external",
-  stdin: {
-    contents:
-      'export { SessionIndex } from "./session-index.ts"; export { getSessionContentSnapshot } from "./session-content-cache.ts"; export { reads } from "./session-readonly.ts";',
-    resolveDir: import.meta.dirname,
-    loader: "ts",
-  },
-  plugins: [
-    {
-      name: "count-snapshot-parses",
-      setup(build) {
-        build.onResolve({ filter: /^\.\/session-readonly\.ts$/ }, () => ({
-          path: "reader",
-          namespace: "count-reader",
-        }));
-        build.onLoad({ filter: /.*/, namespace: "count-reader" }, () => ({
-          loader: "js",
-          resolveDir: import.meta.dirname,
-          contents: `
+const { SessionIndex, getSessionContentSnapshot, invalidateSessionContent, reads } = await importTestBundle(
+  "session-snapshot-sharing",
+  {
+    packages: "external",
+    stdin: {
+      contents:
+        'export { SessionIndex } from "./session-index.ts"; export { getSessionContentSnapshot, invalidateSessionContent } from "./session-content-cache.ts"; export { reads } from "./session-readonly.ts";',
+      resolveDir: import.meta.dirname,
+      loader: "ts",
+    },
+    plugins: [
+      {
+        name: "count-snapshot-parses",
+        setup(build) {
+          build.onResolve({ filter: /^\.\/session-readonly\.ts$/ }, () => ({
+            path: "reader",
+            namespace: "count-reader",
+          }));
+          build.onLoad({ filter: /.*/, namespace: "count-reader" }, () => ({
+            loader: "js",
+            resolveDir: import.meta.dirname,
+            contents: `
       import { readSessionSnapshot as read } from ${JSON.stringify(path.join(import.meta.dirname, "session-readonly.ts"))};
       export const reads = [];
       export function readSessionSnapshot(file) { reads.push(file); return read(file); }
     `,
-        }));
+          }));
+        },
       },
-    },
-  ],
-});
+    ],
+  },
+);
 
 test("index refresh and history read share one bounded snapshot per file version", async (t) => {
   const root = mkdtempSync(path.join(tmpdir(), "pi-shared-snapshot-"));
@@ -70,5 +73,12 @@ test("index refresh and history read share one bounded snapshot per file version
   assert.equal(reads.length, 2);
   assert.notEqual(latest, initial);
   assert.equal(latest.entries.length, 2);
+  assert.equal(readFileSync(file, "utf8"), source);
+  // An explicit invalidation drops the cached manager even when the file
+  // version is unchanged; the next read repopulates it.
+  invalidateSessionContent(file);
+  const afterInvalidate = getSessionContentSnapshot(file);
+  assert.notEqual(afterInvalidate, latest);
+  assert.equal(afterInvalidate.entries.length, 2);
   assert.equal(readFileSync(file, "utf8"), source);
 });

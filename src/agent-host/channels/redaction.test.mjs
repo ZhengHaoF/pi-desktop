@@ -47,3 +47,26 @@ test("invalid model configuration gives channels a corrective message without in
     "MODEL_CONFIG_INVALID: remote error",
   );
 });
+
+test("Feishu device-code pairing secrets are redacted in structured and inline shapes", () => {
+  assert.deepEqual(
+    redactChannelValue({
+      device_code: "device-secret",
+      verificationUri: "https://accounts.feishu.cn/private",
+      qrContent: "https://accounts.feishu.cn/qr-private",
+    }),
+    { device_code: "[REDACTED]", verificationUri: "[REDACTED]", qrContent: "[REDACTED]" },
+  );
+  assert.equal(
+    safeChannelError(
+      new Error(
+        'request?device_code=device-secret&user_code=user-secret body={"verification_uri":"https://accounts.feishu.cn/private"}',
+      ),
+    ),
+    'request?device_code=[REDACTED]&user_code=[REDACTED] body={"verification_uri":"[REDACTED]"}',
+  );
+  assert.equal(
+    safeChannelError(new Error('{"qrContent":"https://accounts.feishu.cn/private"}')),
+    '{"qrContent":"[REDACTED]"}',
+  );
+});

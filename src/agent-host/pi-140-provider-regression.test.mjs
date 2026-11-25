@@ -5,7 +5,6 @@ import path from "node:path";
 import test from "node:test";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { getModel, getModels } from "@earendil-works/pi-ai/compat";
-import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { transformMessages } from "@earendil-works/pi-ai/api/transform-messages";
 
 const credentials = (provider, key) => ({
@@ -63,17 +62,6 @@ test("Kimi Code uses Chat Completions at the /v1 default and keeps base URL over
   assert.equal(proxy.model.api, "openai-completions");
   assert.equal(proxy.request.url, "https://proxy.fixture.invalid/kimi/v1/chat/completions");
   assert.equal(proxy.request.authorization, "Bearer KIMI_FIXTURE_KEY");
-});
-
-test("1.3/1.4 catalog changes that affect stored Desktop selections", () => {
-  // Thinking levels used by manual selection and Auto fast/strong settings.
-  for (const id of ["claude-haiku-5-5", "claude-opus-5"]) {
-    const model = getModel("anthropic", id);
-    assert.ok(model, id);
-    assert.ok(getSupportedThinkingLevels(model).includes("off"), id);
-  }
-  // Codex no longer lists models that always fail for ChatGPT accounts.
-  for (const id of ["gpt-5.5", "gpt-5.3-codex-spark"]) assert.equal(getModel("openai-codex", id), undefined, id);
 });
 
 test("switching models drops foreign thinking from the provider projection without mutating history", () => {

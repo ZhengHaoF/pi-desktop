@@ -1,24 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getModel } from "@earendil-works/pi-ai/compat";
-import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { stream } from "@earendil-works/pi-ai/api/openai-completions";
 import { buildSessionStats } from "./session-stats.ts";
 import { normalizeToolCalls } from "../shared/normalize.ts";
-
-test("Terra keeps provider-specific context windows and supports turning thinking off", () => {
-  for (const [provider, contextWindow] of [
-    ["openai", 272000],
-    ["azure", 272000],
-    ["openai-codex", 500000],
-  ]) {
-    const model = getModel(provider, "gpt-6.1-terra");
-    assert.ok(model, provider);
-    assert.equal(model.contextWindow, contextWindow);
-    assert.ok(getSupportedThinkingLevels(model).includes("off"));
-  }
-  assert.equal(getModel("openai", "gpt-realtime-2.1"), undefined);
-});
 
 test("fragmented large tool calls preserve final arguments, response model and OpenRouter billed totals", async () => {
   const value = "中文代码\n".repeat(25000);

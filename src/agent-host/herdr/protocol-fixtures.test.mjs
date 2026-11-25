@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import { importTestBundle } from "#test-bundle";
+
+const { HERDR_V20_METHODS } = await importTestBundle("herdr-protocol-fixtures", {
+  packages: "external",
+  absWorkingDir: path.resolve(import.meta.dirname, "..", "..", ".."),
+  entryPoints: ["src/agent-host/herdr/protocol-v20.ts"],
+});
 
 const fixtureRoot = path.join(import.meta.dirname, "fixtures");
 const readNdjson = (name) =>
@@ -13,35 +20,8 @@ const readNdjson = (name) =>
 test("protocol fixtures cover every reviewed semantic method and event family", () => {
   const operations = readNdjson("operations-v20.ndjson");
   const methods = new Set(operations.flatMap((entry) => (typeof entry.method === "string" ? [entry.method] : [])));
-  assert.deepEqual(
-    methods,
-    new Set([
-      "ping",
-      "session.snapshot",
-      "workspace.create",
-      "workspace.focus",
-      "workspace.rename",
-      "workspace.close",
-      "tab.create",
-      "tab.focus",
-      "tab.rename",
-      "pane.split",
-      "pane.read",
-      "pane.process_info",
-      "pane.wait_for_output",
-      "pane.focus",
-      "pane.rename",
-      "pane.close",
-      "agent.start",
-      "agent.prompt",
-      "agent.send_keys",
-      "agent.wait",
-      "agent.explain",
-      "agent.focus",
-      "agent.rename",
-      "events.subscribe",
-    ]),
-  );
+  // Derived from the protocol table so a new method cannot land on one side only.
+  assert.deepEqual(methods, new Set(Object.values(HERDR_V20_METHODS)));
   const eventTypes = new Set(readNdjson("events-v20.ndjson").map((entry) => entry.event.type));
   for (const type of ["pane.updated", "pane.agent_detected", "tab.renamed", "workspace.updated", "layout.updated"]) {
     assert.equal(eventTypes.has(type), true, type);

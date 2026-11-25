@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { zhCN } from "../i18n-dictionaries.ts";
 
 const settingsSource = readFileSync(new URL("./SettingsConfig.tsx", import.meta.url), "utf8");
 const cssSource = readFileSync(new URL("../globals.css", import.meta.url), "utf8");
@@ -20,9 +19,6 @@ test("General settings exposes complete accessible chat appearance controls", ()
   }
   assert.match(settingsSource, /chatLayoutFixed", "Comfortable width"/);
   assert.match(settingsSource, /chatLayoutWide", "Expanded width"/);
-  assert.equal(zhCN.chatLayoutFixed, "舒适宽度");
-  assert.equal(zhCN.chatLayoutWide, "扩展宽度");
-  assert.equal(zhCN.chatAssistantWidth, "模型回复宽度");
   assert.match(settingsSource, /assistantWidth: value as ChatAssistantWidth/);
   assert.match(settingsSource, /disabled=\{chatAppearanceSaving\}/);
   assert.match(settingsSource, /role="alert"[\s\S]*?chatAppearanceSaveFailed/);

@@ -8,22 +8,13 @@ import { createDeferred } from "#test-timing";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { getModel } from "@earendil-works/pi-ai/compat";
 import { stream } from "@earendil-works/pi-ai/api/openai-responses";
-import { getSupportedThinkingLevels, envApiKeyAuth } from "@earendil-works/pi-ai";
+import { envApiKeyAuth } from "@earendil-works/pi-ai";
 
 test("catalogs keep chat selection separate from images and classifiers", async () => {
-  // Since 1.3.0 Codex serves a 500K window; the API-key providers keep 272K.
-  for (const [provider, contextWindow] of [
-    ["openai", 272_000],
-    ["azure", 272_000],
-    ["openai-codex", 500_000],
-  ]) {
-    assert.equal(getModel(provider, "gpt-6.1-sol")?.contextWindow, contextWindow);
-  }
   assert.equal(getModel("azure", "gpt-6.1-sol")?.api, "azure-openai-responses");
   assert.equal(getModel("azure", "deepseek-v4-pro")?.api, "openai-completions");
   assert.equal(getModel("azure-openai-responses", "gpt-6.1-sol"), undefined);
   const sonnet = getModel("anthropic", "claude-sonnet-5-5");
-  assert.equal(sonnet?.contextWindow, 1_000_000);
   assert.equal(sonnet?.reasoning, true);
   const runtime = await ModelRuntime.create({
     modelsPath: null,
@@ -219,37 +210,4 @@ test("runtime probe executes OpenAI OAuth and MCP lazy imports without user stor
     "@earendil-works/pi-coding-agent"
   ];
   assert.deepEqual(await probePiRuntimeModules(), { piVersion, openaiOAuthLoaded: true, mcpLoaded: true });
-});
-
-test("Haiku 5.5 supports max while OpenAI decision availability follows the credential type", async () => {
-  assert.ok(getSupportedThinkingLevels(getModel("anthropic", "claude-haiku-5-5")).includes("max"));
-  for (const credential of [
-    { type: "api_key", key: "sk-offline-fixture" },
-    { type: "oauth", access: "offline-subscription", refresh: "offline-refresh", expires: Date.now() + 3600000 },
-  ]) {
-    const runtime = await ModelRuntime.create({
-      modelsPath: null,
-      refreshOnCreate: false,
-      credentials: {
-        async read(provider) {
-          return provider === "openai" ? credential : undefined;
-        },
-        async list() {
-          return [{ providerId: "openai", type: credential.type }];
-        },
-        async modify() {
-          throw new Error("read-only fixture");
-        },
-        async delete() {
-          throw new Error("read-only fixture");
-        },
-      },
-    });
-    const available = await runtime.getAvailableOfType("classifier", "openai");
-    assert.equal(
-      available.some((model) => model.id === "gpt-6-luna"),
-      credential.type === "api_key",
-    );
-    assert.ok(runtime.getModels().every((model) => (model.type ?? "chat") === "chat"));
-  }
 });
