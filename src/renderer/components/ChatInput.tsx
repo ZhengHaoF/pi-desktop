@@ -1163,6 +1163,7 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                               width: "100%",
                               display: "flex",
                               alignItems: "center",
+                              justifyContent: "flex-start",
                               gap: 8,
                               padding: "6px 8px",
                               border: "none",

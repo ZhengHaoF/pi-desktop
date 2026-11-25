@@ -21,7 +21,11 @@ const variantClass: Record<ButtonVariant, string> = {
 const mdStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
-  justifyContent: "center",
+  // No default horizontal alignment: a content-sized button has no free space
+  // to distribute, and a stretched one (width 100%, flex 1) is almost always a
+  // list row or tab that wants its label at the start. Callers that really
+  // center a wide label (CTAs, empty-state actions) set justifyContent
+  // themselves.
   gap: 6,
   minHeight: 32,
   padding: "5px 12px",
