@@ -401,6 +401,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const {
     isAwayFromBottom,
     reattachAutoFollow,
+    reattachAutoFollowAfterCommit,
     beginLocalTurn,
     beginExternalTurn,
     endExternalTurn,
@@ -1035,6 +1036,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (!ownsView()) return;
       dispatchTurn({ type: "compaction-result", result: readCompactResult(result, "manual") });
       await loadSession(sid, true, true);
+      // Compaction replaces the tail the reader was looking at: land on the
+      // rewritten end even when they had scrolled away from it.
+      if (ownsView()) reattachAutoFollowAfterCommit();
     } catch (e) {
       if (!ownsView()) return;
       dispatchTurn({ type: "compaction-error", error: e instanceof Error ? e.message : String(e) });
@@ -1042,7 +1046,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     } finally {
       if (ownsView()) dispatchTurn({ type: "compaction-state", isCompacting: false });
     }
-  }, [captureCommandView, isCompacting, loadSession, runtimeGate]);
+  }, [captureCommandView, isCompacting, loadSession, reattachAutoFollowAfterCommit, runtimeGate]);
 
   const handleBuiltinSlashCommand = useCallback(
     async (text: string): Promise<BuiltinSlashCommandResult> => {
@@ -1083,7 +1087,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
             });
             if (!ownsView()) return { handled: true };
             dispatchTurn({ type: "compaction-result", result: readCompactResult(result, "manual") });
-            if (await loadSession(sid, true, true)) promoteNewSession();
+            const reloaded = await loadSession(sid, true, true);
+            if (reloaded) promoteNewSession();
+            // Same transcript rewrite as the toolbar action: land on the end.
+            if (ownsView()) reattachAutoFollowAfterCommit();
             return complete({ handled: true, message: t("contextCompacted", "Compacted context") });
           }
 
@@ -1161,6 +1168,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       loadSlashCommands,
       loadTools,
       promoteNewSession,
+      reattachAutoFollowAfterCommit,
       runtimeGate,
       onSessionStatsPanelOpen,
       t,

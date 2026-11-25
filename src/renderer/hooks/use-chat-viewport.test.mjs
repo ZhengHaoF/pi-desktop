@@ -389,3 +389,21 @@ test("an explicitly attached follow preference survives a view remount", async (
   await next.flush();
   assert.equal(next.calls.filter((call) => call.target === "end").length, 2);
 });
+
+test("compaction snaps the rewritten transcript end even after a scroll away", async (t) => {
+  const fixture = await mount(t);
+  fixture.container.scrollTop = 100;
+  fixture.current.reattachAutoFollowAfterCommit();
+  assert.equal(fixture.calls.filter((call) => call.target === "end").length, 1, "snaps when the reload resolves");
+  await fixture.flush();
+  assert.equal(
+    fixture.calls.filter((call) => call.target === "end").length,
+    2,
+    "snaps again once the reloaded rows are laid out",
+  );
+  // Compaction re-attaches follow, so the next run keeps tracking the live tail.
+  fixture.calls.length = 0;
+  await fixture.update({ agentRunning: true, streamState: stream("one") });
+  await fixture.flush();
+  assert.ok(fixture.calls.some((call) => call.target === "live"));
+});

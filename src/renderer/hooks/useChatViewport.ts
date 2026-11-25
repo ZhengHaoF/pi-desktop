@@ -215,6 +215,15 @@ export function useChatViewport({
     scrollToBottom("auto");
   }, [engageAutoFollow, scrollToBottom]);
 
+  // Compaction rewrites the transcript in place, so the rows behind the reader
+  // are gone: land on the rewritten end even after an explicit scroll away, and
+  // keep following from there. The reloaded rows commit a frame later, so snap
+  // again once they are laid out.
+  const reattachAutoFollowAfterCommit = useCallback(() => {
+    reattachAutoFollow();
+    scheduleRestore(reattachAutoFollow);
+  }, [reattachAutoFollow, scheduleRestore]);
+
   const disengageAutoFollowForExplicitUpwardGesture = useCallback(() => {
     if (!activeRef.current) return;
     completionScrollAllowedRef.current = false;
@@ -447,6 +456,7 @@ export function useChatViewport({
   return {
     isAwayFromBottom,
     reattachAutoFollow,
+    reattachAutoFollowAfterCommit,
     capturePrependAnchor,
     beginLocalTurn,
     beginExternalTurn,
