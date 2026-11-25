@@ -68,3 +68,15 @@ test("chat text uses the shared scale while glyph-only icons remain fixed", () =
   assert.deepEqual(toolbarSource.match(/fontSize:\s*[0-9]+(?:\.[0-9]+)?/g) ?? [], []);
   assert.deepEqual(messageViewSource.match(/fontSize:\s*[0-9]+(?:\.[0-9]+)?/g) ?? [], ["fontSize: 10"]);
 });
+
+test("the composer dock paints its separation shadow without a compositing layer", () => {
+  // A `filter` on the dock promoted the whole row to a composited layer;
+  // re-rasterising it while the compaction button changed width left the
+  // previous frame's toolbar painted below the row. The shadow belongs on the
+  // card so the dock stays in the normal paint path.
+  assert.doesNotMatch(cssSource, /\.chat-input-transition-dock[^{]*\{[^}]*filter:/);
+  assert.match(
+    cssSource,
+    /\.chat-input-transition-dock\[data-position="conversation"\]\s+\.chat-composer-shell\s*\{[^}]*box-shadow:/,
+  );
+});

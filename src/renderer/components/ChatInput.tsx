@@ -1209,7 +1209,6 @@ const ChatInputComponent = forwardRef<ChatInputHandle, Props>(function ChatInput
                 border: `1px solid ${isStreaming && (onSteer || onFollowUp) ? "var(--warning-border)" : "var(--border)"}`,
                 borderRadius: 14,
                 padding: "10px 10px 10px 12px",
-                boxShadow: "0 8px 24px color-mix(in srgb, #000 8%, transparent)",
                 transition: "border-color 0.15s, background 0.15s, box-shadow 0.15s",
               } as React.CSSProperties
             }

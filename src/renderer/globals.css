@@ -1016,6 +1016,10 @@ body {
   pointer-events: auto !important;
 }
 
+.chat-composer-shell {
+  box-shadow: 0 8px 24px color-mix(in srgb, #000 8%, transparent);
+}
+
 .chat-composer-shell:focus-within {
   border-color: color-mix(in srgb, var(--accent) 58%, var(--border)) !important;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent) !important;
@@ -1037,13 +1041,17 @@ body {
 }
 
 .chat-input-transition-dock {
-  transition:
-    filter 280ms ease,
-    opacity 220ms ease;
+  transition: opacity 220ms ease;
 }
 
-.chat-input-transition-dock[data-position="conversation"] {
-  filter: drop-shadow(0 -2px 8px color-mix(in srgb, #000 3%, transparent));
+/* The composer's separation shadow is painted onto the card rather than as a
+   `filter` on the dock: a filter promotes the whole dock to a composited
+   layer, and re-rasterising that layer while the toolbar's compaction button
+   changed width left the previous frame's toolbar painted below the row. */
+.chat-input-transition-dock[data-position="conversation"] .chat-composer-shell {
+  box-shadow:
+    0 -2px 8px color-mix(in srgb, #000 3%, transparent),
+    0 8px 24px color-mix(in srgb, #000 8%, transparent);
 }
 
 .chat-conversation-enter {
