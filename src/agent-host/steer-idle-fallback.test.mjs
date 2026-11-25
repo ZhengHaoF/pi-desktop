@@ -1,3 +1,8 @@
+// Deliberately bypasses the AgentSessionWrapper constructor: these assertions
+// are about the command-dispatch layer (idle steer/follow-up fallback, goal
+// accept/stop/reject/extend validation), which the real-session tests in
+// goal-mode.test.mjs do not execute. Keep the fake inner session narrow.
+
 import assert from "node:assert/strict";
 import test from "node:test";
 import { importTestBundle } from "#test-bundle";

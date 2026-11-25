@@ -1,3 +1,7 @@
+// Source-shape guard for ProcessPanel: bounded plain-text logs, lifecycle
+// controls and containment-failure actions. No render test exists yet; replace
+// this file with one once ProcessPanel gets a render harness.
+
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";

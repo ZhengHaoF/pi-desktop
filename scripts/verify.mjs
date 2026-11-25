@@ -35,7 +35,7 @@ run("toolchain catalog", "node", [
   "scripts/verify-toolchain-catalog.mjs",
 ]);
 run("Browser i18n invariants", "npm", ["run", "check:browser-i18n"]);
-run("renderer theme tokens", "node", ["scripts/check-renderer-theme.mjs"]);
+run("renderer visual contract", "node", ["scripts/check-renderer-theme.mjs"]);
 run("desktop security invariants", "node", ["scripts/check-desktop-security.mjs"]);
 run("build", "npm", ["run", "build"]);
 run("production artifact isolation", "node", ["scripts/check-production-artifacts.mjs"]);

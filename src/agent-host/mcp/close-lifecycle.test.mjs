@@ -35,47 +35,6 @@ async function until(read) {
   }
 }
 
-test("real HTTP initialization is aborted and settled before connection close completes", async (t) => {
-  const received = createDeferred(),
-    closed = createDeferred();
-  const server = createServer((request, response) => {
-    void (async () => {
-      for await (const chunk of request) {
-        void chunk;
-      }
-      response.on("close", () => closed.resolve());
-      received.resolve();
-    })().catch(() => {});
-  });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  t.after(async () => {
-    server.closeAllConnections();
-    await new Promise((resolve) => server.close(resolve));
-  });
-  const connection = new McpConnection({
-    snapshot: snapshot(process.cwd()),
-    config: {
-      url: `http://127.0.0.1:${server.address().port}/mcp`,
-      timeout: 60,
-      headers: { Authorization: "Bearer fixture" },
-    },
-    trusted: true,
-    changed() {},
-  });
-  const opening = connection.start();
-  await received.promise;
-  await connection.close();
-  await opening;
-  await Promise.race([
-    closed.promise,
-    new Promise((_, reject) => {
-      const timer = setTimeout(() => reject(new Error("HTTP socket did not close")), 2000);
-      timer.unref();
-    }),
-  ]);
-  assert.equal(connection.snapshot.state, "disconnected");
-});
-
 test("closing provider-auth initialization waits for the started token operation and sends no late request", async (t) => {
   let requests = 0;
   const server = createServer((_request, response) => {

@@ -786,3 +786,20 @@ test("session presentation publishes the latest persisted title instead of the s
   await fixture.unmount();
   assert.equal(presentationStore.getSnapshot(), null);
 });
+
+test("a failed steer or follow-up notifies and rejects instead of dropping the message", async (t) => {
+  const fixture = await mountRuntime(t, runtimeDetail({ running: false }));
+  for (const [handler, type, message] of [
+    ["handleSteer", "steer", "Unable to steer the running agent. The message was not queued."],
+    ["handleFollowUp", "follow_up", "Unable to queue this follow-up. The message was not queued."],
+  ]) {
+    testApi.queueCommand(type, Promise.reject(new Error("offline fixture")));
+    await act(async () => {
+      await assert.rejects(() => fixture.current[handler]("hello"), /offline fixture/);
+    });
+    assert.ok(
+      fixture.current.notices.some((notice) => notice.type === "error" && notice.message === message),
+      `${handler} reported the failure`,
+    );
+  }
+});

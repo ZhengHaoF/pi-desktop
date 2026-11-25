@@ -92,11 +92,100 @@ if (!/color:\s*"var\(--accent-contrast\)"/.test(browserSettings))
 if (/var\(--accent-contrast\s*,/.test(browserSettings))
   failures.push("BrowserSettings must not guess a fallback for --accent-contrast");
 
+// Chat appearance: the settings surface, the CSS scales it drives, and the
+// composer layout that consumes them. These are layout contracts rather than
+// behaviour, so they belong in the verify gate next to the theme tokens.
+const settingsConfig = read("components/SettingsConfig.tsx");
+const chatWindow = read("components/ChatWindow.tsx");
+const chatInput = read("components/ChatInput.tsx");
+const composerToolbar = read("components/composer/ComposerToolbar.tsx");
+const messageView = read("components/MessageView.tsx");
+
+for (const controlId of ["chatFontSizeControlId", "chatLayoutControlId", "chatAssistantWidthControlId"])
+  if (!settingsConfig.includes(controlId)) failures.push(`SettingsConfig is missing ${controlId}`);
+for (const value of ["small", "standard", "large", "extra-large", "fixed", "wide", "comfortable", "full"])
+  if (!settingsConfig.includes(`value: "${value}"`))
+    failures.push(`SettingsConfig chat appearance is missing the "${value}" option`);
+if (
+  !settingsConfig.includes("onChatAppearanceChange(next)") ||
+  !settingsConfig.includes("disabled={chatAppearanceSaving}")
+)
+  failures.push("chat appearance changes must go through onChatAppearanceChange and disable while saving");
+if (!/role="alert"[\s\S]*?chatAppearanceSaveFailed/.test(settingsConfig))
+  failures.push("a failed chat appearance save must surface chatAppearanceSaveFailed in an alert");
+
+const CHAT_CSS_RULES = [
+  [/\.chat-appearance-scope\s*\{[\s\S]*?--chat-font-scale:\s*1/, "chat appearance scope keeps a 1x default scale"],
+  [/data-chat-font-size="small"[\s\S]*?--chat-font-scale:\s*0\.9/, "small chat text maps to a 0.9 scale"],
+  [/data-chat-font-size="large"[\s\S]*?--chat-font-scale:\s*1\.15/, "large chat text maps to a 1.15 scale"],
+  [/data-chat-font-size="extra-large"[\s\S]*?--chat-font-scale:\s*1\.3/, "extra-large chat text maps to a 1.3 scale"],
+  [
+    /data-chat-layout="wide"[\s\S]*?--chat-content-max-width:\s*clamp\(760px,\s*80%,\s*1280px\)/,
+    "wide layout keeps the clamp(760px, 80%, 1280px) column",
+  ],
+  [
+    /\.chat-content-column\s*\{[\s\S]*?max-width:\s*var\(--chat-content-max-width\)/,
+    ".chat-content-column must consume --chat-content-max-width",
+  ],
+];
+for (const [pattern, message] of CHAT_CSS_RULES) if (!pattern.test(css)) failures.push(message);
+if (/data-chat-layout="full"|--chat-content-max-width:\s*100%/.test(css))
+  failures.push("full-width layout must not be expressed as a 100% --chat-content-max-width");
+if (/var\(--chat-font-scale\)(?!\s*:)/.test(css))
+  failures.push("--chat-font-scale must only be declared, never applied directly to text");
+if (!/data-chat-assistant-width="full"[^}]*--chat-assistant-max-width:\s*100%/.test(css))
+  failures.push("full reply width must scope --chat-assistant-max-width to assistant messages");
+if (/data-chat-assistant-width="full"[^}]*--chat-content-max-width/.test(css))
+  failures.push("reply width must not widen the conversation column");
+if (!messageView.includes('maxWidth: "var(--chat-assistant-max-width, 68ch)"'))
+  failures.push("assistant messages must read var(--chat-assistant-max-width, 68ch)");
+
+if ((chatWindow.match(/className="chat-content-column/g) ?? []).length !== 4)
+  failures.push("ChatWindow must wrap the column exactly four times after reserving the minimap gutter");
+if ((chatInput.match(/className="chat-content-column"/g) ?? []).length !== 1)
+  failures.push("ChatInput must apply the content column once");
+if (!/className="chat-input-transition-dock[^\n]*w-full/.test(chatWindow))
+  failures.push("the composer dock must span the window, not the content column");
+if (
+  /maxWidth:\s*"var\(--chat-content-max-width\)"/.test(chatWindow) ||
+  /maxWidth:\s*"var\(--chat-content-max-width\)"/.test(chatInput)
+)
+  failures.push("the content column owns the max width; the dock must not re-apply it");
+if (!/paddingRight:\s*isMobile \? CHAT_COLUMN_PADDING : CHAT_INPUT_RIGHT_PADDING/.test(chatWindow))
+  failures.push("the composer dock must reserve the minimap gutter on the right only");
+
+const CHAT_SCALE_OWNERS = [
+  [chatWindow, /fontSize:\s*scaledChatFont\(22\)/, "ChatWindow titles must use scaledChatFont(22)"],
+  [chatInput, /fontSize:\s*scaledChatFont\(14\)/, "ChatInput text must use scaledChatFont(14)"],
+  [messageView, /fontSize:\s*scaledChatFont\(13\.5\)/, "MessageView body text must use scaledChatFont(13.5)"],
+];
+for (const [source, pattern, message] of CHAT_SCALE_OWNERS) if (!pattern.test(source)) failures.push(message);
+// Glyph-only icons keep fixed sizes; text surfaces must stay on the shared scale.
+const RAW_FONT_SIZE = /fontSize:\s*[0-9]+(?:\.[0-9]+)?/g;
+for (const [name, source] of [
+  ["ChatInput", chatInput],
+  ["ComposerToolbar", composerToolbar],
+])
+  if ((source.match(RAW_FONT_SIZE) ?? []).length)
+    failures.push(`${name} must not set a raw numeric fontSize outside the chat scale`);
+if (JSON.stringify(messageView.match(RAW_FONT_SIZE) ?? []) !== JSON.stringify(["fontSize: 10"]))
+  failures.push("MessageView may only size glyph-only icons outside the chat scale (fontSize: 10)");
+
+// The dock must stay in the normal paint path: a filter promotes it to a
+// composited layer, and re-rasterising that layer while the compaction button
+// changed width left the previous frame's toolbar painted below the row.
+if (/\.chat-input-transition-dock[^{]*\{[^}]*filter:/.test(css))
+  failures.push("the composer dock must not use a filter (stale-frame ghost while compacting)");
+if (
+  !/\.chat-input-transition-dock\[data-position="conversation"\]\s+\.chat-composer-shell\s*\{[^}]*box-shadow:/.test(css)
+)
+  failures.push("the composer separation shadow must be painted on .chat-composer-shell");
+
 if (failures.length) {
   console.error(`[renderer-theme] ${failures.length} invariant(s) failed`);
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 console.log(
-  `[renderer-theme] ${TOKEN_OWNERS.length} owners use semantic status tokens; both themes define ${SEMANTIC_TOKENS.length} tokens and meet WCAG AA accent contrast`,
+  `[renderer-theme] ${TOKEN_OWNERS.length} owners use semantic status tokens; both themes define ${SEMANTIC_TOKENS.length} tokens and meet WCAG AA accent contrast; chat appearance scales, column ownership and the composer dock keep their contracts`,
 );

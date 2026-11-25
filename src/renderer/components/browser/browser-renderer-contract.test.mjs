@@ -9,11 +9,6 @@ const messageView = read(new URL("../MessageView.tsx", import.meta.url));
 const browserDock = read(new URL("./BrowserDock.tsx", import.meta.url));
 const browserSettings = read(new URL("./BrowserSettings.tsx", import.meta.url));
 const browserAuthorization = read(new URL("./BrowserAuthorizationDialog.tsx", import.meta.url));
-const browserService = read(new URL("../../../main/browser/browser-service.ts", import.meta.url));
-const browserTabManager = read(new URL("../../../main/browser/browser-tab-manager.ts", import.meta.url));
-const browserScreenshot = read(new URL("../../../main/browser/browser-screenshot.ts", import.meta.url));
-const mainProcess = read(new URL("../../../main/main.ts", import.meta.url));
-const mainWindow = read(new URL("../../../main/window.ts", import.meta.url));
 
 test("Browser remains a fixed right-panel resource and hides its native surface behind Settings", () => {
   assert.match(appShell, /const BROWSER_TAB_ID = "browser"/);
@@ -31,23 +26,6 @@ test("BrowserDock synchronizes native bounds, visibility, session ownership, and
   assert.match(messageView, /pi-desktop:open-browser-tab/);
 });
 
-test("Main fails closed across Renderer reloads and hidden screenshots never present the native View", () => {
-  assert.match(mainWindow, /onRendererUnavailable\?: \(reason: string\) => void/);
-  assert.match(mainWindow, /did-start-loading[\s\S]*onRendererUnavailable/);
-  assert.match(mainWindow, /render-process-gone[\s\S]*onRendererUnavailable/);
-  assert.match(mainProcess, /onRendererUnavailable: \(\) => browserService\?\.handleRendererUnavailable\(\)/);
-  assert.match(browserService, /handleRendererUnavailable\(\)[\s\S]*hideSurfaceForRendererUnavailable\(\)/);
-  assert.match(browserTabManager, /hideSurfaceForRendererUnavailable\(\)[\s\S]*surfaceRequestedVisible = false/);
-  const screenshotBody = browserTabManager.slice(
-    browserTabManager.indexOf("async screenshot("),
-    browserTabManager.indexOf("async click("),
-  );
-  assert.match(screenshotBody, /captureBrowserScreenshot\(/);
-  assert.match(browserScreenshot, /stayHidden: true/);
-  assert.doesNotMatch(screenshotBody, /setVisible\(true\)/);
-  assert.doesNotMatch(browserScreenshot, /setVisible\(true\)/);
-});
-
 test("Browser access is demand-prompted and AppShell never eagerly grants a selected session", () => {
   assert.doesNotMatch(appShell, /browserGrantSession/);
   assert.match(appShell, /agent-authorization-request/);
@@ -63,10 +41,6 @@ test("Browser Settings is reachable and shows the current session permission", (
   assert.match(settingsConfig, /id: "browser"/);
   assert.match(settingsConfig, /<BrowserSettings sessionId=/);
   assert.doesNotMatch(browserSettings, /browserGrantSession/);
-  // Per-session persistent overrides are gone: authorization is global-default
-  // + per-session prompt only.
-  assert.doesNotMatch(browserSettings, /browserSetPersistentSessionPermission/);
-  assert.doesNotMatch(browserSettings, /persistentSessionPermissions/);
   assert.match(browserSettings, /browserRevokeTemporarySessionPermission/);
   assert.match(browserSettings, /browserRequestConfirmation\("advanced-browser-mode"/);
   assert.doesNotMatch(browserSettings, /browserSetUnsafePolicy|ENABLE UNSAFE BROWSER/);

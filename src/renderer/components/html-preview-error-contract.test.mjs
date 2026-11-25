@@ -1,3 +1,7 @@
+// Source-shape guard for HtmlPreview: create failures render a placeholder and
+// late URLs are released without leaking rejections. file-viewer.test.mjs only
+// covers text and binary previews, so this stays until HTML preview joins it.
+
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";

@@ -1,3 +1,7 @@
+// Source-shape guard: each sidebar/picker view releases its own timers. There is
+// no render test for those timers yet; replace this file with one once
+// SessionSidebar (and the picker panels) get a render harness.
+
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";

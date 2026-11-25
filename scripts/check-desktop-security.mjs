@@ -14,6 +14,7 @@ const globals = read("src/renderer/global.d.ts");
 const diagnostics = read("src/main/diagnostics.ts");
 const diagnosticsRedaction = read("src/main/diagnostics-redaction.ts");
 const fileViewer = read("src/renderer/components/FileViewer.tsx");
+const rendererBrowserSettings = read("src/renderer/components/browser/BrowserSettings.tsx");
 const credentialVault = read("src/main/credential-vault.ts");
 const weixinChannelApi = read("src/agent-host/channels/adapters/weixin/api.ts");
 const telegramChannelApi = read("src/agent-host/channels/adapters/telegram/api.ts");
@@ -65,6 +66,7 @@ const browserService = read("src/main/browser/browser-service.ts");
 const browserAuthorization = read("src/main/browser/browser-authorization-coordinator.ts");
 const browserTools = read("src/agent-host/browser-tools.ts");
 const browserTabs = read("src/main/browser/browser-tab-manager.ts");
+const browserScreenshot = read("src/main/browser/browser-screenshot.ts");
 const browserDevToolsShortcut = read("src/main/browser/browser-devtools-shortcut.ts");
 const browserNetwork = read("src/main/browser/browser-network-interceptor.ts");
 const browserIdentity = read("src/main/browser/browser-identity-manager.ts");
@@ -97,6 +99,7 @@ const windowsHelperReproducibility = read("scripts/verify-windows-helper-reprodu
 const windowsHelperPe = read("scripts/windows-helper-pe.mjs");
 const windowsHelperClient = read("src/agent-host/managed-process/windows-helper-client.ts");
 const windowsHelperResolver = read("src/shared/windows-managed-process-helper.ts");
+const managedProcessTools = read("src/agent-host/managed-process/tools.ts");
 const managedProcessService = read("src/agent-host/managed-process/service.ts");
 const managedProcessBackend = read("src/agent-host/managed-process/backend.ts");
 const posixManagedProcessBackend = read("src/agent-host/managed-process/posix-backend.ts");
@@ -848,6 +851,35 @@ const checks = [
       !browserTools.includes('"browser_page_code_set_enabled"') &&
       browserSnippets.includes("assertSnippetSafe"),
     "sealed replay data must be short-lived Main memory and Agent tools must not mutate the snippet library",
+  ],
+  [
+    managedProcessTools.includes('if (getBrowserSessionSource(ctx.sessionManager) !== "local")') &&
+      managedProcessTools.includes("minLength: 1, maxLength: 256") &&
+      managedProcessTools.includes("same runId and returned nextCursor"),
+    "managed process tools must refuse non-local channel turns, bound literal waits to 256 and keep one runId/cursor for polling",
+  ],
+  [
+    /onRendererUnavailable\?: \(reason: string\) => void/.test(windowFactory) &&
+      /did-start-loading[\s\S]*onRendererUnavailable/.test(windowFactory) &&
+      /render-process-gone[\s\S]*onRendererUnavailable/.test(windowFactory) &&
+      /onRendererUnavailable: \(\) => browserService\?\.handleRendererUnavailable\(\)/.test(main) &&
+      /handleRendererUnavailable\(\)[\s\S]*hideSurfaceForRendererUnavailable\(\)/.test(browserService) &&
+      /hideSurfaceForRendererUnavailable\(\)[\s\S]*surfaceRequestedVisible = false/.test(browserTabs),
+    "a renderer reload or crash must hand the native browser surface back to Main and hide it",
+  ],
+  [
+    browserScreenshot.includes("stayHidden: true") &&
+      !browserTabs
+        .slice(browserTabs.indexOf("async screenshot("), browserTabs.indexOf("async click("))
+        .includes("setVisible(true)") &&
+      !browserScreenshot.includes("setVisible(true)"),
+    "capturing a screenshot must never present the native browser view",
+  ],
+  [
+    !/persistentSessionPermissions/.test(rendererBrowserSettings) &&
+      !/browserSetPersistentSessionPermission/.test(rendererBrowserSettings) &&
+      rendererBrowserSettings.includes("browserRevokeTemporarySessionPermission"),
+    "browser authorization stays global-default plus per-session prompt; the UI must not offer a persistent per-session grant",
   ],
 ];
 

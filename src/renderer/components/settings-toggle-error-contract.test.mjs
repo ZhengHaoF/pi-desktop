@@ -1,3 +1,7 @@
+// Source-shape guard for SettingsConfig: background-mode load/save rollback and
+// the automatic-update commit path. No render test covers these branches yet;
+// replace this file with one once the settings shell gets a render harness.
+
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
