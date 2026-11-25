@@ -203,14 +203,29 @@ export async function runMcpUiChecks(window: BrowserWindow, call: Call): Promise
       });
       window.webContents.reload();
     });
-    await window.webContents.executeJavaScript(`(async () => {
+    await window.webContents
+      .executeJavaScript(
+        `(async () => {
       const deadline = Date.now() + 10000;
+      const processDetailsLabels = ['Process details', '过程详情', '過程詳情'];
       let selected = false;
+      // The restored transcript keeps its expansion state, so clicking the group
+      // header unconditionally would collapse it. Only expand what is folded, and
+      // open the tool cards too: a card renders its result only while expanded.
+      const expandProcessDetails = () => {
+        const group = Array.from(document.querySelectorAll('button[aria-expanded]')).find(button =>
+          processDetailsLabels.some(label => (button.textContent || '').includes(label)),
+        );
+        if (group && group.getAttribute('aria-expanded') === 'false') group.click();
+      };
+      const expandToolCards = () => {
+        for (const card of document.querySelectorAll('button.tool-action-toggle[aria-expanded="false"]')) card.click();
+      };
       while (Date.now() < deadline) {
         const sidebar = Array.from(document.querySelectorAll('button[aria-label]')).find(button => button.getAttribute('aria-label')?.includes('MCP smoke session'));
         if (sidebar && !selected) { sidebar.click(); selected = true; }
-        const details = Array.from(document.querySelectorAll('button[title]')).find(button => ['Expand process details', '展开过程详情', '展開過程詳情'].includes(button.title));
-        details?.click();
+        expandProcessDetails();
+        expandToolCards();
         const text = document.body.innerText;
         if (selected && text.includes('MCP_E2E_DONE') && text.includes('codemode') && text.includes('MCP_ORIGINAL')) {
           if (document.querySelector('[data-execution-history], .mcp-session-menu'))
@@ -219,8 +234,13 @@ export async function runMcpUiChecks(window: BrowserWindow, call: Call): Promise
         }
         await new Promise(resolve => setTimeout(resolve, 25));
       }
-      throw new Error('MCP tool call and result did not appear in the reloaded conversation');
-    })()`);
+      return false;
+    })()`,
+      )
+      .then((reloadedConversation: boolean) => {
+        if (!reloadedConversation)
+          throw new Error("MCP tool call and result did not appear in the reloaded conversation");
+      });
     const restored = await call<typeof history>("sessions.executions", { id: sessionId, includeContent: true });
     const restoredChild = restored.records.find((record) => record.executionId === child.executionId);
     if (restoredChild?.status !== "succeeded" || !JSON.stringify(restoredChild.result).includes("MCP_ORIGINAL"))

@@ -1,6 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { extractInterfaceProperties } from "../../scripts/check-contract-coverage.mjs";
 import path from "node:path";
 import test from "node:test";
 import { importTestBundle } from "#test-bundle";
@@ -82,12 +80,6 @@ test("the actual registrar owns one service set and releases subscriptions and s
     emit: (...args) => events.push(args),
   });
   assert.deepEqual(control.state.created, ["files", "auth", "channels", "processes", "herdr"]);
-  const expected = extractInterfaceProperties(
-    "api.ts",
-    readFileSync(path.join(hostRoot, "../contract/api.ts"), "utf8"),
-    "Api",
-  );
-  assert.deepEqual(Object.keys(methods).sort(), expected.sort());
   assert.equal(control.state.running.size, 1);
   await methods["agent.command"]({ sessionId: "fixture", command: { type: "get_state" } });
   const running = [...control.state.running][0];

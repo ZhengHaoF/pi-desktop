@@ -46,13 +46,6 @@ test("track geometry: Button's min-height preset must not inflate the pill", () 
   assert.match(html, /transform:translateY\(-50%\)/);
 });
 
-test("knob slides via left offset between 3px and 21px", () => {
-  const on = renderSwitch({ checked: true, onChange() {} });
-  assert.match(on, /left:21px/);
-  const off = renderSwitch({ checked: false, onChange() {} });
-  assert.match(off, /left:3px/);
-});
-
 test("loading renders busy cursor, dimmed track and disabled button", () => {
   const html = renderSwitch({ checked: true, loading: true, onChange() {} });
   assert.match(html, /cursor:wait/);

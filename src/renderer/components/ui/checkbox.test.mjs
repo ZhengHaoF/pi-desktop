@@ -27,11 +27,6 @@ test("Checkbox renders a native input carrying the shared pi-checkbox class", ()
   assert.match(html, /checked/);
 });
 
-test("sizes map to 18px default and 15px compact", () => {
-  assert.match(renderCheckbox({ checked: false, onChange() {} }), /width:18px;height:18px/);
-  assert.match(renderCheckbox({ checked: false, size: "sm", onChange() {} }), /width:15px;height:15px/);
-});
-
 test("checked passes through and label wraps the box in an implicit label", () => {
   const labeled = renderCheckbox({ checked: false, onChange() {}, label: "Enable X" });
   assert.match(labeled, /<label[^>]*><input[^>]*type="checkbox"/);

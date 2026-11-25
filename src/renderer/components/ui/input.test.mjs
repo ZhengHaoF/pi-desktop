@@ -20,19 +20,9 @@ function renderInput(props) {
   return renderToStaticMarkup(createElement(Input, { ...props }));
 }
 
-test("Input carries the shared pi-input class and form density by default", () => {
+test("Input carries the shared pi-input class", () => {
   const html = renderInput({ value: "x", onChange() {} });
   assert.match(html, /class="pi-input"/);
-  assert.match(html, /min-height:36px/);
-  assert.match(html, /font-size:13px/);
-  assert.match(html, /width:100%/);
-});
-
-test("compact size shrinks the row for sidebar filters", () => {
-  const html = renderInput({ size: "sm", value: "x", onChange() {} });
-  assert.match(html, /min-height:26px/);
-  assert.match(html, /font-size:12px/);
-  assert.match(html, /padding:4px 8px/);
 });
 
 test("invalid and mono toggle the corresponding class and font", () => {

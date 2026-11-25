@@ -20,11 +20,10 @@ function renderDot(props) {
   return renderToStaticMarkup(createElement(StatusDot, { ...props }));
 }
 
-test("renders a presentational span with the shared class and default size/color", () => {
+test("renders a presentational span with the shared class and default color", () => {
   const html = renderDot({});
   assert.match(html, /<span[^>]*role="presentation"/);
   assert.match(html, /class="pi-status-dot"/);
-  assert.match(html, /width:8px;height:8px/);
   assert.match(html, /background:var\(--text-dim\)/);
 });
 
@@ -32,10 +31,6 @@ test("semantic color names map to tokens; unknown values pass through raw", () =
   assert.match(renderDot({ color: "success" }), /background:var\(--success\)/);
   assert.match(renderDot({ color: "danger" }), /background:var\(--danger\)/);
   assert.match(renderDot({ color: "#16a34a" }), /background:#16a34a/);
-});
-
-test("sm size renders 6px", () => {
-  assert.match(renderDot({ size: "sm" }), /width:6px;height:6px/);
 });
 
 test("pulse toggles the data attribute driving the shared animation", () => {

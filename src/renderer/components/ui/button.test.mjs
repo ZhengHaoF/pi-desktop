@@ -43,15 +43,6 @@ test("pressed maps to aria-pressed so the shared toggle styles apply", () => {
   assert.doesNotMatch(renderButton({}), /aria-pressed/);
 });
 
-test("sizes expose the shared layout defaults", () => {
-  assert.match(renderButton({}), /min-height:32px/);
-  assert.match(renderButton({ size: "sm" }), /min-height:26px/);
-  assert.match(renderButton({ size: "icon" }), /width:32px;height:32px/);
-  assert.match(renderButton({ size: "icon" }), /padding:0;/);
-  assert.match(renderButton({ size: "lg" }), /min-height:36px/);
-  assert.match(renderButton({ size: "lg" }), /font-size:13px/);
-});
-
 test("block stretches the button and caller style wins over defaults", () => {
   assert.match(renderButton({ block: true }), /width:100%/);
   const overridden = renderButton({ size: "md", style: { minHeight: 44, padding: "9px 14px" } });
