@@ -227,10 +227,6 @@ export class BrowserTabManager {
     return this.requireOwnedTab(tabId, sessionId).info.url;
   }
 
-  getOwnedTabInfo(tabId: string, sessionId: string): BrowserTabInfo {
-    return structuredClone(this.requireOwnedTab(tabId, sessionId).info);
-  }
-
   /**
    * Pause the Agent and ask the local user to handle something only a human can
    * do (login, captcha, 2FA, consent). The page stays interactive; the Agent
