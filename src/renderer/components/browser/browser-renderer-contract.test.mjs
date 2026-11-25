@@ -22,8 +22,17 @@ test("BrowserDock synchronizes native bounds, visibility, session ownership, and
   assert.match(browserDock, /browserSetBounds\(/);
   assert.match(browserDock, /browserSetSurfaceVisible\(/);
   assert.match(browserDock, /tab\.ownerSessionId === null \|\| tab\.ownerSessionId === ownerSessionId/);
+  // The global active tab may belong to another conversation. The dock derives
+  // both the tab strip and the active tab from the session-visible list.
+  assert.match(browserDock, /const visibleTabs = state\?\.tabs\.filter\(isVisibleTab\)/);
+  assert.match(browserDock, /const activeTab = visibleTabs\.find/);
   assert.match(browserDock, /message\.includes\("TAB_NOT_FOUND"\)/);
   assert.match(messageView, /pi-desktop:open-browser-tab/);
+});
+
+test("Another conversation's Agent cannot open or hijack the Browser panel", () => {
+  assert.match(appShell, /event\.tab\.ownerSessionId !== \(selectedSession\?\.id \?\? null\)/);
+  assert.match(appShell, /browserActivateTab\(tabId, selectedSession\?\.id \?\? null\)/);
 });
 
 test("Browser access is demand-prompted and AppShell never eagerly grants a selected session", () => {

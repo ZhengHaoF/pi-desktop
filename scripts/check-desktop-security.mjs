@@ -876,6 +876,13 @@ const checks = [
     "capturing a screenshot must never present the native browser view",
   ],
   [
+    browserService.includes("this.tabs.assertUserTabAccess(tabId, ownerSessionId)") &&
+      browserService.includes("this.tabs.closeSessionTabs(body.sessionId)") &&
+      browserService.includes("this.tabs.adoptOrphanTabs(tabIds, new Set(known))") &&
+      main.includes("listKnownSessionIds: async () =>"),
+    "renderer Browser commands must pass session ownership through and a deleted conversation must not strand its tabs",
+  ],
+  [
     !/persistentSessionPermissions/.test(rendererBrowserSettings) &&
       !/browserSetPersistentSessionPermission/.test(rendererBrowserSettings) &&
       rendererBrowserSettings.includes("browserRevokeTemporarySessionPermission"),
