@@ -14,7 +14,7 @@ import ReactMarkdown, { defaultUrlTransform, type Components } from "react-markd
 import { SyntaxHighlighter, vs, vscDarkPlus } from "@/lib/syntax-highlight";
 import { useTheme } from "@/hooks/useTheme";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
-import { resolveLocalFileHref } from "@/lib/file-links";
+import { isLocalFileUrl, resolveLocalFileHref } from "@/lib/file-links";
 import { useMarkdownPlugins } from "@/lib/markdown";
 import { shouldHighlightCode } from "@/lib/code-highlight-policy";
 import {
@@ -163,10 +163,11 @@ const markdownComponents: Components = {
 };
 
 // react-markdown 10 strips non-web protocols from href/src via defaultUrlTransform
-// (file: becomes ""). Local file links are this app's core feature, so allow file:.
+// (file: and Windows drive paths like D:/repo/a.png both become ""). Local file
+// links are this app's core feature, so pass those through untouched.
 type UrlTransform = (url: string, key: string, node: unknown) => string;
 const fileAwareUrlTransform: UrlTransform = (url, key, node) => {
-  if (/^file:/i.test(url)) return url;
+  if (isLocalFileUrl(url)) return url;
   return (defaultUrlTransform as UrlTransform)(url, key, node);
 };
 
@@ -292,25 +293,23 @@ function MarkdownImage({
   relativeBase?: string;
   sourceSessionId?: string | null;
 }) {
-  const localPath = useMemo(
-    () => resolveLocalFileHref(typeof src === "string" ? src : undefined, cwd, relativeBase),
-    [cwd, relativeBase, src],
-  );
-  const [previewSrc, setPreviewSrc] = useState<string | null>(localPath ? null : typeof src === "string" ? src : null);
-  const [failed, setFailed] = useState(false);
+  const source = typeof src === "string" && src.trim() !== "" ? src : undefined;
+  const localPath = useMemo(() => resolveLocalFileHref(source, cwd, relativeBase), [cwd, relativeBase, source]);
+  const [previewSrc, setPreviewSrc] = useState<string | null>(localPath ? null : (source ?? null));
+  const [failed, setFailed] = useState<string | null>(null);
   const { t } = useI18n();
 
   useEffect(() => {
     if (!localPath) {
-      setPreviewSrc(typeof src === "string" ? src : null);
-      setFailed(false);
+      setPreviewSrc(source ?? null);
+      setFailed(null);
       return;
     }
 
     let disposed = false;
     let revoke: (() => void) | null = null;
     setPreviewSrc(null);
-    setFailed(false);
+    setFailed(null);
 
     void import("@/lib/file-blob")
       .then(({ fileToObjectUrl }) => fileToObjectUrl(localPath, sourceSessionId))
@@ -322,20 +321,26 @@ function MarkdownImage({
         revoke = result.revoke;
         setPreviewSrc(result.url);
       })
-      .catch(() => {
-        if (!disposed) setFailed(true);
+      .catch((error: unknown) => {
+        if (disposed) return;
+        const reason = error instanceof Error ? error.message : String(error);
+        console.warn(`[markdown-image] ${localPath}: ${reason}`);
+        setFailed(reason);
       });
 
     return () => {
       disposed = true;
       revoke?.();
     };
-  }, [localPath, sourceSessionId, src]);
+  }, [localPath, sourceSessionId, source]);
 
-  if (failed) {
+  // A URL the sanitizer dropped arrives as an empty string; without this guard the
+  // loading placeholder would pulse forever instead of naming the broken image.
+  if (failed || !source) {
     return (
       <span className="markdown-image-error" title={localPath ?? undefined}>
         {alt || "Image failed to load"}
+        {failed ? ` · ${failed}` : ""}
       </span>
     );
   }

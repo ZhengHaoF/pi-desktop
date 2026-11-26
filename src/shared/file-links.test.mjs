@@ -83,3 +83,28 @@ test("rejects malformed four-slash file URLs instead of treating them as UNC", a
   const { resolveLocalFileHref } = await loadSubject();
   assert.equal(resolveLocalFileHref("file:////tmp/a.txt", "/tmp"), null);
 });
+
+test("recognizes local file URLs that Markdown sanitizers would discard", async () => {
+  const { isLocalFileUrl } = await loadSubject();
+
+  for (const url of [
+    "D:/work/carhome/icon-512.png",
+    "d:\\work\\carhome\\icon-512.png",
+    "file:///C:/Users/me/icon.png",
+    "\\\\server\\share\\icon.png",
+    "  C:/icon.png  ",
+  ]) {
+    assert.equal(isLocalFileUrl(url), true, url);
+  }
+
+  for (const url of [
+    "",
+    "   ",
+    "https://example.com/a.png",
+    "ftp://example.com/a.png",
+    "//example.com/a.png",
+    "a/b.png",
+  ]) {
+    assert.equal(isLocalFileUrl(url), false, url);
+  }
+});

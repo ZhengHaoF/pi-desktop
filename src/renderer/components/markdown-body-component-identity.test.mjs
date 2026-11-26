@@ -33,7 +33,7 @@ const { MarkdownBody, getMarkdownComponentIdentityForTest, parseStats } = await 
                 : args.path === "@/i18n"
                   ? "export const useI18n = () => ({ language: 'en-US', t: (_key, fallback) => fallback });"
                   : args.path === "@/lib/file-links"
-                    ? "export const resolveLocalFileHref = () => null;"
+                    ? "export const resolveLocalFileHref = () => null; export const isLocalFileUrl = () => false;"
                     : args.path === "@/lib/markdown"
                       ? "export const parseStats = { count: 0 }; const remarkPlugins = [() => () => { parseStats.count++; }]; export const useMarkdownPlugins = () => ({ remarkPlugins, rehypePlugins: [] });"
                       : args.path === "@/lib/code-highlight-policy"

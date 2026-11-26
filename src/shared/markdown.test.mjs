@@ -10,23 +10,47 @@ import {
   createMarkdownRehypePlugins,
   markdownRehypePlugins,
   markdownRemarkPlugins,
+  rehypeLocalFileUrls,
   rehypeRawToText,
   remarkLocalFileLinks,
 } from "./markdown.ts";
 
 test("Markdown plugins preserve GFM/math, keep AST path links, and show raw HTML as text", () => {
   assert.deepEqual(markdownRemarkPlugins, [remarkGfm, remarkMath, remarkLocalFileLinks]);
-  assert.equal(markdownRehypePlugins.length, 2);
+  assert.equal(markdownRehypePlugins.length, 3);
   assert.equal(markdownRehypePlugins[0], rehypeRawToText);
-  assert.equal(markdownRehypePlugins[1][0], rehypeSanitize);
+  assert.equal(markdownRehypePlugins[1], rehypeLocalFileUrls);
+  assert.equal(markdownRehypePlugins[2][0], rehypeSanitize);
   const richPlugins = createMarkdownRehypePlugins({ katex: rehypeKatex });
   assert.equal(richPlugins[0], rehypeRawToText);
-  assert.equal(richPlugins[1][0], rehypeSanitize);
-  assert.equal(richPlugins[2][0], rehypeKatex);
-  assert.deepEqual(richPlugins[2][1], { throwOnError: false, strict: false });
-  const schema = richPlugins[1][1];
+  assert.equal(richPlugins[1], rehypeLocalFileUrls);
+  assert.equal(richPlugins[2][0], rehypeSanitize);
+  assert.equal(richPlugins[3][0], rehypeKatex);
+  assert.deepEqual(richPlugins[3][1], { throwOnError: false, strict: false });
+  const schema = richPlugins[2][1];
   assert.deepEqual(schema.strip.slice(-4), ["iframe", "object", "style", "form"]);
   assert.ok(schema.protocols.href.includes("file"));
+  assert.ok(schema.protocols.src.includes("file"));
+});
+
+test("rehypeLocalFileUrls rewrites drive and UNC href/src so sanitize keeps them", () => {
+  const tree = {
+    type: "root",
+    children: [
+      { type: "element", tagName: "img", properties: { src: "D:/work/carhome/icon-512.png", alt: "icon" } },
+      { type: "element", tagName: "img", properties: { src: "\\\\server\\share\\icon.png" } },
+      { type: "element", tagName: "a", properties: { href: "C:\\work\\a.md", className: ["x"] } },
+      { type: "element", tagName: "img", properties: { src: "https://example.com/a.png" } },
+      { type: "element", tagName: "a", properties: { href: "relative/b.md" } },
+    ],
+  };
+  rehypeLocalFileUrls()(tree);
+  const [localImage, uncImage, localLink, remoteImage, relativeLink] = tree.children;
+  assert.equal(localImage.properties.src, "file:///D:/work/carhome/icon-512.png");
+  assert.equal(uncImage.properties.src, "file://server/share/icon.png");
+  assert.equal(localLink.properties.href, "file:///C:/work/a.md");
+  assert.equal(remoteImage.properties.src, "https://example.com/a.png");
+  assert.equal(relativeLink.properties.href, "relative/b.md");
 });
 
 test("rehypeRawToText converts raw HTML nodes to literal text before sanitizing", () => {

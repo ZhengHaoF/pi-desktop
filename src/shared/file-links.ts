@@ -95,3 +95,17 @@ export function resolveLocalFileHref(href: string | undefined, cwd?: string, rel
   if (candidateKind === "relative" && cwd && !isLocalFilePathWithin(filePath, cwd)) return null;
   return filePath;
 }
+
+/**
+ * Whether a URL is an explicit local file reference that Markdown URL sanitizing
+ * would otherwise discard: `file:`, a Windows drive path (`D:/repo/a.png`), or a
+ * backslash UNC path. Drive letters read as an unknown protocol to sanitizers.
+ * Protocol-relative `//host/path` is deliberately not local.
+ */
+export function isLocalFileUrl(href: string): boolean {
+  const trimmed = href.trim();
+  if (!trimmed) return false;
+  if (/^file:/i.test(trimmed)) return true;
+  if (/^[a-zA-Z]:[\\/]/.test(trimmed)) return true;
+  return trimmed.startsWith("\\\\");
+}

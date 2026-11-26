@@ -14,6 +14,9 @@ export const markdownSanitizeSchema = {
   protocols: {
     ...defaultSchema.protocols,
     href: [...(defaultSchema.protocols?.href ?? []), "file"],
+    // Markdown images point at local files too; sanitize runs before the URL
+    // transform, so a missing protocol here silently deletes the img src.
+    src: [...(defaultSchema.protocols?.src ?? []), "file"],
   },
   strip: [...(defaultSchema.strip || []), "iframe", "object", "style", "form"],
 };
@@ -126,7 +129,13 @@ export type OptionalMarkdownPlugins = {
   katex?: typeof rehypeKatex;
 };
 
-type HastNode = { type: string; value?: string; children?: HastNode[] };
+type HastNode = {
+  type: string;
+  value?: string;
+  tagName?: string;
+  properties?: Record<string, unknown>;
+  children?: HastNode[];
+};
 
 // Render raw HTML as literal text instead of interpreting it. rehype-sanitize
 // would otherwise drop the raw nodes (tags and content) entirely.
@@ -143,10 +152,35 @@ export function rehypeRawToText() {
   return (tree: HastNode) => rawToText(tree);
 }
 
+const BARE_LOCAL_PATH_ATTR_RE = /^(?:[A-Za-z]:[\\/]|\\\\)/;
+
+/**
+ * rehype-sanitize deletes any href/src whose leading token is not an allowed
+ * protocol, and a Windows drive path reads as the protocol "d:". Rewrite bare
+ * local paths to file: URLs first so only one protocol needs allowlisting.
+ */
+function localPathsToFileUrls(node: HastNode): void {
+  const properties = node.properties;
+  if (properties) {
+    for (const key of ["href", "src"]) {
+      const value = properties[key];
+      if (typeof value === "string" && BARE_LOCAL_PATH_ATTR_RE.test(value)) {
+        const url = localFilePathToUrl(value.replace(/\\/g, "/"));
+        if (url) properties[key] = url;
+      }
+    }
+  }
+  for (const child of node.children ?? []) localPathsToFileUrls(child);
+}
+
+export function rehypeLocalFileUrls() {
+  return (tree: HastNode) => localPathsToFileUrls(tree);
+}
+
 export function createMarkdownRehypePlugins({ katex }: OptionalMarkdownPlugins = {}): NonNullable<
   ReactMarkdownOptions["rehypePlugins"]
 > {
-  const plugins: NonNullable<ReactMarkdownOptions["rehypePlugins"]> = [rehypeRawToText];
+  const plugins: NonNullable<ReactMarkdownOptions["rehypePlugins"]> = [rehypeRawToText, rehypeLocalFileUrls];
   plugins.push([rehypeSanitize, markdownSanitizeSchema]);
   if (katex) plugins.push([katex, { throwOnError: false, strict: false }]);
   return plugins;
