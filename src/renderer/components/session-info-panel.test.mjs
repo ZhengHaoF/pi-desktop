@@ -136,25 +136,28 @@ test("a late clipboard success after panel unmount does not create a feedback ti
 test("context usage renders as a ring whose arc encodes the used percentage", async (t) => {
   const fixture = await mount(t),
     circumference = 2 * Math.PI * 6;
+  const spanText = (span) =>
+    typeof span.props.children === "string"
+      ? span.props.children
+      : Array.isArray(span.props.children)
+        ? span.props.children.filter((child) => typeof child === "string").join("")
+        : "";
   const contextSpan = () =>
-    fixture.root
-      .findAllByType("span")
-      .find((span) =>
-        Array.isArray(span.props.children)
-          ? span.props.children.some((child) => typeof child === "string" && child.includes(" / "))
-          : false,
-      );
+    fixture.root.findAllByType("span").find((span) => {
+      const text = spanText(span);
+      return text.includes(" / ") || text === "Context ?";
+    });
   const arc = () => fixture.root.findByProps({ transform: "rotate(-90 8 8)" });
 
   await fixture.setContextUsage({ percent: 13, contextWindow: 1_000_000, tokens: 130_000 });
-  assert.ok(contextSpan().props.children.includes("13% / 1.0M"));
+  assert.equal(spanText(contextSpan()), "130k / 1.0M · 13%");
   assert.equal(arc().props.strokeDasharray, circumference);
   assert.ok(Math.abs(arc().props.strokeDashoffset - circumference * 0.87) < 1e-9);
   assert.equal(contextSpan().props.style.color, "var(--text-muted)");
 
   // An unknown percentage keeps the question-mark text and leaves the ring empty.
   await fixture.setContextUsage({ percent: null, contextWindow: 1_000_000, tokens: null });
-  assert.ok(contextSpan().props.children.includes("? / 1.0M"));
+  assert.equal(spanText(contextSpan()), "? / 1.0M");
   assert.equal(arc().props.strokeDashoffset, circumference);
 
   // Out-of-range percentages clamp so the arc never overdraws the track.
@@ -164,4 +167,32 @@ test("context usage renders as a ring whose arc encodes the used percentage", as
   // High usage switches the arc and the text to the shared danger color.
   await fixture.setContextUsage({ percent: 95, contextWindow: 1_000_000, tokens: 950_000 });
   assert.equal(contextSpan().props.style.color, "var(--danger)");
+});
+
+test("without runtime context usage the ring stays visible and shows lifetime totals only in the panel", async (t) => {
+  const fixture = await mount(t);
+  const spanText = (span) =>
+    typeof span.props.children === "string"
+      ? span.props.children
+      : Array.isArray(span.props.children)
+        ? span.props.children.filter((child) => typeof child === "string").join("")
+        : "";
+  const contextSpan = () => fixture.root.findAllByType("span").find((span) => spanText(span).trim() === "Context ?");
+  // The ring still renders (muted, empty) instead of disappearing with the label.
+  assert.ok(contextSpan());
+  assert.equal(fixture.root.findByProps({ transform: "rotate(-90 8 8)" }).props.strokeDashoffset, 2 * Math.PI * 6);
+
+  // The header no longer prints the accumulated lifetime total ("3 tokens" in this fixture).
+  const headerTexts = fixture.root.findAllByType("span").map(spanText);
+  assert.equal(
+    headerTexts.some((text) => text.includes("3 tokens")),
+    false,
+  );
+  // The session panel keeps the cumulative figure and explains its scope.
+  const panelText = fixture.root
+    .findAll((node) => typeof node.type === "string")
+    .map((node) => spanText(node))
+    .join(" ");
+  assert.ok(panelText.includes("Cumulative tokens"));
+  assert.ok(panelText.includes("all branches"));
 });

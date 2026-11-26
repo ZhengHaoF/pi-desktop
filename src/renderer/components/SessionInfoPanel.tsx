@@ -81,35 +81,43 @@ export function SessionInfoPanel({
         (() => {
           const tokenStats = sessionStats?.tokens;
           const c = sessionStats?.cost ?? 0;
+          // The header reports context occupancy, not lifetime usage. `tokenStats.total`
+          // accumulates every response ever recorded (including other branches and
+          // cache reads), so it says nothing about how full the window is.
+          const ctx = contextUsage ?? sessionStats?.contextUsage ?? null;
           const fmt = (n: number) =>
             n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
+          const ctxWindow = ctx?.contextWindow ?? 0;
+          const ctxPercent = ctx?.percent ?? null;
           let ctxColor = "var(--text-muted)";
-          let ctxStr: string | null = null;
-          let ctxPercent: number | null = null;
-          if (contextUsage?.contextWindow) {
-            const pct = contextUsage.percent;
-            ctxPercent = pct;
-            if (pct !== null && pct > 90) ctxColor = "var(--danger)";
-            else if (pct !== null && pct > 70) ctxColor = "var(--warning)";
-            ctxStr =
-              pct !== null
-                ? `${pct.toFixed(0)}% / ${fmt(contextUsage.contextWindow)}`
-                : `? / ${fmt(contextUsage.contextWindow)}`;
-          }
+          if (ctxPercent !== null && ctxPercent > 90) ctxColor = "var(--danger)";
+          else if (ctxPercent !== null && ctxPercent > 70) ctxColor = "var(--warning)";
+          const ctxStr =
+            ctxWindow > 0
+              ? `${ctx?.tokens != null ? fmt(ctx.tokens) : "?"} / ${fmt(ctxWindow)}${
+                  ctxPercent !== null ? ` · ${ctxPercent.toFixed(0)}%` : ""
+                }`
+              : t("usageContextUnknown", "Context ?");
 
           const tooltipParts: string[] = [];
+          if (ctxWindow > 0) {
+            tooltipParts.push(
+              `${t("usageContext", "Context")}: ${ctxPercent !== null ? ctxPercent.toFixed(1) + "%" : t("unknown", "unknown")} · ${ctx?.tokens != null ? ctx.tokens.toLocaleString(language) : "?"} / ${ctxWindow.toLocaleString(language)} ${t("tokens", "tokens")}`,
+            );
+          } else {
+            tooltipParts.push(
+              t("usageContextUnavailable", "Context usage is unavailable until the next model response"),
+            );
+          }
           if (tokenStats) {
+            tooltipParts.push(
+              `${t("usageCumulativeTokens", "Cumulative tokens")}: ${tokenStats.total.toLocaleString(language)}`,
+            );
             tooltipParts.push(`${t("usageInput", "Input")}: ${tokenStats.input.toLocaleString(language)}`);
             tooltipParts.push(`${t("usageOutput", "Output")}: ${tokenStats.output.toLocaleString(language)}`);
             tooltipParts.push(`${t("cacheRead", "Cache read")}: ${tokenStats.cacheRead.toLocaleString(language)}`);
             tooltipParts.push(`${t("cacheWrite", "Cache write")}: ${tokenStats.cacheWrite.toLocaleString(language)}`);
             if (c > 0) tooltipParts.push(`${t("usageCost", "Cost")}: $${c.toFixed(4)}`);
-          }
-          if (contextUsage?.contextWindow) {
-            const pct = contextUsage.percent;
-            tooltipParts.push(
-              `${t("usageContext", "Context")}: ${pct !== null ? pct.toFixed(1) + "%" : t("unknown", "unknown")} / ${contextUsage.contextWindow.toLocaleString(language)} ${t("tokens", "tokens")}`,
-            );
           }
           const tooltip = tooltipParts.join("  |  ");
 
@@ -137,33 +145,26 @@ export function SessionInfoPanel({
               }}
             >
               <Info size={14} aria-hidden="true" />
-              {!isMobile && tokenStats && tokenStats.total > 0 && (
-                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  {fmt(tokenStats.total)} {t("tokens", "tokens")}
-                </span>
-              )}
-              {ctxStr && (
-                <span style={{ display: "flex", alignItems: "center", gap: 4, color: ctxColor }}>
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <circle cx="8" cy="8" r="6" stroke="var(--border)" strokeWidth="2" />
-                    <circle
-                      cx="8"
-                      cy="8"
-                      r="6"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeDasharray={CONTEXT_RING_CIRCUMFERENCE}
-                      strokeDashoffset={
-                        CONTEXT_RING_CIRCUMFERENCE * (1 - Math.max(0, Math.min(100, ctxPercent ?? 0)) / 100)
-                      }
-                      transform="rotate(-90 8 8)"
-                      style={{ transition: "stroke-dashoffset 0.25s ease" }}
-                    />
-                  </svg>
-                  {ctxStr}
-                </span>
-              )}
+              <span style={{ display: "flex", alignItems: "center", gap: 4, color: ctxColor }}>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <circle cx="8" cy="8" r="6" stroke="var(--border)" strokeWidth="2" />
+                  <circle
+                    cx="8"
+                    cy="8"
+                    r="6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeDasharray={CONTEXT_RING_CIRCUMFERENCE}
+                    strokeDashoffset={
+                      CONTEXT_RING_CIRCUMFERENCE * (1 - Math.max(0, Math.min(100, ctxPercent ?? 0)) / 100)
+                    }
+                    transform="rotate(-90 8 8)"
+                    style={{ transition: "stroke-dashoffset 0.25s ease" }}
+                  />
+                </svg>
+                {ctxStr}
+              </span>
             </Button>
           );
         })()}
@@ -210,7 +211,14 @@ export function SessionInfoPanel({
                     [t("toolResults", "Tool Results"), sessionStats.toolResults.toLocaleString(language)],
                     [t("total", "Total"), sessionStats.totalMessages.toLocaleString(language)],
                   ];
+                  const ctx = contextUsage ?? sessionStats.contextUsage;
+                  const ctxSummary = ctx?.contextWindow
+                    ? `${ctx.percent !== null ? `${ctx.percent.toFixed(1)}%` : "?"} · ${
+                        ctx.tokens !== null ? formatCompactNumber(ctx.tokens, language) : "?"
+                      } / ${formatCompactNumber(ctx.contextWindow, language)}`
+                    : null;
                   const tokenRows = [
+                    ...(ctxSummary ? [[t("usageContext", "Context"), ctxSummary]] : []),
                     [t("usageInput", "Input"), sessionStats.tokens.input.toLocaleString(language)],
                     [t("usageOutput", "Output"), sessionStats.tokens.output.toLocaleString(language)],
                     ...(sessionStats.tokens.cacheRead > 0
@@ -219,25 +227,27 @@ export function SessionInfoPanel({
                     ...(sessionStats.tokens.cacheWrite > 0
                       ? [[t("cacheWrite", "Cache write"), sessionStats.tokens.cacheWrite.toLocaleString(language)]]
                       : []),
-                    [t("total", "Total"), sessionStats.tokens.total.toLocaleString(language)],
-                  ];
-                  const ctx = contextUsage ?? sessionStats.contextUsage;
-                  const extraTokenRows = [
+                    [
+                      t("usageCumulativeTokens", "Cumulative tokens"),
+                      sessionStats.tokens.total.toLocaleString(language),
+                    ],
                     ...(sessionStats.cost > 0 ? [[t("usageCost", "Cost"), `$${sessionStats.cost.toFixed(4)}`]] : []),
-                    ...(ctx?.contextWindow
-                      ? [
-                          [
-                            t("usageContext", "Context"),
-                            `${ctx.percent !== null ? `${ctx.percent.toFixed(1)}%` : "?"} / ${formatCompactNumber(ctx.contextWindow, language)}`,
-                          ],
-                        ]
-                      : []),
                   ];
+                  const tokenFootnote = [
+                    t(
+                      "usageCumulativeHint",
+                      "Cumulative totals cover the whole session file (all branches), not the current context.",
+                    ),
+                    ...(ctxSummary
+                      ? []
+                      : [t("usageContextUnavailable", "Context usage is unavailable until the next model response")]),
+                  ].join(" ");
                   const section = (
                     title: string,
                     sectionRows: string[][],
                     valueAlign: "left" | "right" = "left",
                     compact = false,
+                    footnote?: string,
                   ) => (
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>
@@ -269,6 +279,11 @@ export function SessionInfoPanel({
                           </div>
                         ))}
                       </div>
+                      {footnote && (
+                        <p style={{ margin: "6px 0 0", fontSize: 11, lineHeight: 1.45, color: "var(--text-dim)" }}>
+                          {footnote}
+                        </p>
+                      )}
                     </div>
                   );
                   const copyButton = (field: SessionCopyField, value: string) => {
@@ -367,7 +382,7 @@ export function SessionInfoPanel({
                     >
                       {sessionInfoSection}
                       {section(t("messages", "Messages"), messageRows)}
-                      {section(t("tokenStatistics", "Tokens"), [...tokenRows, ...extraTokenRows], "right", true)}
+                      {section(t("tokenStatistics", "Tokens"), tokenRows, "right", true, tokenFootnote)}
                       {!!sessionStats.modelUsage?.length &&
                         section(
                           t("modelUsageBreakdown", "Usage by actual model"),
