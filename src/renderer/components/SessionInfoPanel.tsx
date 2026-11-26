@@ -316,12 +316,15 @@ export function SessionInfoPanel({
                           flex: "0 0 auto",
                         }}
                       >
+                        {/* The inherited md padding (12px per side) exceeds this 22px box, so
+                            the content box resolves to zero width; without flexShrink: 0 the
+                            SVG is shrunk to 0×0 and the button looks empty. */}
                         {failed ? (
-                          <CircleAlert size={12} aria-hidden="true" />
+                          <CircleAlert size={12} aria-hidden="true" style={{ flexShrink: 0 }} />
                         ) : copied ? (
-                          <Check size={12} aria-hidden="true" />
+                          <Check size={12} aria-hidden="true" style={{ flexShrink: 0 }} />
                         ) : (
-                          <Copy size={12} aria-hidden="true" />
+                          <Copy size={12} aria-hidden="true" style={{ flexShrink: 0 }} />
                         )}
                       </Button>
                     );

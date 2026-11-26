@@ -116,6 +116,21 @@ test("copy feedback and a late clipboard failure cannot leak across session sele
   assert.equal(fixture.root.findAllByProps({ role: "alert" }).length, 1);
 });
 
+test("copy buttons keep their icon from collapsing inside the tight box", async (t) => {
+  const fixture = await mount(t);
+  const copyButton = fixture.root.findAll(
+    (node) => typeof node.type === "string" && node.props["aria-label"] === "Copy session ID",
+  )[0];
+  const icon = copyButton.findAllByType("svg")[0];
+  assert.ok(icon, "copy icon renders");
+  // The inherited md padding leaves a zero-width content box; without this the SVG
+  // is flex-shrunk to 0×0 and the button renders empty.
+  assert.equal(icon.props.style.flexShrink, 0);
+  // The rendered box keeps its original dimensions.
+  assert.equal(copyButton.props.style.width, 22);
+  assert.equal(copyButton.props.style.height, 22);
+});
+
 test("a late clipboard success after panel unmount does not create a feedback timer", async (t) => {
   const fixture = await mount(t),
     pending = createDeferred();
