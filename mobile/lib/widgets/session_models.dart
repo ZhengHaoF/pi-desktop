@@ -3,9 +3,12 @@
 /// toolResult messages pair into their card by toolCallId.
 library;
 
-/// One rendered line in the chat view: a text bubble, thinking card or tool card.
+import 'image_block.dart';
+
+/// One rendered line in the chat view: a text bubble, thinking card, tool
+/// card or image.
 class ChatLine {
-  final String kind; // 'text' | 'thinking' | 'tool'
+  final String kind; // 'text' | 'thinking' | 'tool' | 'image'
   String role;
   String text;
   bool done;
@@ -23,16 +26,30 @@ class ChatLine {
   Map<dynamic, dynamic>? input;
   String? resultText;
   bool resultIsError;
+  /// Images the tool returned, shown under the result when the card is open.
+  List<ImageRef> resultImages;
   bool running;
+  // Image fields (kind == 'image').
+  ImageRef? image;
+  /// Position of this image among the image blocks of its source message.
+  /// Live events carry no entry id, so this plus [messageIndex] is the only
+  /// identity a streamed image has.
+  int imageOrdinal;
   ChatLine.text({required this.role, required this.text, this.done = false, this.messageIndex})
       : kind = 'text',
         fromToolCall = false,
         resultIsError = false,
+        resultImages = const [],
+        image = null,
+        imageOrdinal = 0,
         running = false;
   ChatLine.thinking({required this.role, required this.text, this.done = false, this.messageIndex})
       : kind = 'thinking',
         fromToolCall = false,
         resultIsError = false,
+        resultImages = const [],
+        image = null,
+        imageOrdinal = 0,
         running = false;
   ChatLine.tool({
     required this.toolCallId,
@@ -45,7 +62,30 @@ class ChatLine {
         role = 'assistant',
         text = '',
         done = false,
-        resultIsError = false;
+        resultIsError = false,
+        resultImages = const [],
+        image = null,
+        imageOrdinal = 0;
+  ChatLine.image({
+    required this.image,
+    required this.role,
+    this.messageIndex,
+    this.imageOrdinal = 0,
+  })  : kind = 'image',
+        text = '',
+        done = true,
+        fromToolCall = false,
+        resultIsError = false,
+        resultImages = const [],
+        running = false;
+}
+
+/// One image attached to a line: where its bytes come from. The decoded bytes
+/// live in the page's image cache, not here.
+class ImageRef {
+  ImageBlockData data;
+
+  ImageRef(this.data);
 }
 
 /// A PC session as returned by sessions.list (SessionInfo subset).
@@ -115,6 +155,18 @@ String? extractText(Object? content) {
   return null;
 }
 
+/// Displayable image blocks of a message's `content`, in order.
+List<ImageRef> extractImages(Object? content) {
+  if (content is! List) return const [];
+  final images = <ImageRef>[];
+  for (final block in content) {
+    if (block is! Map || block['type'] != 'image') continue;
+    final parsed = parseImageBlock(block);
+    if (parsed != null) images.add(ImageRef(parsed));
+  }
+  return images;
+}
+
 /// Upsert a tool card line by toolCallId; returns its index.
 ///
 /// [live] cards start out running until their result pairs in. History cards
@@ -162,16 +214,19 @@ bool applyToolResult(
   final toolCallId = message['toolCallId'] as String?;
   final text = extractText(message['content']) ?? '';
   final isError = message['isError'] == true;
+  final images = extractImages(message['content']);
   final existing = toolCallId == null ? null : indexByCallId[toolCallId];
   if (existing != null && existing < lines.length && lines[existing].kind == 'tool') {
     final line = lines[existing];
     line.resultText = text.trim().isEmpty ? '(无输出)' : text;
     line.resultIsError = isError;
+    line.resultImages = images;
     line.running = false;
     line.done = true;
     return true;
   }
-  if (text.trim().isEmpty && !isError) return false;
+  // A silent result with nothing to show is not worth a card.
+  if (text.trim().isEmpty && !isError && images.isEmpty) return false;
   // Unpaired result (e.g. truncated history): standalone tool line.
   lines.add(ChatLine.tool(
     toolCallId: toolCallId ?? '',
@@ -181,55 +236,131 @@ bool applyToolResult(
   final line = lines.last;
   line.resultText = text.trim().isEmpty ? '(无输出)' : text;
   line.resultIsError = isError;
+  line.resultImages = images;
   line.running = false;
   line.done = true;
   return true;
 }
 
+/// True when a toolResult is a successful `models.generateImages` call, the
+/// one tool whose images the desktop also lifts into the reply.
+/// Mirrors `withGeneratedImageReply` (renderer/lib/generated-image-reply.ts).
+bool isGeneratedImageResult(Map<dynamic, dynamic> message) {
+  if (message['role'] != 'toolResult' || message['toolName'] != 'codemode') return false;
+  final details = message['details'];
+  if (details is! Map) return false;
+  final calls = details['calls'];
+  if (calls is! List) return false;
+  return calls.any(
+    (call) => call is Map && call['name'] == 'models.generateImages' && call['status'] == 'ok',
+  );
+}
+
 /// Build chat lines from a sessions.get detail (history), including tool
 /// cards paired with their results.
-List<ChatLine> historyLinesFromDetail(Map<String, dynamic> detail) {
+///
+/// `ordinalOffset` shifts every line's message ordinal: with paged history the
+/// first loaded message is not message 0 of the session, and live events
+/// count from the session total.
+List<ChatLine> historyLinesFromDetail(Map<String, dynamic> detail, {int ordinalOffset = 0}) {
   final lines = <ChatLine>[];
   final indexByCallId = <String, int>{};
   final context = detail['context'];
   final messages = context is Map ? context['messages'] : null;
-  if (messages is List) {
-    for (var messageIndex = 0; messageIndex < messages.length; messageIndex++) {
-      final message = messages[messageIndex];
-      if (message is! Map) continue;
-      final role = message['role'] as String? ?? 'assistant';
-      if (role == 'toolResult') {
-        applyToolResult(lines, indexByCallId, message, messageIndex: messageIndex);
-        continue;
+  if (messages is! List) return lines;
+
+  // Generated images are lifted out of the turn's tool results and appended
+  // after that turn's last line, the way the desktop reply shows them. One
+  // entry per turn: where in `lines` the turn ended, and what to insert there.
+  final generatedInserts = <({int at, int messageIndex, List<ImageRef> images})>[];
+  var turnImages = <ImageRef>[];
+  var turnStartOrdinal = -1;
+
+  void closeTurn() {
+    if (turnImages.isNotEmpty && lines.isNotEmpty) {
+      generatedInserts.add((at: lines.length, messageIndex: lines.last.messageIndex ?? turnStartOrdinal, images: turnImages));
+    }
+    turnImages = <ImageRef>[];
+  }
+
+  for (var messageIndex = 0; messageIndex < messages.length; messageIndex++) {
+    final message = messages[messageIndex];
+    if (message is! Map) continue;
+    final role = message['role'] as String? ?? 'assistant';
+    final ordinal = messageIndex + ordinalOffset;
+    if (role == 'toolResult') {
+      applyToolResult(lines, indexByCallId, message, messageIndex: ordinal);
+      if (isGeneratedImageResult(message)) turnImages.addAll(extractImages(message['content']));
+      continue;
+    }
+    if (role != 'user' && role != 'assistant') continue;
+    if (role == 'user') {
+      closeTurn();
+      turnStartOrdinal = ordinal;
+    }
+    final content = message['content'];
+    if (content is! List) {
+      final text = extractText(content);
+      if (text != null && text.trim().isNotEmpty) {
+        lines.add(ChatLine.text(role: role, text: text.trim(), done: true, messageIndex: ordinal));
       }
-      if (role != 'user' && role != 'assistant') continue;
-      final content = message['content'];
-      if (content is! List) {
-        final text = extractText(content);
-        if (text != null && text.trim().isNotEmpty) {
-          lines.add(ChatLine.text(role: role, text: text.trim(), done: true, messageIndex: messageIndex));
+      continue;
+    }
+    for (final block in content) {
+      if (block is! Map) continue;
+      if (block['type'] == 'toolCall') {
+        upsertToolCard(lines, indexByCallId, block, live: false, messageIndex: ordinal);
+      } else if (block['type'] == 'thinking') {
+        final thinking = (block['thinking'] as String? ?? '').trim();
+        if (thinking.isNotEmpty) {
+          lines.add(ChatLine.thinking(role: role, text: thinking, done: true, messageIndex: ordinal));
         }
-        continue;
-      }
-      for (final block in content) {
-        if (block is! Map) continue;
-        if (block['type'] == 'toolCall') {
-          upsertToolCard(lines, indexByCallId, block, live: false, messageIndex: messageIndex);
-        } else if (block['type'] == 'thinking') {
-          final thinking = (block['thinking'] as String? ?? '').trim();
-          if (thinking.isNotEmpty) {
-            lines.add(ChatLine.thinking(role: role, text: thinking, done: true, messageIndex: messageIndex));
-          }
-        } else if (block['type'] == 'text') {
-          final text = (block['text'] as String? ?? '').trim();
-          if (text.isNotEmpty) {
-            lines.add(ChatLine.text(role: role, text: text, done: true, messageIndex: messageIndex));
-          }
+      } else if (block['type'] == 'text') {
+        final text = (block['text'] as String? ?? '').trim();
+        if (text.isNotEmpty) {
+          lines.add(ChatLine.text(role: role, text: text, done: true, messageIndex: ordinal));
         }
+      } else if (block['type'] == 'image') {
+        final parsed = parseImageBlock(block);
+        if (parsed != null) lines.add(ChatLine.image(image: ImageRef(parsed), role: role, messageIndex: ordinal));
       }
     }
   }
+  closeTurn();
+
+  // Insert back to front so earlier insertion points stay valid.
+  for (final insert in generatedInserts.reversed) {
+    lines.insertAll(
+      insert.at,
+      [
+        for (final image in insert.images)
+          ChatLine.image(image: image, role: 'assistant', messageIndex: insert.messageIndex),
+      ],
+    );
+  }
   return lines;
+}
+
+/// Total messages in the session according to a sessions.get detail, or null
+/// when the PC did not paginate (an unpaged response carries no totals).
+int? historyTotalMessages(Map<String, dynamic> detail) {
+  final context = detail['context'];
+  if (context is! Map) return null;
+  final total = context['totalMessages'];
+  return total is int ? total : null;
+}
+
+/// How many messages precede the loaded page. Live events count ordinals from
+/// the session total, so a partial page must be shifted by this to keep its
+/// ordinals from colliding with freshly streamed ones.
+int historyOrdinalOffset(Map<String, dynamic> detail) {
+  final context = detail['context'];
+  if (context is! Map) return 0;
+  final total = context['totalMessages'];
+  final loaded = context['loadedMessages'];
+  if (total is! int || loaded is! int) return 0;
+  final offset = total - loaded;
+  return offset < 0 ? 0 : offset;
 }
 
 /// Number of messages in a sessions.get detail, used to seed the live message
@@ -238,6 +369,26 @@ int historyMessageCount(Map<String, dynamic> detail) {
   final context = detail['context'];
   final messages = context is Map ? context['messages'] : null;
   return messages is List ? messages.length : 0;
+}
+
+/// Cursor for the page before this one, or null when nothing is older.
+String? historyPreviousCursor(Map<String, dynamic> detail) {
+  final context = detail['context'];
+  if (context is! Map || context['truncatedBefore'] != true) return null;
+  final cursor = context['previousCursor'];
+  return cursor is String && cursor.isNotEmpty ? cursor : null;
+}
+
+/// Where an older page sits in the session, given the oldest ordinal loaded
+/// so far. The page ends right before that message, so its first message is
+/// `oldestOrdinal - pageLength` and the new oldest ordinal is the same value.
+/// Loading several pages in a row keeps walking down toward 0, which keeps
+/// ordinals unique across pages (and clear of live events, which count up
+/// from the session total).
+({int offset, int oldest}) olderPageOrdinals({required int oldestOrdinal, required int pageLength}) {
+  final offset = oldestOrdinal - pageLength;
+  // Never negative: an unpaged or odd response must not produce bogus keys.
+  return (offset: offset < 0 ? 0 : offset, oldest: offset < 0 ? 0 : offset);
 }
 
 /// Group session summaries by project root, sorted by recency.

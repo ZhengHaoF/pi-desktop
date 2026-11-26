@@ -8,8 +8,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import '../core/chat_scroll_policy.dart';
+import '../core/image_cache.dart';
 import '../core/remote_connection.dart';
 import '../widgets/ask_sheet.dart';
+import '../widgets/chat_image.dart';
+import '../widgets/image_block.dart';
 import '../widgets/markdown_text.dart';
 import '../widgets/session_models.dart';
 import '../widgets/text_selection_menu.dart';
@@ -58,6 +61,33 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final _scrollController = ScrollController();
   final _lines = <ChatLine>[];
   final _toolIndexByCallId = <String, int>{};
+  /// The session's working directory on the PC. Relative paths in a reply
+  /// (`![logo](res/icon.png)`) resolve against it, as they do on the desktop.
+  String? _cwd;
+  /// Decoded bytes for transcript images. One per page: it goes away with the
+  /// page, so a session's screenshots are not kept alive after leaving it.
+  /// A failed request propagates to the thumbnail, which offers a retry.
+  late final _imageCache = TranscriptImageCache(
+    (entryId, blockIndex) async {
+      final sessionId = _sessionId;
+      if (sessionId == null) return null;
+      return widget.connection.request('sessions.entryContent', {
+        'id': sessionId,
+        'entryId': entryId,
+        'blockIndex': blockIndex,
+      });
+    },
+    // Pictures the reply names by path are read from the PC's disk. The
+    // session id is what lets the PC authorize a path the session referenced.
+    readFile: (path) async {
+      final sessionId = _sessionId;
+      if (sessionId == null) return null;
+      return widget.connection.request('files.read', {
+        'path': path,
+        'sourceSessionId': sessionId,
+      });
+    },
+  );
   final _expandedTools = <String>{};
   final _expandedThinking = <String>{};
   /// Process groups the user opened, keyed by the turn's user message ordinal.
@@ -68,6 +98,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// Ordinal of the live message being streamed, so lines of the same message
   /// share one count in process-group headers. Seeded from history.
   int _liveMessageIndex = -1;
+  /// History paging (desktop useSessionHistory parity): the first page holds
+  /// the most recent turns and older ones load when the reader reaches the top.
+  /// `null` means nothing older is available (or the PC did not paginate).
+  String? _previousCursor;
+  bool _loadingOlder = false;
+  bool _historyExhausted = false;
+  /// Session ordinal of the oldest loaded message. An older page is numbered
+  /// downward from here, so ordinals never collide across however many pages
+  /// load. 0 for an unpaged response (everything is loaded).
+  int _oldestOrdinal = 0;
+  /// Scroll extent just before an older page is prepended, so the viewport
+  /// can be held on the same message once the list grows.
+  double _maxScrollBeforePrepend = 0;
+  /// Same window as the desktop: enough turns to open on, with a byte budget
+  /// that keeps a screenshot-heavy session from arriving in one frame.
+  static const _historyWindow = {'maxTurns': 20, 'maxBytes': 1024 * 1024};
+  /// How close to the top (in pixels) the reader must be for the older page to
+  /// load on its own.
+  static const double _olderPageTriggerPx = 240;
   final _approvals = <Map<String, dynamic>>[];
   /// Pending ask requests keyed by requestId. The sheet shows one at a time and
   /// the map survives a sheet being dismissed so it can be reopened.
@@ -135,6 +184,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 时才创建（ensure_session），因此这里不能触发任何 agent 回合。
       _loadingHistory = false;
       _currentModel = widget.newTaskModel;
+      // A new task's directory is known up front; it becomes the session cwd.
+      _cwd = widget.newTaskCwd;
       unawaited(_loadModelNames());
     } else {
       _attach(_sessionId!);
@@ -165,15 +216,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // which would break the running-mirror restore below.
       final detail = await widget.connection.request(
         'sessions.get',
-        {'id': sessionId, 'includeState': true},
+        {'id': sessionId, 'includeState': true, 'historyWindow': _historyWindow},
       );
+      if (!mounted || _sessionId != sessionId) return;
+      final offset = historyOrdinalOffset(detail);
       setState(() {
         _lines
           ..clear()
-          ..addAll(historyLinesFromDetail(detail));
+          ..addAll(historyLinesFromDetail(detail, ordinalOffset: offset));
         // Live messages must not reuse history ordinals, or a fresh turn would
-        // fold into the last historical group's key.
-        _liveMessageIndex = historyMessageCount(detail) - 1;
+        // fold into the last historical group's key. With a partial page the
+        // ordinals continue from the session total, not from the page length.
+        _liveMessageIndex = historyMessageCount(detail) + offset - 1;
+        _oldestOrdinal = offset;
+        _previousCursor = historyPreviousCursor(detail);
+        _historyExhausted = _previousCursor == null;
         _currentModel = _modelFromDetail(detail);
         // sessions.get already asked the PC for get_state; reuse it instead of
         // firing a second command just to learn the thinking level.
@@ -182,6 +239,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // Restore the turn mirror from the runtime snapshot so the
         // steer-vs-prompt choice is correct right after opening the page.
         _turnRunning = turnRunningFromAgentState(detail['agentState']);
+        _cwd = _cwdFromDetail(detail) ?? _cwd;
       });
       _applyTurnRunning(_turnRunning);
       // agent.running broadcasts changes only and never replays a snapshot on
@@ -299,14 +357,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// Re-read only the session's selected model, without rebuilding the
   /// transcript, so scroll position and the draft survive PC-side switches.
+  ///
+  /// This fires on every `sessions.changed`, i.e. once per message the PC
+  /// writes, so it asks for the smallest history the PC will serve: the model
+  /// and thinking level come from the whole session path, not from the page.
   Future<void> _refreshCurrentModel() async {
     final sessionId = _sessionId;
     if (!mounted || sessionId == null) return;
     try {
       final detail = await widget.connection.request(
         'sessions.get',
-        {'id': sessionId, 'includeState': true},
+        {
+          'id': sessionId,
+          'includeState': true,
+          'historyWindow': {'maxTurns': 1, 'maxBytes': 32 * 1024},
+        },
       );
+      if (!mounted || _sessionId != sessionId) return;
       final model = _modelFromDetail(detail);
       if (!mounted || model == null) return;
       setState(() {
@@ -318,9 +385,41 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// The session's working directory, as the PC reports it. A directory that
+  /// has been moved or deleted is still the base for relative paths, so it is
+  /// read from either place the PC puts it.
+  String? _cwdFromDetail(Map<String, dynamic> detail) {
+    final unavailable = detail['unavailableWorkingDirectory'];
+    if (unavailable is String && unavailable.trim().isNotEmpty) return unavailable;
+    final info = detail['info'];
+    if (info is Map) {
+      final cwd = info['cwd'];
+      if (cwd is String && cwd.trim().isNotEmpty) return cwd;
+    }
+    return null;
+  }
+
+  /// Render one `![alt](target)` of a reply. Only pictures that live on the
+  /// PC are shown; a web URL is left as text (the app does not fetch from the
+  /// internet on a reply's say-so).
+  Widget? _buildMarkdownImage(String alt, String target) {
+    final sessionId = _sessionId;
+    if (sessionId == null) return null;
+    final path = resolveLocalImagePath(target, cwd: _cwd);
+    if (path == null) return null;
+    return ChatImage(
+      // Keyed by path so two references to the same picture share a widget
+      // and different pictures never swap places on rebuild.
+      key: ValueKey('md-image:$path'),
+      ref: ImageRef(LocalFileImage(path)),
+      sessionId: sessionId,
+      cache: _imageCache,
+      alt: alt,
+    );
+  }
+
   /// `sessions.get` 的 agentState 就是 PC 的 get_state 快照，档位直接取这里。
-  String? _thinkingLevelFromDetail(Map<String, dynamic> detail) {
-    final agentState = detail['agentState'];
+  String? _thinkingLevelFromDetail(Map<String, dynamic> detail) {    final agentState = detail['agentState'];
     if (agentState is! Map) return null;
     final state = agentState['state'];
     if (state is! Map) return null;
@@ -547,6 +646,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   void _applyStreamedMessage(String? role, Object? content, String? text, {required bool done}) {
     final messageIndex = _liveMessageIndex;
     var hasContent = false;
+    var imageOrdinal = 0;
     if (content is List) {
       for (final block in content) {
         if (block is! Map) continue;
@@ -561,6 +661,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           if (blockText.isEmpty) continue;
           hasContent = true;
           _upsertTextLine(role ?? 'assistant', blockText, done: done);
+        } else if (block['type'] == 'image') {
+          // Every update carries the whole message, so the same image would
+          // be added once per snapshot. Images are only placed when the
+          // message ends, keyed by their position inside it.
+          hasContent = true;
+          if (done) _upsertImageLine(role ?? 'assistant', block, messageIndex, imageOrdinal);
+          imageOrdinal += 1;
         }
       }
     }
@@ -738,6 +845,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// Place one image of the live message, identified by its position in that
+  /// message so a replayed `message_end` replaces rather than duplicates it.
+  /// Blocks that cannot be shown (url-only, non-raster) are skipped.
+  void _upsertImageLine(String role, Map<dynamic, dynamic> block, int messageIndex, int ordinal) {
+    final parsed = parseImageBlock(block);
+    if (parsed == null) return;
+    for (final line in _lines) {
+      if (line.kind == 'image' && line.messageIndex == messageIndex && line.imageOrdinal == ordinal) {
+        line.image = ImageRef(parsed);
+        return;
+      }
+    }
+    _lines.add(
+      ChatLine.image(
+        image: ImageRef(parsed),
+        role: role,
+        messageIndex: messageIndex,
+        imageOrdinal: ordinal,
+      ),
+    );
+  }
+
   void _throttledScroll() {
     if (_pendingRender) return;
     _pendingRender = true;
@@ -780,6 +909,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       return false;
     }
     if (notification is ScrollUpdateNotification) {
+      // Reaching for the top of a truncated history loads the page before it.
+      // The prepended page grows the list upward, so this does not fire again
+      // until the reader scrolls up once more.
+      if (notification.metrics.pixels < _olderPageTriggerPx) _loadOlder();
       final delta = notification.scrollDelta;
       if (delta == null) return false;
       // 惯性滚动（fling）阶段 UserScrollNotification 不再更新，用位移兜底。
@@ -811,6 +944,64 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     setState(() => _scrollMagnetEngaged = true);
     _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
     _syncAwayFromBottom();
+  }
+
+  /// Load the page before the oldest loaded one and prepend it, keeping the
+  /// reader on the same message. The older page's ordinals precede the current
+  /// ones, so every existing line shifts by the number of prepended messages.
+  Future<void> _loadOlder() async {
+    final cursor = _previousCursor;
+    final sessionId = _sessionId;
+    if (cursor == null || sessionId == null || _loadingOlder) return;
+    if (_scrollController.hasClients) _maxScrollBeforePrepend = _scrollController.position.maxScrollExtent;
+    setState(() => _loadingOlder = true);
+    try {
+      final response = await widget.connection.request('sessions.contextPage', {
+        'id': sessionId,
+        'cursor': cursor,
+        ..._historyWindow,
+      });
+      if (!mounted || _sessionId != sessionId) return;
+      // sessions.contextPage answers {context: PagedContextInfo}; the history
+      // helpers read the sessions.get shape, which wraps it in a detail.
+      final rawContext = response['context'];
+      final Map<String, dynamic>? contextPage =
+          rawContext is Map ? Map<String, dynamic>.from(rawContext) : null;
+      final pageDetail = contextPage == null ? null : <String, dynamic>{'context': contextPage};
+      final olderCount = pageDetail == null ? 0 : historyMessageCount(pageDetail);
+      final nextCursor = pageDetail == null ? null : historyPreviousCursor(pageDetail);
+      final ordinals = olderPageOrdinals(oldestOrdinal: _oldestOrdinal, pageLength: olderCount);
+      final older = pageDetail == null
+          ? const <ChatLine>[]
+          : historyLinesFromDetail(pageDetail, ordinalOffset: ordinals.offset);
+      setState(() {
+        _lines.insertAll(0, older);
+        _oldestOrdinal = ordinals.oldest;
+        _previousCursor = nextCursor;
+        _historyExhausted = nextCursor == null;
+      });
+      // Keep the viewport on the same message: everything moved down by the
+      // height the prepended lines added. Only the offset moves; the magnet
+      // state is the reader's, and they were scrolled away from the bottom.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        final jump = _scrollController.position.maxScrollExtent - _maxScrollBeforePrepend;
+        if (jump > 0) _scrollController.jumpTo(_scrollController.offset + jump);
+        _syncAwayFromBottom();
+      });
+    } catch (err) {
+      // A stale cursor means the session changed underneath (a new message
+      // arrived, or it was compacted). The transcript already shows the
+      // newest state, so stop here rather than surface an error.
+      if (mounted && _sessionId == sessionId) {
+        setState(() {
+          _historyExhausted = true;
+          _previousCursor = null;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _loadingOlder = false);
+    }
   }
 
   /// 展开/收起思考过程与工具卡后的磁吸协同（对齐桌面端行为）：
@@ -995,12 +1186,34 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  /// Leading list row: nothing once the whole history is loaded, a spinner
+  /// while an older page is in flight, and a tap target otherwise. The tap is
+  /// the fallback for a page too short to scroll, which would otherwise never
+  /// reach the scroll trigger.
+  Widget _buildOlderHistoryRow(BuildContext context) {
+    if (_historyExhausted && !_loadingOlder) return const SizedBox(width: double.infinity);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Center(
+        child: _loadingOlder
+            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 1.8))
+            : TextButton.icon(
+                onPressed: _loadOlder,
+                icon: const Icon(Icons.history, size: 16),
+                label: const Text('加载更早的消息', style: TextStyle(fontSize: 12)),
+              ),
+      ),
+    );
+  }
+
   Widget _buildLine(BuildContext context, ChatLine line) {
     if (line.kind == 'tool') {
       final callId = line.toolCallId ?? '';
       return _ToolCard(
         line: line,
         expanded: _expandedTools.contains(callId),
+        imageCache: _imageCache,
+        sessionId: _sessionId,
         onToggle: () => setState(() {
           if (!_expandedTools.remove(callId)) _expandedTools.add(callId);
           // 展开/收起不是"看历史"手势：磁吸状态保持不变，收起后不跳。
@@ -1017,6 +1230,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           if (!_expandedThinking.remove(thinkingId)) _expandedThinking.add(thinkingId);
           _scrollMagnetOnToggle();
         }),
+      );
+    }
+    if (line.kind == 'image') {
+      final image = line.image;
+      final sessionId = _sessionId;
+      // An image with no session to load from cannot be resolved; this only
+      // happens for a new-task page before its first message, which has no
+      // transcript yet.
+      if (image == null || sessionId == null) return const SizedBox.shrink();
+      return Align(
+        alignment: line.role == 'user' ? Alignment.centerRight : Alignment.centerLeft,
+        child: ChatImage(ref: image, sessionId: sessionId, cache: _imageCache),
       );
     }
     final isUser = line.role == 'user';
@@ -1038,7 +1263,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ),
         child: isUser
             ? Text(line.text.isEmpty && !line.done ? '…' : line.text, style: baseStyle)
-            : MarkdownText(data: line.text.isEmpty && !line.done ? '…' : line.text, baseStyle: baseStyle),
+            : MarkdownText(
+                data: line.text.isEmpty && !line.done ? '…' : line.text,
+                baseStyle: baseStyle,
+                buildImage: _buildMarkdownImage,
+              ),
       ),
     );
   }
@@ -1144,16 +1373,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         child: ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    itemCount:
-                        entries.length + (_sendingText != null ? 1 : 0) + (_awaitingFirst ? 1 : 0),
+                    // One leading slot for the older-history control.
+                    itemCount: 1 + entries.length + (_sendingText != null ? 1 : 0) + (_awaitingFirst ? 1 : 0),
                     itemBuilder: (context, index) {
-                      if (index < entries.length) {
-                        final entry = entries[index];
+                      if (index == 0) return _buildOlderHistoryRow(context);
+                      final entryIndex = index - 1;
+                      if (entryIndex < entries.length) {
+                        final entry = entries[entryIndex];
                         final group = entry.group;
                         if (group != null) return _buildProcessGroup(context, group);
                         return _buildLine(context, entry.line!);
                       }
-                      final pendingIndex = index - entries.length;
+                      final pendingIndex = entryIndex - entries.length;
                       if (_sendingText != null && pendingIndex == 0) {
                         return Align(
                           alignment: Alignment.centerRight,
@@ -1435,13 +1666,22 @@ class _ThinkingCard extends StatelessWidget {
 
 /// Collapsible tool card mirroring the desktop ToolCallBlock: header with a
 /// readable action title, raw tool name and running/error state, expandable
-/// args JSON and paired result text.
+/// args JSON, paired result text, and any images the tool returned.
 class _ToolCard extends StatelessWidget {
   final ChatLine line;
   final bool expanded;
   final VoidCallback onToggle;
+  /// Resolves result images. Null disables them (nothing to load from).
+  final TranscriptImageCache? imageCache;
+  final String? sessionId;
 
-  const _ToolCard({required this.line, required this.expanded, required this.onToggle});
+  const _ToolCard({
+    required this.line,
+    required this.expanded,
+    required this.onToggle,
+    this.imageCache,
+    this.sessionId,
+  });
 
   IconData get _icon {
     final name = (line.toolName ?? '').toLowerCase();
@@ -1457,7 +1697,9 @@ class _ToolCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final actionTitle = toolActionTitle(line.toolName ?? 'tool', line.input);
     final hasInput = line.input?.isNotEmpty ?? false;
-    final hasBody = hasInput || (line.resultText?.isNotEmpty ?? false);
+    final showImages = imageCache != null && sessionId != null && line.resultImages.isNotEmpty;
+    // A tool whose only output is a screenshot still has something to open.
+    final hasBody = hasInput || (line.resultText?.isNotEmpty ?? false) || showImages;
     // Collapsed cards never show the args. Serializing a large edit/write
     // input on every streaming snapshot is pure waste, so build it only when
     // the card is open.
@@ -1566,6 +1808,19 @@ class _ToolCard extends StatelessWidget {
                             style: const TextStyle(fontSize: 10.5, fontFamily: 'monospace', color: Colors.black87),
                           ),
                         ],
+                        // Images the tool returned (screenshots, diffs, read
+                        // pictures), shown only while the card is open like
+                        // the rest of the body.
+                        if (showImages)
+                          for (final image in line.resultImages)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: ChatImage(
+                                ref: image,
+                                sessionId: sessionId!,
+                                cache: imageCache!,
+                              ),
+                            ),
                       ],
                     ),
                   )
