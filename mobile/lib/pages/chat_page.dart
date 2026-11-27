@@ -194,6 +194,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool get _hasPendingSend => _sendingText != null || _sendingImages.isNotEmpty;
   bool _slashOpen = false;
   bool _slashSkillsLoaded = false;
+  bool _slashSkillsLoading = false;
   /// Turn-state mirror (PC `isStreaming` equivalent): true while the agent
   /// is running a turn on the PC. Drives steer-vs-prompt and the queue bar.
   bool _turnRunning = false;
@@ -208,6 +209,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     {'name': 'name', 'desc': '设置会话显示名', 'source': '内置'},
     {'name': 'session', 'desc': '查看会话消息/token/费用统计', 'source': '内置'},
     {'name': 'copy', 'desc': '复制最后一条助手回复', 'source': '内置'},
+    {'name': 'goal', 'desc': '描述目标与验收标准，Agent 自主执行并自检直到验收', 'source': '扩展'},
+    {'name': 'mcp', 'desc': '在桌面设置中管理 MCP 服务', 'source': '扩展'},
   ];
   String? _sessionId;
 
@@ -224,6 +227,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // A new task's directory is known up front; it becomes the session cwd.
       _cwd = widget.newTaskCwd;
       unawaited(_loadModelNames());
+      unawaited(_loadSlashSkills());
     } else {
       _attach(_sessionId!);
     }
@@ -279,6 +283,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _cwd = _cwdFromDetail(detail) ?? _cwd;
       });
       _applyTurnRunning(_turnRunning);
+      unawaited(_loadSlashSkills());
       // agent.running broadcasts changes only and never replays a snapshot on
       // subscribe; reconcile against the authoritative running-session ids so
       // an idle PC cannot leave this page stuck in "turn in progress".
@@ -822,35 +827,54 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// "/" 命令面板：首字符输入 "/" 时展示内置命令 + PC 端技能列表。
+  Future<void> _loadSlashSkills() async {
+    if (_slashSkillsLoaded || _slashSkillsLoading || !widget.connection.isReady) {
+      return;
+    }
+    final cwd = _cwd ?? widget.newTaskCwd;
+    if (cwd == null || cwd.isEmpty) return;
+    _slashSkillsLoading = true;
+    try {
+      final result = await widget.connection.request('skills.list', {'cwd': cwd});
+      final skills = result['skills'];
+      if (!mounted) return;
+      final existingNames = {for (final item in _slashItems) item['name'] ?? ''};
+      final added = <Map<String, String>>[];
+      if (skills is List) {
+        for (final s in skills) {
+          if (s is! Map) continue;
+          final rawName = (s['name'] as String? ?? '').replaceFirst('/', '').trim();
+          if (rawName.isEmpty) continue;
+          final cmdName = rawName.startsWith('skill:') ? rawName : 'skill:$rawName';
+          if (existingNames.add(cmdName)) {
+            added.add({
+              'name': cmdName,
+              'desc': (s['description'] as String? ?? '').trim(),
+              'source': '技能',
+            });
+          }
+        }
+      }
+      setState(() {
+        _slashSkillsLoaded = true;
+        _slashSkillsLoading = false;
+        if (added.isNotEmpty) {
+          _slashItems = [..._slashItems, ...added];
+        }
+      });
+    } catch (_) {
+      // 技能目录暂不可用（如离线/无 cwd）时保留下次重试机会，内置与扩展命令仍可用。
+      _slashSkillsLoading = false;
+    }
+  }
+
+  /// "/" 命令面板：首字符输入 "/" 且未含空白时展示内置、扩展与 PC 端技能列表。
   void _onPromptChanged(String text) {
-    if (text.startsWith('/')) {
+    final slashActive = text.startsWith('/') && !text.substring(1).contains(RegExp(r'\s'));
+    if (slashActive) {
       if (!_slashOpen) {
         _slashOpen = true;
-        if (!_slashSkillsLoaded) {
-          _slashSkillsLoaded = true;
-          widget.connection
-              .request('skills.list', null)
-              .then((result) {
-                final skills = result['skills'];
-                if (skills is! List) return;
-                setState(() {
-                  _slashItems = [
-                    ..._slashItems,
-                    for (final s in skills)
-                      if (s is Map)
-                        {
-                          'name': (s['name'] as String? ?? '').replaceFirst('/', ''),
-                          'desc': s['description'] as String? ?? '',
-                          'source': '技能',
-                        },
-                  ];
-                });
-              })
-              .catchError((Object err) {
-                // Skill catalog unavailable — builtin commands still work.
-              });
-        }
+        unawaited(_loadSlashSkills());
       }
       setState(() {});
     } else if (_slashOpen) {
@@ -867,6 +891,90 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         .where((item) =>
             item['name']!.toLowerCase().contains(query) || item['desc']!.toLowerCase().contains(query))
         .toList();
+  }
+
+  List<Widget> _buildSlashPopupChildren() {
+    final filtered = _filteredSlashItems();
+    if (filtered.isEmpty) {
+      return const [
+        Padding(
+          padding: EdgeInsets.all(14),
+          child: Text(
+            '没有匹配的命令',
+            style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+          ),
+        ),
+      ];
+    }
+    const sources = ['内置', '扩展', '技能'];
+    final children = <Widget>[];
+    for (final source in sources) {
+      final groupItems = filtered.where((item) => item['source'] == source).toList();
+      if (groupItems.isEmpty) continue;
+      children.add(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 2),
+          child: Row(
+            children: [
+              Text(
+                source,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '${groupItems.length}',
+                style: const TextStyle(
+                  fontSize: 10.5,
+                  fontFamily: 'monospace',
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      for (final item in groupItems) {
+        final name = item['name'] ?? '';
+        final desc = item['desc'] ?? '';
+        children.add(
+          ListTile(
+            dense: true,
+            visualDensity: const VisualDensity(vertical: -2),
+            leading: Icon(
+              source == '技能'
+                  ? Icons.extension_outlined
+                  : (source == '扩展'
+                      ? Icons.auto_awesome_outlined
+                      : Icons.build_circle_outlined),
+              size: 16,
+              color: AppColors.textSecondary,
+            ),
+            title: Text(
+              '/$name',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'monospace',
+              ),
+            ),
+            subtitle: desc.isEmpty
+                ? null
+                : Text(
+                    desc,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11),
+                  ),
+            onTap: () => _applySlashCommand(name),
+          ),
+        );
+      }
+    }
+    return children;
   }
 
   void _applySlashCommand(String name) {
@@ -1221,6 +1329,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // back later; until then these pending items + loading row show).
     setState(() {
       _error = null;
+      _slashOpen = false;
       _sendingText = text.isEmpty ? null : text;
       _sendingImages = images;
       _pendingImages.clear();
@@ -1548,43 +1657,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               clearing: _clearingQueue,
               onClear: _clearQueue,
             ),
-          if (_slashOpen)
-            Container(
-              margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-              constraints: const BoxConstraints(maxHeight: 220),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.black12),
-              ),
-              child: ListView(
-                shrinkWrap: true,
-                padding: EdgeInsets.zero,
-                children: [
-                  for (final item in _filteredSlashItems())
-                    ListTile(
-                      dense: true,
-                      leading: Icon(
-                        item['source'] == '技能' ? Icons.extension : Icons.build_circle_outlined,
-                        size: 16,
-                        color: Colors.black45,
-                      ),
-                      title: Text('/${item['name']}',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
-                      subtitle: Text(item['desc'] ?? '',
-                          maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
-                      onTap: () => _applySlashCommand(item['name']!),
-                    ),
-                  if (_filteredSlashItems().isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(14),
-                      child: Text('没有匹配的命令', style: TextStyle(fontSize: 12, color: Colors.black38)),
-                    ),
-                ],
-              ),
-            ),
           Expanded(
-            child: _loadingHistory
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final popupMaxH = constraints.maxHeight > 32
+                    ? (constraints.maxHeight - 12).clamp(80.0, 260.0)
+                    : 80.0;
+                return Stack(
+                  children: [
+                    Positioned.fill(
+                      child: _loadingHistory
                 ? const Center(
                     child: SizedBox(
                       width: 22,
@@ -1686,6 +1768,36 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         ),
                     ],
                   ),
+                    ),
+                    if (_slashOpen)
+                      Positioned(
+                        left: 12,
+                        right: 12,
+                        bottom: 4,
+                        child: ConstrainedBox(
+                          key: const Key('slash-command-popup'),
+                          constraints: BoxConstraints(maxHeight: popupMaxH),
+                          child: Material(
+                            color: AppColors.surface,
+                            elevation: 6,
+                            shadowColor: const Color(0x24000000),
+                            clipBehavior: Clip.antiAlias,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              side: const BorderSide(color: AppColors.border),
+                            ),
+                            child: ListView(
+                              shrinkWrap: true,
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              children: _buildSlashPopupChildren(),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
           ),
           if (widget.offlineBanner != null) widget.offlineBanner!,
           SafeArea(

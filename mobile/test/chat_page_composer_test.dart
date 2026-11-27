@@ -11,6 +11,7 @@ import 'package:pi_remote/pages/chat_page.dart';
 class FakeConnection extends RemoteConnection {
   final events = StreamController<RemoteSessionEvent>.broadcast();
   final commands = <Map<String, dynamic>>[];
+  final requests = <Map<String, Object?>>[];
 
   FakeConnection({
     required super.relayUrl,
@@ -38,11 +39,22 @@ class FakeConnection extends RemoteConnection {
 
   @override
   Future<Map<String, dynamic>> request(String method, Object? params) async {
+    requests.add({'method': method, 'params': params});
     switch (method) {
       case 'sessions.get':
-        return {'context': {'messages': <dynamic>[]}};
+        return {
+          'info': {'cwd': r'D:\work\carhome'},
+          'context': {'messages': <dynamic>[]},
+        };
       case 'sessions.list':
         return {'runningSessionIds': <dynamic>[]};
+      case 'skills.list':
+        return {
+          'skills': [
+            {'name': 'review', 'description': 'Code review skill'},
+          ],
+          'diagnostics': <dynamic>[],
+        };
       case 'models.preferences.get':
         return {'models': <dynamic>[]};
       default:
@@ -143,5 +155,49 @@ void main() {
 
     expect(connection.commands.any((c) => c['type'] == 'abort'), isTrue);
     expect(find.textContaining('已发送中止', findRichText: true), findsOneWidget);
+  });
+
+  testWidgets('输入 / 时命令弹出框紧贴底部输入框上方显示，而不是浮在顶部', (tester) async {
+    final connection = FakeConnection(
+      relayUrl: 'ws://relay.example:8788/ws',
+      deviceId: 'dev-1',
+      deviceLabel: 'phone',
+    );
+
+    await pumpFrames(tester, ChatPage(connection: connection, sessionId: 's1', title: '会话'));
+
+    await tester.enterText(find.byType(TextField), '/');
+    await tester.pump();
+
+    final popup = find.byKey(const Key('slash-command-popup'));
+    expect(popup, findsOneWidget);
+
+    final popupRect = tester.getRect(popup);
+    final composerRect = tester.getRect(find.byType(TextField));
+    final appBarRect = tester.getRect(find.byType(AppBar));
+
+    // Must sit right above the composer (far from top AppBar).
+    expect(popupRect.bottom, lessThanOrEqualTo(composerRect.top));
+    expect((composerRect.top - popupRect.bottom).abs(), lessThan(40));
+    expect(popupRect.top, greaterThan(appBarRect.bottom + 100));
+
+    // Requested skills.list with session cwd, and displays Built-in / Extensions (/goal, /mcp) / Skills.
+    final skillReqs = connection.requests.where((r) => r['method'] == 'skills.list').toList();
+    expect(skillReqs, isNotEmpty);
+    expect(skillReqs.first['params'], {'cwd': r'D:\work\carhome'});
+
+    final popupScrollable = find.descendant(of: popup, matching: find.byType(Scrollable));
+    await tester.scrollUntilVisible(find.text('/goal'), 80, scrollable: popupScrollable);
+    expect(find.text('/goal'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('/mcp'), 80, scrollable: popupScrollable);
+    expect(find.text('/mcp'), findsOneWidget);
+
+    await tester.scrollUntilVisible(find.text('/skill:review'), 80, scrollable: popupScrollable);
+    expect(find.text('/skill:review'), findsOneWidget);
+
+    await tester.tap(find.text('/skill:review'));
+    await tester.pump();
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.controller?.text, '/skill:review ');
   });
 }
