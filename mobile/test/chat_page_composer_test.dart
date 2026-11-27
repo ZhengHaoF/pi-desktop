@@ -1,12 +1,17 @@
 /// 回归测试：输入框要随长文本换行长高，而不是把整段文字压成一行横向滚动。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pi_remote/core/remote_connection.dart';
 import 'package:pi_remote/pages/chat_page.dart';
 
 class FakeConnection extends RemoteConnection {
+  final events = StreamController<RemoteSessionEvent>.broadcast();
+  final commands = <Map<String, dynamic>>[];
+
   FakeConnection({
     required super.relayUrl,
     required super.deviceId,
@@ -17,10 +22,19 @@ class FakeConnection extends RemoteConnection {
   bool get isReady => true;
 
   @override
+  Stream<RemoteSessionEvent> get onEvent => events.stream;
+
+  @override
   Future<void> subscribe(String topic, String key) async {}
 
   @override
   Future<void> unsubscribe(String topic, String key) async {}
+
+  @override
+  Future<Map<String, dynamic>> agentCommand(String sessionId, Map<String, dynamic> command) async {
+    commands.add({'sessionId': sessionId, ...command});
+    return <String, dynamic>{};
+  }
 
   @override
   Future<Map<String, dynamic>> request(String method, Object? params) async {
@@ -85,5 +99,49 @@ void main() {
     await tester.pump();
     expect(tester.getSize(find.byType(TextField)).height, lessThanOrEqualTo(wrappedHeight * 2),
         reason: '达到 maxLines 后高度必须封顶');
+  });
+
+  testWidgets('中止功能集成到右下角发送键：运行中空输入为停止，有输入为插队，顶栏不常驻停止按钮', (tester) async {
+    final connection = FakeConnection(
+      relayUrl: 'ws://relay.example:8788/ws',
+      deviceId: 'dev-1',
+      deviceLabel: 'phone',
+    );
+
+    await pumpFrames(tester, ChatPage(connection: connection, sessionId: 's1', title: '会话'));
+
+    // AppBar has no persistent stop icon; idle empty composer shows send button.
+    expect(find.byIcon(Icons.stop_circle_outlined), findsNothing);
+    expect(find.byKey(const Key('composer-send')), findsOneWidget);
+    expect(find.byKey(const Key('composer-stop')), findsNothing);
+
+    // Sending puts the page into awaiting-first state -> immediately offers stop.
+    await tester.enterText(find.byType(TextField), '帮我看下日志');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('composer-send')));
+    await tester.pump();
+    expect(find.byKey(const Key('composer-stop')), findsOneWidget);
+
+    // Turn becomes running on PC: typing switches button back to steer send; clearing returns to stop.
+    connection.events.add(RemoteSessionEvent('agent.running', 'global', {
+      'runningSessionIds': ['s1'],
+    }));
+    await tester.pump();
+    expect(find.byKey(const Key('composer-stop')), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), '顺便检查单测');
+    await tester.pump();
+    expect(find.byKey(const Key('composer-send')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('composer-send')));
+    await tester.pump();
+    expect(connection.commands.any((c) => c['type'] == 'steer' && c['message'] == '顺便检查单测'), isTrue);
+
+    // Now composer is empty again while running -> tapping stop sends abort.
+    expect(find.byKey(const Key('composer-stop')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('composer-stop')));
+    await tester.pump();
+
+    expect(connection.commands.any((c) => c['type'] == 'abort'), isTrue);
+    expect(find.textContaining('已发送中止', findRichText: true), findsOneWidget);
   });
 }

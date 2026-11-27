@@ -1,16 +1,19 @@
-/// Transcript images: an inline thumbnail and the full-screen viewer it opens.
+/// Transcript images: a thumbnail, the tap that loads it, and the full-screen
+/// viewer it opens.
 ///
-/// The thumbnail asks an [TranscriptImageCache] for decoded bytes, so a paged-history
-/// placeholder shows a spinner until the PC returns it and offers a retry when
-/// that round trip fails. Tapping opens [ImageViewer], a full-bleed route
-/// with pinch-zoom and pan.
+/// A picture whose bytes came with the message renders at once. One that would
+/// cost a request (a paged-history placeholder, a path named in prose) waits
+/// for a tap, so an old session costs no image data until the reader asks.
+/// Either way, tapping the picture opens [ImageViewer].
 library;
 
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../core/app_theme.dart';
 import '../core/image_cache.dart';
+import '../widgets/image_block.dart';
 import '../widgets/session_models.dart';
 
 /// Edge-to-edge size of a thumbnail, in logical pixels. Screenshots are wide,
@@ -32,14 +35,24 @@ class ChatImage extends StatefulWidget {
   /// What the picture is, shown while it loads and in place of it when it
   /// cannot be shown. A reply's `![alt](path)` supplies it; blocks have none.
   final String? alt;
+  /// Load without a tap. Defaults to true only for blocks whose bytes already
+  /// arrived with the message: decoding those costs no network. A placeholder
+  /// that would need a request (paged history, a path in prose) waits for a
+  /// tap, so scrolling through an old session never spends data on pictures
+  /// the reader is only scrolling past.
+  final bool? autoLoad;
 
   const ChatImage({
     required this.ref,
     required this.sessionId,
     required this.cache,
     this.alt,
+    this.autoLoad,
     super.key,
   });
+
+  /// Whether this picture loads by itself.
+  bool get shouldAutoLoad => autoLoad ?? (ref.data is InlineImage);
 
   @override
   State<ChatImage> createState() => _ChatImageState();
@@ -54,18 +67,28 @@ class _ChatImageState extends State<ChatImage> {
   Uint8List? _bytes;
   String? _mime;
   Object? _error;
+  /// A request is in flight (or was made): distinguishes "waiting for a tap"
+  /// from "loading", which look alike before any bytes arrive.
+  bool _loadStarted = false;
   int _attempt = 0;
 
   @override
   void initState() {
     super.initState();
-    _resolve();
+    if (widget.shouldAutoLoad) _resolve();
   }
 
   @override
   void didUpdateWidget(ChatImage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!ChatImage.samePicture(oldWidget, widget) || oldWidget.cache != widget.cache) _resolve();
+    if (ChatImage.samePicture(oldWidget, widget) && oldWidget.cache == widget.cache) return;
+    // A different picture (or a different cache) invalidates everything.
+    _attempt += 1;
+    _bytes = null;
+    _mime = null;
+    _error = null;
+    _loadStarted = false;
+    if (widget.shouldAutoLoad) _resolve();
   }
 
   Future<void> _resolve() async {
@@ -73,6 +96,7 @@ class _ChatImageState extends State<ChatImage> {
     // Direct assignment rather than setState: the first call runs from
     // initState, where notifying dependents is not allowed yet.
     _error = null;
+    _loadStarted = true;
     try {
       final result = await widget.cache.bytesFor(widget.ref, sessionId: widget.sessionId);
       if (!mounted || attempt != _attempt) return;
@@ -89,6 +113,12 @@ class _ChatImageState extends State<ChatImage> {
       if (!mounted || attempt != _attempt) return;
       setState(() => _error = error);
     }
+  }
+
+  /// Start a load the reader asked for, so the tap shows a spinner at once.
+  void _loadOnTap() {
+    setState(() => _loadStarted = true);
+    _resolve();
   }
 
   Future<void> _openViewer() async {
@@ -135,16 +165,20 @@ class _ChatImageState extends State<ChatImage> {
               alt: widget.alt,
               onRetry: () {
                 setState(() => _bytes = null);
-                _resolve();
+                _loadOnTap();
               },
             ),
           ),
         ),
       );
     } else if (_error != null) {
-      body = _FailedImage(alt: widget.alt, onRetry: _resolve);
-    } else {
+      body = _FailedImage(alt: widget.alt, onRetry: _loadOnTap);
+    } else if (_loadStarted) {
       body = _LoadingImage(alt: widget.alt);
+    } else {
+      // Not loaded yet and not loading: the reader decides when to spend the
+      // request this picture needs.
+      body = _TapToLoadImage(alt: widget.alt, onTap: _loadOnTap);
     }
     // No alignment of its own: the caller places the thumbnail (right for the
     // user's own pictures, left inside assistant bubbles and tool cards).
@@ -164,6 +198,62 @@ class _ChatImageState extends State<ChatImage> {
   }
 }
 
+/// Placeholder for a picture that needs a request: the reader taps to spend
+/// it. The alt text says which picture waits, when the reply named one.
+class _TapToLoadImage extends StatelessWidget {
+  final VoidCallback onTap;
+  final String? alt;
+
+  const _TapToLoadImage({required this.onTap, this.alt});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = alt?.trim();
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 176,
+        height: 120,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceSubtle,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: const BoxDecoration(color: AppColors.brandSoft, shape: BoxShape.circle),
+              child: const Icon(Icons.image_outlined, size: 18, color: AppColors.brand),
+            ),
+            if (label != null && label.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                ),
+              ),
+            ],
+            const SizedBox(height: 4),
+            const Text(
+              '点击加载图片',
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.brand),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Placeholder shown while the bytes are on their way from the PC.
 class _LoadingImage extends StatelessWidget {
   /// What the picture is, when the reply said so.
@@ -175,26 +265,27 @@ class _LoadingImage extends StatelessWidget {
   Widget build(BuildContext context) {
     final label = alt?.trim();
     return Container(
-      width: 160,
+      width: 176,
       height: 120,
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(10),
+        color: AppColors.surfaceSubtle,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 1.8)),
+          const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
           if (label != null && label.isNotEmpty) ...[
             const SizedBox(height: 8),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               child: Text(
                 label,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 11, color: Colors.black45),
+                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
             ),
           ],
@@ -218,33 +309,34 @@ class _FailedImage extends StatelessWidget {
     final label = alt?.trim();
     return InkWell(
       onTap: onRetry,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        width: 160,
+        width: 176,
         height: 120,
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(10),
+          color: AppColors.dangerBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.dangerBorder),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.broken_image_outlined, size: 22, color: Colors.black38),
+            const Icon(Icons.broken_image_outlined, size: 22, color: AppColors.danger),
             const SizedBox(height: 6),
             if (label != null && label.isNotEmpty) ...[
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 11, color: Colors.black45),
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 ),
               ),
               const SizedBox(height: 2),
             ],
-            const Text('图片加载失败，点击重试', style: TextStyle(fontSize: 11, color: Colors.black45)),
+            const Text('图片加载失败，点击重试', style: TextStyle(fontSize: 11, color: AppColors.danger)),
           ],
         ),
       ),

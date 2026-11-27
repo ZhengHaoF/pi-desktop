@@ -1,19 +1,51 @@
-/// Connect page: relay address + device id, then straight to the PC home.
+/// Connect page: QR pairing first, one-tap quick reconnect for paired hosts,
+/// handshake verification before leaving the page, and collapsible manual config.
 library;
 
 import 'package:flutter/material.dart';
 
+import '../core/app_theme.dart';
 import '../core/device_label.dart';
 import '../core/host_store.dart';
 import '../core/keep_alive.dart';
 import '../core/navigation.dart';
 import '../core/remote_connection.dart';
 import '../widgets/text_selection_menu.dart';
+import '../widgets/ui_kit.dart';
 import 'home_page.dart';
 import 'scan_page.dart';
 
+/// Factory signature for constructing [RemoteConnection] (overridable in tests).
+typedef RemoteConnectionFactory = RemoteConnection Function({
+  required String relayUrl,
+  required String deviceId,
+  required String deviceLabel,
+  String? pairingToken,
+  String? targetHostId,
+});
+
+RemoteConnection _defaultConnectionFactory({
+  required String relayUrl,
+  required String deviceId,
+  required String deviceLabel,
+  String? pairingToken,
+  String? targetHostId,
+}) =>
+    RemoteConnection(
+      relayUrl: relayUrl,
+      deviceId: deviceId,
+      deviceLabel: deviceLabel,
+      pairingToken: pairingToken,
+      targetHostId: targetHostId,
+    );
+
 class ConnectPage extends StatefulWidget {
-  const ConnectPage({super.key});
+  const ConnectPage({
+    this.connectionFactory,
+    super.key,
+  });
+
+  final RemoteConnectionFactory? connectionFactory;
 
   @override
   State<ConnectPage> createState() => _ConnectPageState();
@@ -24,22 +56,49 @@ class _ConnectPageState extends State<ConnectPage> {
 
   final _urlController = TextEditingController(text: _defaultRelayUrl);
   final _deviceController = TextEditingController();
-  /// 扫码载荷带入的配对材料：一次性 token 与目标 PC（hostId）。
   String? _pairingToken;
   String? _targetHostId;
+  String? _savedHostName;
+  bool _canQuickReconnect = false;
+  bool _advancedExpanded = true;
   LinkState _state = LinkState.disconnected;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    loadOrCreateDeviceId().then((id) {
-      if (mounted) _deviceController.text = id;
-    });
-    // 回填上次成功连接的 relay 地址；用户已手动改过输入框时不覆盖。
-    loadLastRelayUrl().then((url) {
-      if (!mounted || url == null) return;
-      if (_urlController.text == _defaultRelayUrl) _urlController.text = url;
+    _loadSavedConnectionInfo();
+  }
+
+  Future<void> _loadSavedConnectionInfo() async {
+    final deviceId = await loadOrCreateDeviceId();
+    if (mounted && _deviceController.text.isEmpty) {
+      _deviceController.text = deviceId;
+    }
+    final url = await loadLastRelayUrl();
+    final preferredId = await loadPreferredHost();
+    final hosts = await loadKnownHosts();
+    final pairedIds = url == null ? const <String>{} : await loadPairedHostIds(deviceId, relayUrl: url);
+    if (!mounted) return;
+    String? hostName;
+    if (preferredId != null) {
+      for (final h in hosts) {
+        if (h.id == preferredId) {
+          hostName = h.displayName;
+          break;
+        }
+      }
+      hostName ??= preferredId;
+    }
+    final hasPairedHost = url != null &&
+        (preferredId != null ? pairedIds.contains(preferredId) : pairedIds.isNotEmpty);
+    setState(() {
+      if (url != null) {
+        if (_urlController.text == _defaultRelayUrl) _urlController.text = url;
+        _advancedExpanded = !hasPairedHost;
+      }
+      _canQuickReconnect = hasPairedHost;
+      _savedHostName = hostName;
     });
   }
 
@@ -55,12 +114,9 @@ class _ConnectPageState extends State<ConnectPage> {
       _targetHostId = scanned.hostId;
       _error = null;
     });
-    // 配对二维码带的主机公钥是带外锚点：先钉扎，hello_ack 不符即拒连。
-    // 钉扎按 relay 地址隔离，换 relay 不互相污染。
     if (scanned.e2eePub != null && scanned.hostId != null) {
       await savePinnedHostPub(scanned.hostId!, scanned.e2eePub!, relayUrl: scanned.url);
     }
-    // Scanning is an explicit intent to connect — go straight through.
     await _connect();
   }
 
@@ -70,30 +126,55 @@ class _ConnectPageState extends State<ConnectPage> {
       _state = LinkState.connecting;
       _error = null;
     });
-    final connection = RemoteConnection(
-      relayUrl: _urlController.text.trim(),
-      deviceId: _deviceController.text.trim(),
-      // 型号 + Android 版本进 hello 的 label，电脑端配对列表才分得清是哪台。
+    final relayUrl = _urlController.text.trim();
+    final deviceId = _deviceController.text.trim();
+    final factory = widget.connectionFactory ?? _defaultConnectionFactory;
+    final connection = factory(
+      relayUrl: relayUrl,
+      deviceId: deviceId,
       deviceLabel: await resolveDeviceLabel(),
       pairingToken: _pairingToken,
       targetHostId: _targetHostId,
     );
     try {
-      await connection.connect();
-      if (!mounted) return;
-      // 连接成功且用户开启保活 → 前台服务 + WifiLock，息屏不断链。
+      final ready = await connection.connectAndWaitHandshake();
+      if (!mounted) {
+        connection.disconnect();
+        return;
+      }
+      if (!ready) {
+        final pairingRejected = connection.lastFailureWasPairingReject;
+        final message = connection.describeLastFailure() ?? '连接超时或未响应，请检查 Relay 地址后重试';
+        final rejectedHostId = connection.hostId ?? _targetHostId;
+        connection.disconnect();
+        if (pairingRejected && rejectedHostId != null && rejectedHostId.isNotEmpty) {
+          await deleteDeviceSecret(deviceId, relayUrl: relayUrl, hostId: rejectedHostId);
+          await deleteCachedSessions(rejectedHostId);
+        }
+        if (!mounted) return;
+        setState(() {
+          _state = LinkState.disconnected;
+          _error = message;
+          if (pairingRejected) {
+            _pairingToken = null;
+            _canQuickReconnect = false;
+          }
+        });
+        return;
+      }
       if (await keepAliveEnabled()) {
         await startKeepAlive();
       }
       if (!mounted) return;
-      // 清空导航栈而不是替换当前页：从设置页「断开连接并返回」进来时，
-      // 栈底还压着一条已断开连接的旧 HomePage，仅替换当前页会把首页留成
-      // 「可返回」状态（AppBar 显示返回箭头，按返回退到死连接）。
       pushAsRoot(context, HomePage(connection: connection));
     } catch (err) {
+      final message = connection.describeLastFailure() ??
+          (err is StateError ? err.message.replaceFirst('Bad state: ', '') : err.toString());
+      connection.disconnect();
+      if (!mounted) return;
       setState(() {
         _state = LinkState.disconnected;
-        _error = err.toString();
+        _error = message;
       });
     }
   }
@@ -107,53 +188,191 @@ class _ConnectPageState extends State<ConnectPage> {
 
   @override
   Widget build(BuildContext context) {
+    final connecting = _state == LinkState.connecting;
+    final relaySummary = relayScope(_urlController.text.trim());
     return Scaffold(
       appBar: AppBar(title: const Text('Pi Go — 连接')),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
-            TextField(
-              controller: _urlController,
-              contextMenuBuilder: buildChineseTextSelectionMenu,
-              decoration: InputDecoration(
-                labelText: 'Relay 地址',
-                hintText: 'ws://192.168.x.x:8788/ws',
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  tooltip: '扫描电脑二维码',
-                  onPressed: _scanQr,
-                  icon: const Icon(Icons.qr_code_scanner),
-                ),
+            SurfaceCard(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  Image.asset(
+                    'assets/app_icon.png',
+                    width: 52,
+                    height: 52,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Pi Go',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                            ),
+                            SizedBox(width: 8),
+                            StatusBadge(
+                              label: '端到端加密',
+                              foreground: AppColors.brandInk,
+                              background: AppColors.brandSoft,
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          '远程管理电脑端 Pi Agent 会话与任务',
+                          style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _scanQr,
-              icon: const Icon(Icons.qr_code_2, size: 18),
-              label: const Text('扫描电脑屏幕上的二维码'),
+            SurfaceCard(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton.icon(
+                    onPressed: connecting ? null : _scanQr,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.brand,
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+                    label: const Text('扫描电脑屏幕上的二维码', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                  ),
+                  if (_canQuickReconnect) ...[
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: connecting ? null : _connect,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(46),
+                        side: const BorderSide(color: AppColors.borderStrong),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: connecting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.bolt_rounded, size: 19, color: AppColors.brand),
+                      label: Text(
+                        connecting
+                            ? '正在校验配对…'
+                            : _savedHostName != null
+                                ? '快速重连 $_savedHostName（$relaySummary）'
+                                : '快速连接（$relaySummary）',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    ErrorBanner(message: _error!),
+                  ],
+                ],
+              ),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _deviceController,
-              contextMenuBuilder: buildChineseTextSelectionMenu,
-              decoration: const InputDecoration(labelText: '设备标识', border: OutlineInputBorder()),
+            SurfaceCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  InkWell(
+                    onTap: () => setState(() => _advancedExpanded = !_advancedExpanded),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.tune_rounded, size: 18, color: AppColors.textSecondary),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '手动配置与设备标识',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          ),
+                          const Spacer(),
+                          AnimatedRotation(
+                            turns: _advancedExpanded ? 0 : -0.25,
+                            duration: const Duration(milliseconds: 140),
+                            child: const Icon(Icons.expand_more, size: 20, color: AppColors.textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (_advancedExpanded)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Divider(height: 1),
+                          const SizedBox(height: 14),
+                          TextField(
+                            controller: _urlController,
+                            contextMenuBuilder: buildChineseTextSelectionMenu,
+                            decoration: InputDecoration(
+                              labelText: 'Relay 地址',
+                              hintText: 'ws://192.168.x.x:8788/ws',
+                              filled: true,
+                              fillColor: AppColors.surfaceSubtle,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              suffixIcon: IconButton(
+                                tooltip: '扫描电脑二维码',
+                                onPressed: _scanQr,
+                                icon: const Icon(Icons.qr_code_scanner),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _deviceController,
+                            contextMenuBuilder: buildChineseTextSelectionMenu,
+                            decoration: InputDecoration(
+                              labelText: '设备标识',
+                              filled: true,
+                              fillColor: AppColors.surfaceSubtle,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          FilledButton.tonal(
+                            onPressed: connecting ? null : _connect,
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(44),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: Text(connecting ? '连接中…' : '使用当前配置连接'),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
             ),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: _state == LinkState.connecting ? null : _connect,
-              child: Text(_state == LinkState.connecting ? '连接中…' : '连接'),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 16),
-              Text(_error!, style: const TextStyle(color: Colors.red)),
-            ],
-            const Spacer(),
-            Text(
-              '端到端加密：配对成功后所有会话内容在手机与电脑间加密传输，'
-              '中继服务器无法读取。\n首次连接请用电脑端「设备配对」二维码扫码配对。',
-              style: Theme.of(context).textTheme.bodySmall,
+            const SizedBox(height: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                '配对成功后所有会话内容均在手机与电脑间端到端加密传输，中继服务器无法读取。首次连接请使用电脑端「设备配对」二维码。',
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.5),
+              ),
             ),
           ],
         ),

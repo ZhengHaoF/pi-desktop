@@ -221,7 +221,14 @@ void main() {
 
       await pumpPage(tester, connection);
 
-      // The row is on screen, so its bytes are requested exactly once.
+      // A paged-history picture is a placeholder until the reader asks for it.
+      expect(connection.entryContentRequests, isEmpty);
+      expect(find.text('点击加载图片'), findsOneWidget);
+
+      await tester.tap(find.text('点击加载图片'));
+      await tester.pump();
+
+      // One tap, one request.
       expect(connection.entryContentRequests, hasLength(1));
       expect(connection.entryContentRequests.single['entryId'], 'entry-9');
 

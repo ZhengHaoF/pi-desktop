@@ -1,14 +1,18 @@
 /// Minimal markdown renderer for chat bubbles (zero-dependency): headers,
-/// unordered/ordered lists, fenced code blocks, inline **bold** / *italic* /
-/// `code` / [link](url) / ![image](path). Covers the subset the agent emits.
+/// unordered/ordered lists, fenced code blocks with copy/scroll, blockquotes,
+/// horizontal rules, and inline **bold** / *italic* / `code` / [link](url) /
+/// ![image](path).
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../core/app_theme.dart';
 
 /// One `![alt](target)` found in a line of prose.
 class _MarkdownImage {
-  /// Display text while the picture loads, or instead of it when it cannot
-  /// be shown.
   final String alt;
   final String target;
 
@@ -73,16 +77,17 @@ List<InlineSpan> _inlineSpans(
         style: base.copyWith(
           fontFamily: 'monospace',
           fontSize: (base.fontSize ?? 13) - 1,
-          background: Paint()..color = Colors.black.withValues(alpha: 0.07),
+          color: AppColors.brandInk,
+          backgroundColor: AppColors.brandSoft,
         ),
       ));
     } else if (linkText != null && linkUrl != null) {
       spans.add(TextSpan(
         text: linkText,
         style: base.copyWith(
-          color: Colors.blue,
+          color: AppColors.brand,
           decoration: TextDecoration.underline,
-          decorationColor: Colors.blue,
+          decorationColor: AppColors.brand,
         ),
       ));
     }
@@ -95,40 +100,140 @@ List<InlineSpan> _inlineSpans(
   return spans;
 }
 
-Widget _monoBlock(BuildContext context, String code) {
-  return Container(
-    width: double.infinity,
-    margin: const EdgeInsets.symmetric(vertical: 4),
-    padding: const EdgeInsets.all(8),
-    decoration: BoxDecoration(
-      color: Colors.black.withValues(alpha: 0.06),
-      borderRadius: BorderRadius.circular(6),
-    ),
-    child: Text(
-      code,
-      style: const TextStyle(fontSize: 10.5, fontFamily: 'monospace', height: 1.35),
-    ),
-  );
+class _CodeBlockWidget extends StatefulWidget {
+  final String code;
+  final String language;
+
+  const _CodeBlockWidget({required this.code, this.language = ''});
+
+  @override
+  State<_CodeBlockWidget> createState() => _CodeBlockWidgetState();
 }
 
-/// One rendered block: paragraph / header / list item / code fence.
-///
-/// [buildImage] renders one `![alt](target)` of this block; when null (or for
-/// headers and code) the image syntax stays as literal text.
+class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
+  bool _copied = false;
+  Timer? _resetTimer;
+
+  @override
+  void dispose() {
+    _resetTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.code));
+    if (!mounted) return;
+    setState(() => _copied = true);
+    _resetTimer?.cancel();
+    _resetTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _copied = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = widget.language.trim().isEmpty ? 'code' : widget.language.trim();
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSubtle,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(10, 5, 6, 5),
+            decoration: const BoxDecoration(
+              color: AppColors.surfaceMuted,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
+              border: Border(bottom: BorderSide(color: AppColors.border)),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const Spacer(),
+                InkWell(
+                  onTap: _copy,
+                  borderRadius: BorderRadius.circular(6),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _copied ? Icons.check_rounded : Icons.copy_rounded,
+                          size: 13,
+                          color: _copied ? AppColors.success : AppColors.textMuted,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _copied ? '已复制' : '复制',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: _copied ? AppColors.success : AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.all(10),
+            child: Text(
+              widget.code,
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontFamily: 'monospace',
+                height: 1.45,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One rendered block: paragraph / header / list item / quote / code fence.
 Widget _block(
   BuildContext context,
   String kind,
   String content,
   TextStyle base, {
+  String codeLang = '',
   MarkdownImageBuilder? buildImage,
 }) {
-  // Headers and code never contain pictures.
-  if (kind == 'code' || kind.startsWith('h')) {
+  if (kind == 'code') {
+    return _CodeBlockWidget(code: content, language: codeLang);
+  }
+  if (kind == 'hr') {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 6),
+      child: Divider(height: 1, color: AppColors.border),
+    );
+  }
+  if (kind.startsWith('h')) {
     return _textBlock(context, kind, content, base);
   }
   final extracted = _extractImages(content);
   if (buildImage == null || extracted.images.isEmpty) {
-    // Put the syntax back exactly as written when it cannot be rendered.
     return _textBlock(context, kind, content, base);
   }
   final text = extracted.text.trim();
@@ -141,22 +246,31 @@ Widget _block(
   final Widget body = Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      // Always a paragraph: the list marker (if any) is drawn by the wrapper.
       if (text.isNotEmpty) _textBlock(context, 'p', text, base),
       ...images,
     ],
   );
-  // A list item keeps its marker; the pictures go under the item's text.
+  if (kind == 'quote') {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.fromLTRB(10, 4, 8, 4),
+      decoration: const BoxDecoration(
+        color: AppColors.surfaceSubtle,
+        border: Border(left: BorderSide(color: AppColors.brandBorder, width: 3)),
+      ),
+      child: body,
+    );
+  }
   if (kind == 'ul' || kind == 'ol') {
     final dot = kind == 'ol' ? content.indexOf('.') : -1;
     final marker = dot > 0 ? '${content.substring(0, dot)}.' : '•';
     return Padding(
-      padding: EdgeInsets.only(left: kind == 'ol' ? 4 : 10, top: 1, bottom: 1),
+      padding: EdgeInsets.only(left: kind == 'ol' ? 4 : 10, top: 2, bottom: 2),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: EdgeInsets.only(right: kind == 'ol' ? 4 : 6),
+            padding: EdgeInsets.only(right: kind == 'ol' ? 5 : 6),
             child: Text(marker, style: base.copyWith(fontWeight: kind == 'ol' ? FontWeight.bold : null)),
           ),
           Expanded(child: body),
@@ -164,45 +278,62 @@ Widget _block(
       ),
     );
   }
-  return Padding(padding: const EdgeInsets.symmetric(vertical: 1), child: body);
+  return Padding(padding: const EdgeInsets.symmetric(vertical: 1.5), child: body);
 }
 
 /// A block rendered as text only: no image extraction.
 Widget _textBlock(BuildContext context, String kind, String content, TextStyle base) {
   switch (kind) {
-    case 'code':
-      return _monoBlock(context, content);
+    case 'quote':
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(vertical: 3),
+        padding: const EdgeInsets.fromLTRB(10, 4, 8, 4),
+        decoration: const BoxDecoration(
+          color: AppColors.surfaceSubtle,
+          border: Border(left: BorderSide(color: AppColors.brandBorder, width: 3)),
+        ),
+        child: RichText(
+          text: TextSpan(
+            children: _inlineSpans(
+              context,
+              content,
+              base.copyWith(color: AppColors.textSecondary),
+            ),
+          ),
+        ),
+      );
     case 'h1':
       return Padding(
-        padding: const EdgeInsets.only(top: 4, bottom: 2),
+        padding: const EdgeInsets.only(top: 6, bottom: 3),
         child: Text(
           content,
-          style: base.copyWith(fontSize: (base.fontSize ?? 13) + 3, fontWeight: FontWeight.bold),
+          style: base.copyWith(fontSize: (base.fontSize ?? 13.5) + 3.5, fontWeight: FontWeight.w700),
         ),
       );
     case 'h2':
       return Padding(
-        padding: const EdgeInsets.only(top: 4, bottom: 2),
+        padding: const EdgeInsets.only(top: 5, bottom: 2),
         child: Text(
           content,
-          style: base.copyWith(fontSize: (base.fontSize ?? 13) + 2, fontWeight: FontWeight.bold),
+          style: base.copyWith(fontSize: (base.fontSize ?? 13.5) + 2, fontWeight: FontWeight.w700),
         ),
       );
     case 'h3':
       return Padding(
-        padding: const EdgeInsets.only(top: 3, bottom: 1),
+        padding: const EdgeInsets.only(top: 4, bottom: 1.5),
         child: Text(
           content,
-          style: base.copyWith(fontSize: (base.fontSize ?? 13) + 1, fontWeight: FontWeight.bold),
+          style: base.copyWith(fontSize: (base.fontSize ?? 13.5) + 1, fontWeight: FontWeight.w600),
         ),
       );
     case 'ul':
       return Padding(
-        padding: const EdgeInsets.only(left: 10, top: 1, bottom: 1),
+        padding: const EdgeInsets.only(left: 10, top: 2, bottom: 2),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(padding: EdgeInsets.only(right: 6), child: Text('•', style: TextStyle(height: 1.3))),
+            const Padding(padding: EdgeInsets.only(right: 6), child: Text('•', style: TextStyle(height: 1.35))),
             Expanded(child: RichText(text: TextSpan(children: _inlineSpans(context, content, base)))),
           ],
         ),
@@ -212,13 +343,13 @@ Widget _textBlock(BuildContext context, String kind, String content, TextStyle b
       final number = dot > 0 ? content.substring(0, dot) : '';
       final body = dot > 0 ? content.substring(dot + 1).trim() : content;
       return Padding(
-        padding: const EdgeInsets.only(left: 4, top: 1, bottom: 1),
+        padding: const EdgeInsets.only(left: 4, top: 2, bottom: 2),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: Text('$number.', style: base.copyWith(fontWeight: FontWeight.bold)),
+              padding: const EdgeInsets.only(right: 5),
+              child: Text('$number.', style: base.copyWith(fontWeight: FontWeight.w600)),
             ),
             Expanded(child: RichText(text: TextSpan(children: _inlineSpans(context, body, base)))),
           ],
@@ -226,7 +357,7 @@ Widget _textBlock(BuildContext context, String kind, String content, TextStyle b
       );
     default:
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 1),
+        padding: const EdgeInsets.symmetric(vertical: 1.5),
         child: RichText(text: TextSpan(children: _inlineSpans(context, content, base))),
       );
   }
@@ -241,8 +372,6 @@ class MarkdownText extends StatelessWidget {
   final String data;
   final TextStyle baseStyle;
   final bool plain;
-  /// Renders `![alt](target)` pictures. Without it the syntax stays as text,
-  /// which is right for places that cannot read files from the PC.
   final MarkdownImageBuilder? buildImage;
 
   const MarkdownText({
@@ -259,12 +388,16 @@ class MarkdownText extends StatelessWidget {
     final widgets = <Widget>[];
     final lines = data.split('\n');
     var inCode = false;
+    var codeLang = '';
     final codeBuffer = <String>[];
     for (final rawLine in lines) {
       if (rawLine.trimLeft().startsWith('```')) {
         if (inCode) {
-          widgets.add(_block(context, 'code', codeBuffer.join('\n'), baseStyle));
+          widgets.add(_block(context, 'code', codeBuffer.join('\n'), baseStyle, codeLang: codeLang));
           codeBuffer.clear();
+          codeLang = '';
+        } else {
+          codeLang = rawLine.trimLeft().substring(3).trim();
         }
         inCode = !inCode;
         continue;
@@ -276,12 +409,21 @@ class MarkdownText extends StatelessWidget {
       final line = rawLine.trimRight();
       final trimmed = line.trim();
       if (trimmed.isEmpty) {
-        widgets.add(const SizedBox(height: 4));
+        widgets.add(const SizedBox(height: 5));
+        continue;
+      }
+      if (RegExp(r'^(-{3,}|\*{3,}|_{3,})$').hasMatch(trimmed)) {
+        widgets.add(_block(context, 'hr', '', baseStyle));
         continue;
       }
       final header = RegExp(r'^(#{1,3})\s+(.*)$').firstMatch(trimmed);
       if (header != null) {
         widgets.add(_block(context, 'h${header.group(1)!.length}', header.group(2)!, baseStyle, buildImage: buildImage));
+        continue;
+      }
+      final quote = RegExp(r'^>\s?(.*)$').firstMatch(trimmed);
+      if (quote != null) {
+        widgets.add(_block(context, 'quote', quote.group(1)!, baseStyle, buildImage: buildImage));
         continue;
       }
       final ul = RegExp(r'^[-*]\s+(.*)$').firstMatch(trimmed);
@@ -297,7 +439,7 @@ class MarkdownText extends StatelessWidget {
       widgets.add(_block(context, 'p', trimmed, baseStyle, buildImage: buildImage));
     }
     if (inCode && codeBuffer.isNotEmpty) {
-      widgets.add(_block(context, 'code', codeBuffer.join('\n'), baseStyle));
+      widgets.add(_block(context, 'code', codeBuffer.join('\n'), baseStyle, codeLang: codeLang));
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
   }

@@ -12,6 +12,7 @@ import '../widgets/session_models.dart';
 const _kPreferredHost = 'remote.preferredHostId';
 const _kKnownHosts = 'remote.knownHosts';
 const _kSessionsCachePrefix = 'remote.sessionsCache.';
+const _kLastActiveSessionPrefix = 'remote.lastActiveSession.';
 const _kDeviceId = 'remote.deviceId';
 const _kLastRelayUrl = 'remote.lastRelayUrl';
 const _kDeviceSecretPrefix = 'remote.deviceSecret.';
@@ -200,4 +201,23 @@ Future<List<SessionSummary>> loadCachedSessions(String hostId) async {
 Future<void> deleteCachedSessions(String hostId) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.remove(_kSessionsCachePrefix + hostId);
+}
+
+Future<void> saveLastActiveSessionId(String hostId, String sessionId) async {
+  if (hostId.isEmpty || sessionId.isEmpty) return;
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString(_kLastActiveSessionPrefix + hostId, sessionId);
+}
+
+Future<String?> loadLastActiveSessionId(String hostId) async {
+  if (hostId.isEmpty) return null;
+  final prefs = await SharedPreferences.getInstance();
+  final v = prefs.getString(_kLastActiveSessionPrefix + hostId);
+  return (v == null || v.isEmpty) ? null : v;
+}
+
+Future<void> deleteLastActiveSessionId(String hostId) async {
+  if (hostId.isEmpty) return;
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove(_kLastActiveSessionPrefix + hostId);
 }

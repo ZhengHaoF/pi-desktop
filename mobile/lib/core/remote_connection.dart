@@ -25,6 +25,23 @@ class RemoteSessionEvent {
   RemoteSessionEvent(this.topic, this.key, this.data);
 }
 
+/// A request the PC answered with an error.
+///
+/// [code] is the contract's error code (`STALE_CURSOR`, `NOT_FOUND`,
+/// `BAD_REQUEST`, …). Callers use it to tell a permanent condition from a
+/// transient one: a stale cursor means stop paging, a timeout means retry.
+class RpcException implements Exception {
+  final String? code;
+  final String message;
+
+  const RpcException(this.code, this.message);
+
+  /// What the user sees: the PC's own message, without the code prefix the
+  /// other error paths add.
+  @override
+  String toString() => message;
+}
+
 /// One entry of the relay's host directory (multi-PC selector).
 class RemoteHostInfo {
   final String id;
@@ -118,8 +135,10 @@ class RemoteConnection {
     if (_lastCloseCode == null) return null;
     switch (_lastCloseCode) {
       case 4003:
-        return '配对失败：设备尚未配对或凭证已失效，请在电脑上重新扫码配对'
-            '${reason == null || reason.isEmpty ? '' : '（$reason）'}';
+        if (reason != null && reason.contains('pairing token')) {
+          return '配对二维码已过期或已被使用，请在电脑端重新打开「设备配对」扫码';
+        }
+        return '配对已失效，可能已在电脑端移除了此设备，请重新扫描电脑端二维码';
       case 4002:
         return '连接被中继拒绝（协议违规）${reason == null || reason.isEmpty ? '' : '：$reason'}';
       case 4000:
@@ -240,6 +259,28 @@ class RemoteConnection {
     // Ready only after the relay confirms the hello and hands us a hostId;
     // queued payloads flush then (see _onFrame / _sendEnvelope).
     _sendEnvelope(helloPayload(role: 'device', label: deviceLabel, auth: auth, e2eePub: _deviceKeys!.publicKey));
+  }
+
+  /// Connect and wait for the initial handshake to reach [LinkState.ready] or
+  /// fail back to [LinkState.disconnected] (e.g. 4003 pairing rejected).
+  Future<bool> connectAndWaitHandshake({Duration timeout = const Duration(seconds: 10)}) async {
+    final completer = Completer<bool>();
+    late final StreamSubscription<LinkState> sub;
+    sub = onState.listen((next) {
+      if (next == LinkState.ready && !completer.isCompleted) {
+        completer.complete(true);
+      } else if (next == LinkState.disconnected && !completer.isCompleted) {
+        completer.complete(false);
+      }
+    });
+    try {
+      await connect();
+      if (state == LinkState.ready && !completer.isCompleted) return true;
+      if (state == LinkState.disconnected && !completer.isCompleted) return false;
+      return await completer.future.timeout(timeout, onTimeout: () => false);
+    } finally {
+      await sub.cancel();
+    }
   }
 
   /// PC host restarts change the hostId; a stale id makes the relay drop
@@ -562,7 +603,10 @@ class RemoteConnection {
           if (response.ok) {
             completer.complete(response.result == null ? <String, dynamic>{} : Map<String, dynamic>.from(response.result as Map));
           } else {
-            completer.completeError(StateError(response.error?['message'] ?? 'rpc error'));
+            final error = response.error;
+            completer.completeError(
+              RpcException(error?['code'] as String?, (error?['message'] as String?) ?? 'rpc error'),
+            );
           }
         }
         break;

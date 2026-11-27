@@ -7,17 +7,23 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
+import 'package:flutter/services.dart';
+import '../core/app_theme.dart';
 import '../core/chat_scroll_policy.dart';
+import '../core/image_attachments.dart';
 import '../core/image_cache.dart';
 import '../core/remote_connection.dart';
 import '../widgets/ask_sheet.dart';
 import '../widgets/chat_image.dart';
+import '../widgets/image_attachments_bar.dart';
 import '../widgets/image_block.dart';
 import '../widgets/markdown_text.dart';
+import '../widgets/model_picker_sheet.dart';
 import '../widgets/session_models.dart';
 import '../widgets/text_selection_menu.dart';
 import '../widgets/tool_action_title.dart';
 import '../widgets/transcript_groups.dart';
+import '../widgets/ui_kit.dart';
 
 /// PC `agentState.running` means the session object is still alive
 /// (`isAlive()`), NOT that a turn is in flight. A turn is running only when
@@ -39,6 +45,13 @@ class ChatPage extends StatefulWidget {
     this.sessionId,
     this.newTaskCwd,
     this.newTaskModel,
+    this.pickImages,
+    this.onOpenDrawer,
+    this.subtitle,
+    this.onSubtitleTap,
+    this.headerActions,
+    this.offlineBanner,
+    this.onSessionCreated,
     super.key,
   }) : assert(sessionId != null || newTaskCwd != null, "ChatPage 需要 sessionId 或 newTaskCwd");
 
@@ -51,6 +64,14 @@ class ChatPage extends StatefulWidget {
   final String? newTaskCwd;
   /// 新任务时用户显式选择的模型；null 表示跟随 PC 的默认模型。
   final Map<String, String>? newTaskModel;
+  /// Optional picker override for widget tests.
+  final PickImagesFn? pickImages;
+  final VoidCallback? onOpenDrawer;
+  final String? subtitle;
+  final VoidCallback? onSubtitleTap;
+  final List<Widget>? headerActions;
+  final Widget? offlineBanner;
+  final ValueChanged<String>? onSessionCreated;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -104,6 +125,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   String? _previousCursor;
   bool _loadingOlder = false;
   bool _historyExhausted = false;
+  /// The last older-page attempt failed for a reason worth retrying. The
+  /// cursor is kept, but scrolling no longer retries on its own: one tap does.
+  bool _olderLoadFailed = false;
   /// Session ordinal of the oldest loaded message. An older page is numbered
   /// downward from here, so ordinals never collide across however many pages
   /// load. 0 for an unpaged response (everything is loaded).
@@ -113,7 +137,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   double _maxScrollBeforePrepend = 0;
   /// Same window as the desktop: enough turns to open on, with a byte budget
   /// that keeps a screenshot-heavy session from arriving in one frame.
-  static const _historyWindow = {'maxTurns': 20, 'maxBytes': 1024 * 1024};
+  /// History window for one page. The desktop uses 20 turns; a phone page is
+  /// half that so the first paint is quick and a page stays well inside the
+  /// request timeout on a slow link. The byte budget is a backstop, not a
+  /// quota: 10 turns of ordinary chat is ~100 KB, and the cap only binds on
+  /// turns with very large tool output. It stays because an uncapped page can
+  /// grow past what the link can deliver, and then that page can never load —
+  /// whereas a capped page degrades to fewer turns and still makes progress.
+  static const _historyWindow = {'maxTurns': 10, 'maxBytes': 1024 * 1024};
   /// How close to the top (in pixels) the reader must be for the older page to
   /// load on its own.
   static const double _olderPageTriggerPx = 240;
@@ -155,12 +186,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 新任务页上用户手动挑过模型：首条消息建会话时按显式选择处理。
   bool _newTaskModelExplicit = false;
   String? _sendingText;
+  List<AttachedImage> _sendingImages = const [];
+  final List<AttachedImage> _pendingImages = [];
+  bool _pickingImages = false;
   bool _awaitingFirst = false;
+
+  bool get _hasPendingSend => _sendingText != null || _sendingImages.isNotEmpty;
   bool _slashOpen = false;
   bool _slashSkillsLoaded = false;
   /// Turn-state mirror (PC `isStreaming` equivalent): true while the agent
   /// is running a turn on the PC. Drives steer-vs-prompt and the queue bar.
   bool _turnRunning = false;
+  bool _aborting = false;
   Timer? _queuePollTimer;
   List<String> _steeringQueue = const [];
   List<String> _followUpQueue = const [];
@@ -265,6 +302,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     setState(() {
       _turnRunning = running;
       if (!running) {
+        _aborting = false;
+        _awaitingFirst = false;
         _steeringQueue = const [];
         _followUpQueue = const [];
       }
@@ -505,11 +544,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     try {
       await showModalBottomSheet<void>(
         context: context,
-        backgroundColor: Colors.white,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
         builder: (sheetContext) => ValueListenableBuilder<Map<String, dynamic>?>(
           valueListenable: prefs,
-          builder: (context, data, _) => _ModelPickerSheet(
+          builder: (context, data, _) => ModelPickerSheet(
             prefs: data,
             current: _currentModel,
             thinkingLevel: _thinkingLevel,
@@ -681,7 +718,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       }
     }
     if (hasContent && role == 'assistant') _awaitingFirst = false;
-    if (role == 'user') _sendingText = null;
+    if (role == 'user') {
+      _sendingText = null;
+      // User images are only added to `_lines` on `done == true`, so keep the
+      // optimistic thumbnail until that final snapshot arrives.
+      if (done) _sendingImages = const [];
+    }
   }
 
   /// 流式 upsert 的行查找：从尾向前找同 role 同 kind 且未完结的行。
@@ -912,7 +954,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // Reaching for the top of a truncated history loads the page before it.
       // The prepended page grows the list upward, so this does not fire again
       // until the reader scrolls up once more.
-      if (notification.metrics.pixels < _olderPageTriggerPx) _loadOlder();
+      if (notification.metrics.pixels < _olderPageTriggerPx && !_olderLoadFailed) _loadOlder();
       final delta = notification.scrollDelta;
       if (delta == null) return false;
       // 惯性滚动（fling）阶段 UserScrollNotification 不再更新，用位移兜底。
@@ -979,6 +1021,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _oldestOrdinal = ordinals.oldest;
         _previousCursor = nextCursor;
         _historyExhausted = nextCursor == null;
+        _olderLoadFailed = false;
       });
       // Keep the viewport on the same message: everything moved down by the
       // height the prepended lines added. Only the offset moves; the magnet
@@ -989,16 +1032,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (jump > 0) _scrollController.jumpTo(_scrollController.offset + jump);
         _syncAwayFromBottom();
       });
-    } catch (err) {
-      // A stale cursor means the session changed underneath (a new message
-      // arrived, or it was compacted). The transcript already shows the
-      // newest state, so stop here rather than surface an error.
-      if (mounted && _sessionId == sessionId) {
-        setState(() {
+    } on RpcException catch (error) {
+      if (!mounted || _sessionId != sessionId) return;
+      setState(() {
+        if (error.code == 'STALE_CURSOR') {
+          // The session was compacted or forked under the cursor: older pages
+          // can no longer be addressed. The transcript already shows the
+          // newest state, so stop quietly.
           _historyExhausted = true;
           _previousCursor = null;
-        });
-      }
+          _olderLoadFailed = false;
+        } else {
+          // Anything else (a timeout, a relay hiccup) is worth another try:
+          // keep the cursor and let the reader tap again.
+          _olderLoadFailed = true;
+        }
+      });
+    } catch (_) {
+      // A transport failure (timeout, link dropped) is equally transient.
+      if (mounted && _sessionId == sessionId) setState(() => _olderLoadFailed = true);
     } finally {
       if (mounted) setState(() => _loadingOlder = false);
     }
@@ -1091,13 +1143,87 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (mounted) unawaited(_openNextAsk());
   }
 
+  Future<void> _openImageSourceSheet() async {
+    if (!widget.connection.isReady || _pickingImages) return;
+    if (_pendingImages.length >= maxAttachedImages) {
+      setState(() => _error = '每次最多发送 $maxAttachedImages 张图片');
+      return;
+    }
+    final source = await showModalBottomSheet<ImagePickSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              key: const Key('attach-source-gallery'),
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('从相册选择'),
+              onTap: () => Navigator.of(sheetContext).pop(ImagePickSource.gallery),
+            ),
+            ListTile(
+              key: const Key('attach-source-camera'),
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('拍照'),
+              onTap: () => Navigator.of(sheetContext).pop(ImagePickSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || source == null) return;
+    await _pickImagesFrom(source);
+  }
+
+  Future<void> _pickImagesFrom(ImagePickSource source) async {
+    if (_pickingImages) return;
+    setState(() => _pickingImages = true);
+    try {
+      final picker = widget.pickImages ?? defaultPickImages;
+      final remaining = maxAttachedImages - _pendingImages.length;
+      if (remaining <= 0) {
+        if (mounted) setState(() => _error = '每次最多发送 $maxAttachedImages 张图片');
+        return;
+      }
+      final picked = await picker(source, remainingSlots: remaining);
+      if (!mounted || picked.isEmpty) return;
+      final selection = selectAttachedImages(_pendingImages, picked);
+      final rejection = selection.describeRejection();
+      setState(() {
+        _pendingImages.addAll(selection.accepted);
+        if (rejection != null) {
+          _error = rejection;
+        } else if (selection.accepted.isNotEmpty) {
+          _error = null;
+        }
+      });
+    } catch (err) {
+      if (mounted) setState(() => _error = '选择图片失败：$err');
+    } finally {
+      if (mounted) setState(() => _pickingImages = false);
+    }
+  }
+
+  void _removePendingImage(int index) {
+    if (index < 0 || index >= _pendingImages.length) return;
+    setState(() {
+      _pendingImages.removeAt(index);
+      _error = null;
+    });
+  }
+
   Future<void> _send() async {
     final text = _promptController.text.trim();
-    if (text.isEmpty) return;
+    final images = List<AttachedImage>.from(_pendingImages);
+    if (text.isEmpty && images.isEmpty) return;
     // Optimistic feedback immediately (the stream mirrors the user message
-    // back later; until then this pending bubble + loading row show).
+    // back later; until then these pending items + loading row show).
     setState(() {
-      _sendingText = text;
+      _error = null;
+      _sendingText = text.isEmpty ? null : text;
+      _sendingImages = images;
+      _pendingImages.clear();
       _awaitingFirst = true;
     });
     _promptController.clear();
@@ -1108,12 +1234,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // PC parity: while a turn is running, Enter steers (queued into the
       // current turn); when idle the message starts a fresh turn.
       final type = _turnRunning ? 'steer' : 'prompt';
-      await widget.connection.agentCommand(sessionId, {'type': type, 'message': text});
+      await widget.connection.agentCommand(sessionId, {
+        'type': type,
+        'message': text,
+        if (images.isNotEmpty) 'images': [for (final img in images) img.toWireBlock()],
+      });
       // 会话刚建出来时还没有快照可读，发完首条消息再补一次档位。
       if (_thinkingLevel == null) unawaited(_loadThinkingLevel());
     } catch (err) {
+      if (!mounted) return;
+      if (text.isNotEmpty && _promptController.text.isEmpty) {
+        _promptController.text = text;
+        _promptController.selection = TextSelection.collapsed(offset: text.length);
+      }
       setState(() {
+        if (images.isNotEmpty) {
+          final merged = [...images, ..._pendingImages];
+          _pendingImages
+            ..clear()
+            ..addAll(merged.take(maxAttachedImages));
+        }
         _sendingText = null;
+        _sendingImages = const [];
         _awaitingFirst = false;
         _error = err.toString();
       });
@@ -1140,6 +1282,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final sessionId = created['sessionId'] as String?;
     if (sessionId == null || sessionId.isEmpty) return null;
     _sessionId = sessionId;
+    widget.onSessionCreated?.call(sessionId);
     // 刚建的会话磁盘上还没有文件（pi 在第一条消息后才落盘），这里不能走
     // sessions.get 读历史，只订阅事件流即可。
     await _attach(sessionId, loadHistory: false);
@@ -1158,12 +1301,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   Future<void> _abort() async {
     final sessionId = _sessionId;
-    if (sessionId == null) return;
+    if (sessionId == null || _aborting) return;
+    setState(() => _aborting = true);
     try {
       await widget.connection.agentCommand(sessionId, {'type': 'abort'});
-      setState(() => _lines.add(ChatLine.text(role: 'system', text: '— 已发送中止 —', done: true)));
+      if (!mounted) return;
+      setState(() {
+        _awaitingFirst = false;
+        _lines.add(ChatLine.text(role: 'system', text: '— 已发送中止 —', done: true));
+      });
     } catch (err) {
-      setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = err.toString());
+    } finally {
+      if (mounted) setState(() => _aborting = false);
     }
   }
 
@@ -1199,8 +1349,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 1.8))
             : TextButton.icon(
                 onPressed: _loadOlder,
-                icon: const Icon(Icons.history, size: 16),
-                label: const Text('加载更早的消息', style: TextStyle(fontSize: 12)),
+                icon: Icon(_olderLoadFailed ? Icons.refresh : Icons.history, size: 16),
+                label: Text(
+                  _olderLoadFailed ? '加载失败，点击重试' : '加载更早的消息',
+                  style: const TextStyle(fontSize: 12),
+                ),
               ),
       ),
     );
@@ -1245,29 +1398,52 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
     final isUser = line.role == 'user';
+    final bubbleMaxWidth = (MediaQuery.sizeOf(context).width * 0.84).clamp(240.0, 420.0);
     final baseStyle = TextStyle(
-      fontSize: 13,
-      height: 1.35,
+      fontSize: 13.5,
+      height: 1.45,
       fontStyle: line.done ? FontStyle.normal : FontStyle.italic,
-      color: Colors.black87,
+      color: AppColors.textPrimary,
     );
+    final bodyText = line.text.isEmpty && !line.done ? '…' : line.text;
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        constraints: BoxConstraints(maxWidth: isUser ? 320 : 340),
-        decoration: BoxDecoration(
-          color: isUser ? Theme.of(context).colorScheme.primaryContainer : Colors.white,
-          borderRadius: BorderRadius.circular(10),
+      child: GestureDetector(
+        onLongPress: line.text.trim().isEmpty
+            ? null
+            : () {
+                Clipboard.setData(ClipboardData(text: line.text));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('已复制消息内容')),
+                );
+              },
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+          constraints: BoxConstraints(maxWidth: bubbleMaxWidth),
+          decoration: BoxDecoration(
+            color: isUser ? AppColors.brandSoft : AppColors.surface,
+            border: Border.all(
+              color: isUser ? AppColors.brandBorder.withValues(alpha: 0.7) : AppColors.border,
+            ),
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(16),
+              topRight: const Radius.circular(16),
+              bottomLeft: Radius.circular(isUser ? 16 : 4),
+              bottomRight: Radius.circular(isUser ? 4 : 16),
+            ),
+            boxShadow: isUser
+                ? null
+                : const [BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 1))],
+          ),
+          child: isUser
+              ? Text(bodyText, style: baseStyle)
+              : MarkdownText(
+                  data: bodyText,
+                  baseStyle: baseStyle,
+                  buildImage: _buildMarkdownImage,
+                ),
         ),
-        child: isUser
-            ? Text(line.text.isEmpty && !line.done ? '…' : line.text, style: baseStyle)
-            : MarkdownText(
-                data: line.text.isEmpty && !line.done ? '…' : line.text,
-                baseStyle: baseStyle,
-                buildImage: _buildMarkdownImage,
-              ),
       ),
     );
   }
@@ -1291,23 +1467,77 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // Fold each completed turn's process into one collapsed row; the turn that
     // is still streaming (or held open for a reader scrolled away) stays flat.
     final entries = buildTranscriptEntries(_lines, liveTail: _turnRunning || _holdLastTurnOpen);
+    final subtitle = widget.subtitle;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title, overflow: TextOverflow.ellipsis),
-        actions: [
-          IconButton(
-            tooltip: '中止当前回合',
-            onPressed: _abort,
-            icon: const Icon(Icons.stop_circle_outlined),
-          ),
-        ],
+        leading: widget.onOpenDrawer == null
+            ? null
+            : IconButton(
+                tooltip: '打开工作区侧栏',
+                icon: const Icon(Icons.menu_rounded),
+                onPressed: widget.onOpenDrawer,
+              ),
+        title: subtitle == null
+            ? Text(widget.title, overflow: TextOverflow.ellipsis)
+            : InkWell(
+                onTap: widget.onSubtitleTap,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.title,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.computer_rounded,
+                            size: 12,
+                            color: AppColors.textMuted,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              subtitle,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w400,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ),
+                          if (widget.onSubtitleTap != null) ...[
+                            const SizedBox(width: 2),
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              size: 14,
+                              color: AppColors.textMuted,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+        actions: widget.headerActions,
       ),
       body: Column(
         children: [
           if (_error != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+            ErrorBanner(
+              message: _error!,
+              margin: const EdgeInsets.fromLTRB(12, 6, 12, 2),
             ),
           for (final approval in _approvals)
             _ApprovalCard(approval: approval, onRespond: _respondApproval),
@@ -1362,9 +1592,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       child: CircularProgressIndicator(strokeWidth: 2.2),
                     ),
                   )
-                : (_lines.isEmpty && _sendingText == null && !_awaitingFirst)
-                ? const Center(
-                    child: Text('向 PC 上的 agent 发送第一条指令…', style: TextStyle(color: Colors.black38)),
+                : (_lines.isEmpty && !_hasPendingSend && !_awaitingFirst)
+                ? const EmptyStateView(
+                    icon: Icons.chat_bubble_outline_rounded,
+                    title: '向 PC 上的 agent 发送第一条指令…',
+                    subtitle: '支持输入文字、图片或 / 唤起内置命令与技能',
                   )
                 : Stack(
                     children: [
@@ -1372,9 +1604,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         onNotification: _onScrollNotification,
                         child: ListView.builder(
                     controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     // One leading slot for the older-history control.
-                    itemCount: 1 + entries.length + (_sendingText != null ? 1 : 0) + (_awaitingFirst ? 1 : 0),
+                    itemCount:
+                        1 + entries.length + (_sendingText != null ? 1 : 0) + _sendingImages.length + (_awaitingFirst ? 1 : 0),
                     itemBuilder: (context, index) {
                       if (index == 0) return _buildOlderHistoryRow(context);
                       final entryIndex = index - 1;
@@ -1384,21 +1617,34 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         if (group != null) return _buildProcessGroup(context, group);
                         return _buildLine(context, entry.line!);
                       }
-                      final pendingIndex = entryIndex - entries.length;
-                      if (_sendingText != null && pendingIndex == 0) {
-                        return Align(
-                          alignment: Alignment.centerRight,
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(vertical: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            constraints: const BoxConstraints(maxWidth: 320),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(10),
+                      var pendingIndex = entryIndex - entries.length;
+                      if (_sendingText != null) {
+                        if (pendingIndex == 0) {
+                          final bubbleMaxWidth = (MediaQuery.sizeOf(context).width * 0.84).clamp(240.0, 420.0);
+                          return Align(
+                            alignment: Alignment.centerRight,
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                              constraints: BoxConstraints(maxWidth: bubbleMaxWidth),
+                              decoration: BoxDecoration(
+                                color: AppColors.brandSoft,
+                                border: Border.all(color: AppColors.brandBorder.withValues(alpha: 0.7)),
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(16),
+                                  topRight: Radius.circular(16),
+                                  bottomLeft: Radius.circular(16),
+                                  bottomRight: Radius.circular(4),
+                                ),
+                              ),
+                              child: Text(_sendingText!, style: const TextStyle(fontSize: 13.5, height: 1.45)),
                             ),
-                            child: Text(_sendingText!, style: const TextStyle(fontSize: 13, height: 1.35)),
-                          ),
-                        );
+                          );
+                        }
+                        pendingIndex -= 1;
+                      }
+                      if (pendingIndex < _sendingImages.length) {
+                        return SendingImageBubble(image: _sendingImages[pendingIndex]);
                       }
                       return Align(
                         alignment: Alignment.centerLeft,
@@ -1441,9 +1687,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
           ),
+          if (widget.offlineBanner != null) widget.offlineBanner!,
           SafeArea(
+            top: false,
+            bottom: widget.onOpenDrawer == null,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+              padding: EdgeInsets.fromLTRB(
+                12,
+                widget.offlineBanner != null ? 4 : 8,
+                12,
+                widget.onOpenDrawer != null ? 8 : 10,
+              ),
               // 卡片式输入区（对齐参考稿）：整块白卡承载输入 + 工具条，
               // 模型选择从标题栏挪到卡片底部，发送键做成圆形，空输入时置灰。
               child: Container(
@@ -1462,6 +1716,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    PendingImagesBar(
+                      images: _pendingImages,
+                      onRemove: _removePendingImage,
+                    ),
                     TextField(
                       controller: _promptController,
                       enabled: ready,
@@ -1492,12 +1750,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           onTap: _pickModel,
                         ),
                         const Spacer(),
+                        _ComposerAttachButton(
+                          enabled: ready && !_pickingImages && _pendingImages.length < maxAttachedImages,
+                          onTap: _openImageSourceSheet,
+                        ),
+                        const SizedBox(width: 6),
                         ValueListenableBuilder<TextEditingValue>(
                           valueListenable: _promptController,
-                          builder: (context, value, _) => _ComposerSendButton(
-                            enabled: ready && value.text.trim().isNotEmpty,
-                            onTap: _send,
-                          ),
+                          builder: (context, value, _) {
+                            final hasDraft = value.text.trim().isNotEmpty || _pendingImages.isNotEmpty;
+                            final isBusy = _turnRunning || _awaitingFirst;
+                            final showStop = isBusy && !hasDraft;
+                            final enabled = ready && (showStop ? (_sessionId != null && !_aborting) : hasDraft);
+                            return _ComposerActionButton(
+                              enabled: enabled,
+                              showStop: showStop,
+                              steerMode: _turnRunning && hasDraft,
+                              onTap: showStop ? _abort : _send,
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -1577,7 +1848,7 @@ class _QueueBar extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 2),
                 child: Text(
-                  '⚡ 插队：$text',
+                  '⚡ 插队：${text.trim().isEmpty ? '[图片]' : text}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 12, color: Color(0xFF8D6E00)),
@@ -1587,7 +1858,7 @@ class _QueueBar extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 2),
                 child: Text(
-                  '⏭ 排队：$text',
+                  '⏭ 排队：${text.trim().isEmpty ? '[图片]' : text}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 12, color: Colors.black54),
@@ -1613,30 +1884,34 @@ class _ThinkingCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(10),
+        color: AppColors.brandSoft.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.brandBorder.withValues(alpha: 0.6)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           InkWell(
             onTap: onToggle,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
               child: Row(
                 children: [
-                  Icon(Icons.psychology_outlined, size: 15, color: Colors.black45),
+                  const Icon(Icons.psychology_outlined, size: 15, color: AppColors.brand),
                   const SizedBox(width: 6),
-                  Text('思考过程', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54)),
-                  const SizedBox(width: 6),
+                  const Text(
+                    '思考过程',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.brandInk),
+                  ),
+                  const SizedBox(width: 8),
                   if (!expanded)
                     Expanded(
                       child: Text(
                         preview,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.black45),
+                        style: const TextStyle(fontSize: 11.5, fontStyle: FontStyle.italic, color: AppColors.textMuted),
                       ),
                     )
                   else
@@ -1644,7 +1919,7 @@ class _ThinkingCard extends StatelessWidget {
                   AnimatedRotation(
                     turns: expanded ? 0 : -0.25,
                     duration: const Duration(milliseconds: 140),
-                    child: const Icon(Icons.expand_more, size: 16, color: Colors.black38),
+                    child: const Icon(Icons.expand_more, size: 16, color: AppColors.textMuted),
                   ),
                 ],
               ),
@@ -1652,10 +1927,15 @@ class _ThinkingCard extends StatelessWidget {
           ),
           if (expanded)
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+              padding: const EdgeInsets.fromLTRB(11, 0, 11, 10),
               child: Text(
                 line.text,
-                style: const TextStyle(fontSize: 11.5, height: 1.4, fontStyle: FontStyle.italic, color: Colors.black54),
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.45,
+                  fontStyle: FontStyle.italic,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
         ],
@@ -1707,28 +1987,42 @@ class _ToolCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(10),
-        border: line.resultIsError ? Border.all(color: Colors.red.shade300) : null,
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: line.resultIsError ? AppColors.dangerBorder : AppColors.border,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           InkWell(
             onTap: hasBody ? onToggle : null,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Row(
                 children: [
-                  Icon(_icon, size: 15, color: Colors.black54),
-                  const SizedBox(width: 6),
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: line.resultIsError ? AppColors.dangerBg : AppColors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: Icon(
+                      _icon,
+                      size: 14,
+                      color: line.resultIsError ? AppColors.danger : AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       actionTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -1738,28 +2032,29 @@ class _ToolCard extends StatelessWidget {
                       line.toolName ?? 'tool',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 10, color: Colors.black38),
+                      style: const TextStyle(fontSize: 10.5, fontFamily: 'monospace', color: AppColors.textMuted),
                     ),
                   ),
                   if (line.resultIsError) ...[
                     const SizedBox(width: 6),
-                    Text(
-                      '失败',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.red.shade700),
+                    const StatusBadge(
+                      label: '失败',
+                      foreground: AppColors.danger,
+                      background: AppColors.dangerBg,
                     ),
                   ],
                   const SizedBox(width: 6),
                   if (line.running)
                     const SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(strokeWidth: 1.6),
+                      width: 13,
+                      height: 13,
+                      child: CircularProgressIndicator(strokeWidth: 1.8),
                     )
                   else
                     AnimatedRotation(
                       turns: expanded ? 0 : -0.25,
                       duration: const Duration(milliseconds: 140),
-                      child: Icon(hasBody ? Icons.expand_more : Icons.remove, size: 16, color: Colors.black38),
+                      child: Icon(hasBody ? Icons.expand_more : Icons.remove, size: 16, color: AppColors.textMuted),
                     ),
                 ],
               ),
@@ -1772,40 +2067,75 @@ class _ToolCard extends StatelessWidget {
             child: expanded && hasBody
                 ? Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                    decoration: const BoxDecoration(
+                      border: Border(top: BorderSide(color: AppColors.border)),
+                    ),
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if (inputJson != null)
+                        if (inputJson != null) ...[
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              '参数',
+                              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.textMuted),
+                            ),
+                          ),
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.all(6),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.04),
-                              borderRadius: BorderRadius.circular(6),
+                              color: AppColors.surfaceMuted,
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               inputJson,
-                              style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Colors.black87),
+                              style: const TextStyle(fontSize: 10.5, fontFamily: 'monospace', color: AppColors.textPrimary),
                             ),
                           ),
+                        ],
                         if (line.resultText?.isNotEmpty ?? false) ...[
                           Padding(
-                            padding: const EdgeInsets.only(top: 6, bottom: 2),
-                            child: Text(
-                              line.resultIsError ? '结果（出错）' : '结果',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: line.resultIsError ? Colors.red.shade700 : Colors.black45,
-                              ),
+                            padding: const EdgeInsets.only(top: 8, bottom: 4),
+                            child: Row(
+                              children: [
+                                Text(
+                                  line.resultIsError ? '结果（出错）' : '结果',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: line.resultIsError ? AppColors.danger : AppColors.textMuted,
+                                  ),
+                                ),
+                                const Spacer(),
+                                InkWell(
+                                  onTap: () {
+                                    Clipboard.setData(ClipboardData(text: line.resultText!));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('已复制工具输出')),
+                                    );
+                                  },
+                                  child: const Icon(Icons.copy_rounded, size: 13, color: AppColors.textMuted),
+                                ),
+                              ],
                             ),
                           ),
-                          Text(
-                            line.resultText!,
-                            maxLines: 14,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 10.5, fontFamily: 'monospace', color: Colors.black87),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: line.resultIsError ? AppColors.dangerBg : AppColors.surfaceSubtle,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: line.resultIsError ? AppColors.dangerBorder : AppColors.border,
+                              ),
+                            ),
+                            child: Text(
+                              line.resultText!,
+                              maxLines: 14,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 10.5, fontFamily: 'monospace', color: AppColors.textPrimary),
+                            ),
                           ),
                         ],
                         // Images the tool returned (screenshots, diffs, read
@@ -1899,8 +2229,7 @@ class _ProcessGroupCard extends StatelessWidget {
 }
 
 /// Compact current-model chip shown in the composer toolbar; opens the picker
-/// sheet. Speech / attach buttons are deliberately absent: the mobile
-/// allowlist has no upload or voice channel, so they would be dead controls.
+/// sheet.
 class _ModelChip extends StatelessWidget {
   final Map<String, String>? model;
   final Map<String, String> modelNames;
@@ -1959,35 +2288,36 @@ class _ModelChip extends StatelessWidget {
   }
 }
 
-/// Circular send button. Empty draft keeps it grey and inert, matching the
-/// reference composer instead of always offering a live send arrow.
-class _ComposerSendButton extends StatelessWidget {
+/// Compact image-attachment button in the composer toolbar.
+class _ComposerAttachButton extends StatelessWidget {
   final bool enabled;
   final VoidCallback onTap;
 
-  const _ComposerSendButton({required this.enabled, required this.onTap});
+  const _ComposerAttachButton({required this.enabled, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
     return Semantics(
       button: true,
       enabled: enabled,
-      label: '发送',
-      child: Material(
-        color: enabled ? primary : const Color(0xFFE9E9EC),
-        shape: const CircleBorder(),
-        child: InkWell(
-          key: const Key('composer-send'),
-          customBorder: const CircleBorder(),
-          onTap: enabled ? onTap : null,
-          child: SizedBox(
-            width: 38,
-            height: 38,
-            child: Icon(
-              Icons.arrow_upward,
-              size: 20,
-              color: enabled ? Colors.white : const Color(0xFFAFAFB6),
+      label: '添加图片',
+      child: Tooltip(
+        message: '添加图片',
+        child: Material(
+          color: const Color(0xFFF3F3F5),
+          shape: const CircleBorder(),
+          child: InkWell(
+            key: const Key('composer-attach-image'),
+            customBorder: const CircleBorder(),
+            onTap: enabled ? onTap : null,
+            child: SizedBox(
+              width: 36,
+              height: 36,
+              child: Icon(
+                Icons.add_photo_alternate_outlined,
+                size: 19,
+                color: enabled ? const Color(0xFF4E4E56) : const Color(0xFFBDBDC4),
+              ),
             ),
           ),
         ),
@@ -1996,252 +2326,53 @@ class _ComposerSendButton extends StatelessWidget {
   }
 }
 
-/// Pi 的档位标识 → 中文显示名（off/minimal/low/medium/high/xhigh/max）。
-const Map<String, String> thinkingLevelLabels = {
-  'off': '关闭',
-  'minimal': '极简',
-  'low': '低',
-  'medium': '中',
-  'high': '高',
-  'xhigh': '极高',
-  'max': '最大',
-};
+/// Multi-state circular composer action button:
+/// - idle + empty: disabled grey send arrow
+/// - idle + draft: primary send arrow (`prompt`)
+/// - busy + empty: dark stop square (`abort`)
+/// - busy + draft: amber steer arrow (`steer`)
+class _ComposerActionButton extends StatelessWidget {
+  final bool enabled;
+  final bool showStop;
+  final bool steerMode;
+  final VoidCallback onTap;
 
-/// Bottom-sheet model picker backed by models.preferences.get. Shows the full
-/// PC catalog (same set as the desktop picker); `enabledModels` is Pi's own
-/// scoped-picker filter and must not narrow this list. Marks the current
-/// selection and the PC-side default, and — when the PC projects the model's
-/// supported levels — offers the per-session thinking level on top.
-class _ModelPickerSheet extends StatefulWidget {
-  /// null 表示首次打开、缓存还没暖起来：先显示加载占位，数据到了原地刷新。
-  final Map<String, dynamic>? prefs;
-  final Map<String, String>? current;
-  /// Live level from `get_state`; null means the session follows the PC default.
-  final String? thinkingLevel;
-  final List<String> thinkingLevels;
-  final Future<void> Function(String provider, String modelId, BuildContext) onPick;
-  /// null on a new-task page: there is no session to write the level to yet.
-  final Future<void> Function(String level)? onThinkingLevel;
-
-  const _ModelPickerSheet({
-    required this.prefs,
-    required this.current,
-    required this.thinkingLevel,
-    required this.thinkingLevels,
-    required this.onPick,
-    this.onThinkingLevel,
+  const _ComposerActionButton({
+    required this.enabled,
+    required this.showStop,
+    required this.steerMode,
+    required this.onTap,
   });
 
   @override
-  State<_ModelPickerSheet> createState() => _ModelPickerSheetState();
-}
-
-class _ModelPickerSheetState extends State<_ModelPickerSheet> {
-  String? _level;
-
-  @override
-  void initState() {
-    super.initState();
-    _level = widget.thinkingLevel;
-  }
-
-  List<Map<String, dynamic>> _models() {
-    final raw = widget.prefs?['models'];
-    return <Map<String, dynamic>>[
-      if (raw is List)
-        for (final m in raw)
-          if (m is Map) Map<String, dynamic>.from(m),
-    ];
-  }
-
-  Future<void> _chooseLevel(String level) async {
-    final onThinkingLevel = widget.onThinkingLevel;
-    if (onThinkingLevel == null) return;
-    setState(() => _level = level);
-    await onThinkingLevel(level);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final models = _models();
-    final prefs = widget.prefs;
-    final defaultModel = prefs?['defaultModel'];
-    bool isDefault(Map<String, dynamic> m) {
-      if (defaultModel is! Map) return false;
-      return defaultModel['provider'] == m['provider'] && defaultModel['modelId'] == m['id'];
-    }
-
-    bool isCurrent(Map<String, dynamic> m) =>
-        widget.current?['provider'] == m['provider'] && widget.current?['modelId'] == m['id'];
-    return SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.62),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 8, 6),
-              child: Row(
-                children: [
-                  const Text('选择模型', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  const Spacer(),
-                  IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => Navigator.of(context).pop()),
-                ],
+    final activeBg = showStop
+        ? AppColors.textPrimary
+        : (steerMode ? const Color(0xFFD97706) : Theme.of(context).colorScheme.primary);
+    final label = showStop ? '中止当前回合' : (steerMode ? '插队发送' : '发送');
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: label,
+      child: Tooltip(
+        message: label,
+        child: Material(
+          color: enabled ? activeBg : const Color(0xFFE9E9EC),
+          shape: const CircleBorder(),
+          child: InkWell(
+            key: Key(showStop ? 'composer-stop' : 'composer-send'),
+            customBorder: const CircleBorder(),
+            onTap: enabled ? onTap : null,
+            child: SizedBox(
+              width: 38,
+              height: 38,
+              child: Icon(
+                showStop ? Icons.stop_rounded : Icons.arrow_upward,
+                size: showStop ? 21 : 20,
+                color: enabled ? Colors.white : const Color(0xFFAFAFB6),
               ),
             ),
-            if (widget.thinkingLevels.isNotEmpty && widget.onThinkingLevel != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text('思考强度', style: TextStyle(fontSize: 13, color: Color(0xFF6B6B73))),
-                        const Spacer(),
-                        Text(
-                          _level == null ? '跟随默认' : (thinkingLevelLabels[_level] ?? _level!),
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final level in widget.thinkingLevels)
-                          ChoiceChip(
-                            label: Text(thinkingLevelLabels[level] ?? level),
-                            selected: _level == level,
-                            showCheckmark: false,
-                            visualDensity: VisualDensity.compact,
-                            labelStyle: const TextStyle(fontSize: 12.5),
-                            onSelected: (_) => _chooseLevel(level),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            const Divider(height: 1),
-            Flexible(
-              child: prefs == null
-                  ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 40),
-                      child: Center(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                            SizedBox(width: 10),
-                            Text('正在加载模型列表…', style: TextStyle(fontSize: 13, color: Colors.black45)),
-                          ],
-                        ),
-                      ),
-                    )
-                  : models.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Center(child: Text('没有可用模型', style: TextStyle(color: Colors.black38))),
-                    )
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      itemCount: models.length,
-                      itemBuilder: (context, index) => _modelRow(
-                        context,
-                        models[index],
-                        isCurrent: isCurrent(models[index]),
-                        isDefault: isDefault(models[index]),
-                      ),
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 高行条目（对齐参考稿）：品牌色首字母块 + 模型名 + provider/id 小字，
-  /// 右侧勾选当前项，PC 默认模型给一个淡色「默认」标；不再显示倍率。
-  Widget _modelRow(
-    BuildContext context,
-    Map<String, dynamic> m, {
-    required bool isCurrent,
-    required bool isDefault,
-  }) {
-    final provider = m['provider'] as String? ?? '';
-    final hue = provider.hashCode.abs() % 360;
-    final avatarBg = HSLColor.fromAHSL(1, hue.toDouble(), 0.4, 0.94).toColor();
-    final avatarFg = HSLColor.fromAHSL(1, hue.toDouble(), 0.5, 0.36).toColor();
-    final label = (m['name'] as String?)?.trim().isNotEmpty == true
-        ? m['name'] as String
-        : (m['id'] as String? ?? '');
-    final initial = label.isEmpty ? '?' : label.substring(0, 1).toUpperCase();
-    return InkWell(
-      onTap: isCurrent
-          ? null
-          : () => widget.onPick(m['provider'] as String, m['id'] as String, context),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-        child: Row(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: avatarBg, borderRadius: BorderRadius.circular(10)),
-              child: Text(
-                initial,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: avatarFg),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$provider / ${m['id']}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF9A9AA2)),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            if (isCurrent)
-              Icon(Icons.check_circle, size: 20, color: Theme.of(context).colorScheme.primary)
-            else if (isDefault)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text('默认', style: TextStyle(fontSize: 11, color: Colors.green.shade700)),
-              )
-            else
-              const SizedBox(width: 20),
-          ],
+          ),
         ),
       ),
     );

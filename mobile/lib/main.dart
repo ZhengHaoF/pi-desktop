@@ -8,6 +8,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import 'core/app_theme.dart';
 import 'core/keep_alive.dart';
 import 'pages/connect_page.dart';
 
@@ -24,11 +25,7 @@ class PiRemoteApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Pi Go',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF534AB7)),
-        scaffoldBackgroundColor: const Color(0xFFF7F7FA),
-      ),
+      theme: buildAppTheme(),
       home: const ConnectPage(),
     );
   }

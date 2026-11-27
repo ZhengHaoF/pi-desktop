@@ -85,6 +85,17 @@ const logoReply =
     '\n48 px 实际尺寸效果：\n'
     r'![48px 预览](D:\work\carhome\res\icon-preview-48.png)';
 
+/// Tap every "load this picture" placeholder on screen, one at a time. A
+/// picture named by path costs a files.read, so it waits for the reader.
+Future<void> loadPictures(WidgetTester tester) async {
+  for (var i = 0; i < 8; i++) {
+    final placeholder = find.text('点击加载图片');
+    if (placeholder.evaluate().isEmpty) return;
+    await tester.tap(placeholder.first);
+    await tester.pump();
+  }
+}
+
 void main() {
   group('from history', () {
     testWidgets('a reply naming pictures by path shows the pictures', (tester) async {
@@ -100,6 +111,11 @@ void main() {
       connection.detailExtra = {'info': {'cwd': sessionCwd}};
 
       await pumpPage(tester, connection);
+      // Nothing is fetched until the reader asks.
+      expect(connection.fileReads, isEmpty);
+      expect(find.text('点击加载图片'), findsNWidgets(2));
+
+      await loadPictures(tester);
       await settle(tester);
 
       expect(find.byType(Image), findsNWidgets(2));
@@ -124,6 +140,9 @@ void main() {
       connection.detailExtra = {'info': {'cwd': sessionCwd}};
 
       await pumpPage(tester, connection);
+      expect(connection.fileReads, isEmpty);
+
+      await loadPictures(tester);
       await settle(tester);
 
       expect(connection.fileReads, hasLength(2));
@@ -148,6 +167,7 @@ void main() {
       connection.detailExtra = {'info': {'cwd': sessionCwd}};
 
       await pumpPage(tester, connection);
+      await loadPictures(tester);
       await settle(tester);
 
       expect(find.byType(Image), findsOneWidget);
@@ -178,6 +198,9 @@ void main() {
       }));
       await tester.pump();
       await tester.pump();
+
+      expect(find.text('点击加载图片'), findsNWidgets(2));
+      await loadPictures(tester);
       await settle(tester);
 
       expect(find.byType(Image), findsNWidgets(2));
@@ -195,8 +218,17 @@ void main() {
           'message': {'role': 'assistant', 'content': [{'type': 'text', 'text': '$text $i'}]},
         }));
         await tester.pump();
-        await settle(tester);
+        // The event arrives through a stream, so the row is laid out on the
+        // frame after the one that handles it.
+        await tester.pump();
+        if (i == 0) {
+          // Load it once, then keep streaming: the picture must survive the
+          // rebuilds without being fetched again.
+          await loadPictures(tester);
+          await settle(tester);
+        }
       }
+      await settle(tester);
 
       expect(find.byType(Image), findsOneWidget);
       expect(connection.fileReads, hasLength(1), reason: 'one picture, one read');
@@ -232,6 +264,9 @@ void main() {
       };
 
       await pumpPage(tester, connection);
+      // The read only happens on request.
+      expect(connection.fileReads, isEmpty);
+      await loadPictures(tester);
       await settle(tester);
 
       expect(find.byType(Image), findsNothing);

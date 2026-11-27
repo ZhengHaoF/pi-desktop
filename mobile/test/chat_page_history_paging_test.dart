@@ -90,7 +90,7 @@ void main() {
       await pumpPage(tester, connection);
 
       final params = connection.params['sessions.get'] as Map;
-      expect(params['historyWindow'], {'maxTurns': 20, 'maxBytes': 1024 * 1024});
+      expect(params['historyWindow'], {'maxTurns': 10, 'maxBytes': 1024 * 1024});
     });
 
     testWidgets('an unpaged response still renders (older PC or test fixture)', (tester) async {
@@ -176,7 +176,7 @@ void main() {
 
       final params = connection.params['sessions.contextPage'] as Map;
       expect(params['cursor'], 'cursor-abc');
-      expect(params['maxTurns'], 20);
+      expect(params['maxTurns'], 10);
       expect(params['maxBytes'], 1024 * 1024);
     });
 
@@ -186,7 +186,10 @@ void main() {
         'sessions.get',
         () async => pagedDetail(messages: longPage(2, 'new'), totalMessages: 40, previousCursor: 'stale'),
       );
-      connection.on('sessions.contextPage', () async => throw StateError('rpc error: STALE_CURSOR'));
+      connection.on(
+        'sessions.contextPage',
+        () async => throw const RpcException('STALE_CURSOR', 'Session history changed; reload the latest page'),
+      );
 
       await pumpPage(tester, connection);
       await tester.tap(find.text('加载更早的消息'));
@@ -194,9 +197,45 @@ void main() {
         await tester.pump(const Duration(milliseconds: 60));
       }
 
-      expect(find.textContaining('STALE_CURSOR'), findsNothing);
+      expect(find.textContaining('Session history changed'), findsNothing);
       expect(find.text('加载更早的消息'), findsNothing);
+      expect(find.text('加载失败，点击重试'), findsNothing,
+          reason: 'a stale cursor is not a retryable failure');
       expect(find.textContaining('new q 0'), findsOneWidget);
+    });
+
+    testWidgets('a transient failure keeps the cursor and offers a retry', (tester) async {
+      final connection = FakeConnection(relayUrl: 'ws://r', deviceId: 'd', deviceLabel: 'phone');
+      connection.on(
+        'sessions.get',
+        () async => pagedDetail(messages: longPage(2, 'new'), totalMessages: 40, previousCursor: 'c1'),
+      );
+      var attempts = 0;
+      connection.on('sessions.contextPage', () async {
+        attempts += 1;
+        if (attempts == 1) throw const RpcException('GATEWAY_TIMEOUT', 'gateway did not answer in time');
+        return {'context': pagedDetail(messages: longPage(1, 'old'), totalMessages: 40)['context']};
+      });
+
+      await pumpPage(tester, connection);
+      await tester.tap(find.text('加载更早的消息'));
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 60));
+      }
+
+      // Paging is not dead: the reader can try again.
+      expect(find.text('加载失败，点击重试'), findsOneWidget);
+      expect(find.textContaining('gateway did not answer'), findsNothing,
+          reason: 'a transient failure should not be a banner');
+
+      await tester.tap(find.text('加载失败，点击重试'));
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 60));
+      }
+
+      expect(attempts, 2);
+      expect(find.text('加载失败，点击重试'), findsNothing);
+      expect(find.textContaining('old q 0'), findsOneWidget);
     });
 
     testWidgets('the control disappears once the last page is loaded', (tester) async {

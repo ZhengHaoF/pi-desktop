@@ -42,15 +42,36 @@ void main() {
       expect(loads, 0);
     });
 
-    testWidgets('a deferred image shows a spinner until the bytes arrive', (tester) async {
+    testWidgets('a deferred image waits for a tap before requesting anything', (tester) async {
+      var loads = 0;
+      final cache = TranscriptImageCache((_, _) async {
+        loads += 1;
+        return null;
+      });
+      final ref = ImageRef(DeferredImage('e-1', 0));
+
+      await pumpImage(tester, ChatImage(ref: ref, sessionId: 's', cache: cache, alt: '旧图标'));
+      await tester.pump();
+
+      expect(find.text('点击加载图片'), findsOneWidget);
+      // The alt says which picture is waiting.
+      expect(find.text('旧图标'), findsOneWidget);
+      expect(loads, 0, reason: 'scrolling past a picture must not spend data on it');
+    });
+
+    testWidgets('tapping a deferred image loads it and shows a spinner meanwhile', (tester) async {
       final gate = Completer<Map<dynamic, dynamic>?>();
       final cache = TranscriptImageCache((_, _) => gate.future);
       final ref = ImageRef(DeferredImage('e-1', 0));
 
       await pumpImage(tester, ChatImage(ref: ref, sessionId: 's', cache: cache));
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      await tester.tap(find.text('点击加载图片'));
+      await tester.pump();
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      expect(find.byType(Image), findsNothing);
+      expect(find.text('点击加载图片'), findsNothing);
 
       gate.complete({
         'content': {'type': 'image', 'data': png1x1, 'mimeType': 'image/png'},
@@ -81,6 +102,8 @@ void main() {
       final ref = ImageRef(DeferredImage('e-1', 0));
 
       await pumpImage(tester, ChatImage(ref: ref, sessionId: 's', cache: cache));
+      await tester.tap(find.text('点击加载图片'));
+      await tester.pump();
       await tester.pump();
 
       expect(find.text('图片加载失败，点击重试'), findsOneWidget);
@@ -99,6 +122,8 @@ void main() {
       final ref = ImageRef(DeferredImage('e-1', 0));
 
       await pumpImage(tester, ChatImage(ref: ref, sessionId: 's', cache: cache));
+      await tester.tap(find.text('点击加载图片'));
+      await tester.pump();
       await tester.pump();
 
       expect(find.text('图片加载失败，点击重试'), findsOneWidget);
