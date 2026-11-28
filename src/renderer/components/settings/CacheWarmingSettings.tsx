@@ -78,7 +78,10 @@ export function CacheWarmingSettings() {
         />
       </SettingRow>
       <p style={{ margin: 0, fontSize: 12, lineHeight: 1.55, color: "var(--text-dim)" }}>
-        {t("cacheWarmingDescription", "Cache warming may use model tokens. This setting is shared with the Pi CLI.")}
+        {t(
+          "cacheWarmingDescription",
+          "By default, eligible prompt caches also stay warm while idle. Warming may use model tokens. This setting is shared with the Pi CLI.",
+        )}
       </p>
       {error && (
         <p role="alert" style={{ margin: 0, fontSize: 12, lineHeight: 1.55, color: "var(--danger)" }}>
