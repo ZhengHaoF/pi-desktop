@@ -15,6 +15,8 @@ import '../core/image_cache.dart';
 import '../core/remote_connection.dart';
 import '../widgets/ask_sheet.dart';
 import '../widgets/chat_image.dart';
+import '../widgets/extension_ui_card.dart';
+import '../widgets/goal_panel.dart';
 import '../widgets/image_attachments_bar.dart';
 import '../widgets/image_block.dart';
 import '../widgets/markdown_text.dart';
@@ -195,6 +197,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool _slashOpen = false;
   bool _slashSkillsLoaded = false;
   bool _slashSkillsLoading = false;
+  RemoteGoalState? _goalState;
+  String? _dismissedGoalKey;
   /// Turn-state mirror (PC `isStreaming` equivalent): true while the agent
   /// is running a turn on the PC. Drives steer-vs-prompt and the queue bar.
   bool _turnRunning = false;
@@ -281,6 +285,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // steer-vs-prompt choice is correct right after opening the page.
         _turnRunning = turnRunningFromAgentState(detail['agentState']);
         _cwd = _cwdFromDetail(detail) ?? _cwd;
+        final rawAgentState = detail['agentState'];
+        final rawRuntime = rawAgentState is Map ? rawAgentState['state'] : null;
+        if (rawRuntime is Map) {
+          _goalState = RemoteGoalState.fromDynamic(rawRuntime['goalState']);
+        }
       });
       _applyTurnRunning(_turnRunning);
       unawaited(_loadSlashSkills());
@@ -325,6 +334,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       _startQueuePolling();
     } else {
       _stopQueuePolling();
+      if (finished) unawaited(_refreshGoalState());
       // The finished turn now folds; keep the viewport pinned to the bottom.
       if (finished && !_holdLastTurnOpen) _scrollMagnetOnToggle();
     }
@@ -649,6 +659,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final data = event.data;
     if (data is! Map) return;
     final type = data['type'] as String?;
+    if (type == 'extension_ui_request' && data['method'] == 'notify') {
+      final msg = (data['message'] as String? ?? '').trim();
+      if (msg.isNotEmpty) {
+        setState(() {
+          _awaitingFirst = false;
+          _lines.add(ChatLine.text(role: 'system', text: msg, done: true));
+        });
+        _throttledScroll();
+      }
+      return;
+    }
     if (type == 'message_start') {
       // A new message in the stream: advance the ordinal that process groups
       // use for "N 条消息" and for their stable expansion keys.
@@ -662,6 +683,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // Tool results pair into their toolCall card (desktop MessageView
         // behavior); unpaired ones become standalone result cards.
         applyToolResult(_lines, _toolIndexByCallId, message, messageIndex: _liveMessageIndex);
+        if (message['toolName'] == 'goal_report') {
+          unawaited(_refreshGoalState());
+        }
         _throttledScroll();
         return;
       }
@@ -677,12 +701,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           break;
         case 'message_end':
           _applyStreamedMessage(role, content, text, done: true);
+          _appendOutcome(message);
           break;
         default:
           break;
       }
     });
     _throttledScroll();
+  }
+
+  /// 失败/中止的 assistant 消息没有可渲染内容块，stopReason 以卡片展示
+  /// （桌面 AssistantOutcome parity）。没有它，PC 上模型请求失败时手机
+  /// 一片空白，看起来像还在处理。
+  void _appendOutcome(Map message) {
+    final outcome = assistantOutcomeLine(message, messageIndex: _liveMessageIndex);
+    if (outcome == null) return;
+    _awaitingFirst = false;
+    _lines.add(outcome);
   }
 
   void _applyStreamedMessage(String? role, Object? content, String? text, {required bool done}) {
@@ -778,7 +813,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       if (!mounted) return;
       final steeringList = queued is Map ? queued['steering'] : null;
       final followUpList = queued is Map ? queued['followUp'] : null;
+      final nextGoal = RemoteGoalState.fromDynamic(agentState['goalState']);
       setState(() {
+        if (nextGoal != null || agentState.containsKey('goalState')) {
+          _goalState = nextGoal;
+        }
         _steeringQueue = [
           if (steeringList is List)
             for (final s in steeringList)
@@ -792,6 +831,43 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       });
     } catch (_) {
       // Transient (host restart etc.); the next tick retries.
+    }
+  }
+
+  Future<void> _refreshGoalState() async {
+    final sessionId = _sessionId;
+    if (sessionId == null || !widget.connection.isReady) return;
+    try {
+      final state = await widget.connection.request('agent.state', {'sessionId': sessionId});
+      final agentState = state['state'] is Map ? state['state'] as Map : state;
+      if (!mounted) return;
+      final nextGoal = RemoteGoalState.fromDynamic(agentState['goalState']);
+      setState(() {
+        if (nextGoal != null || agentState.containsKey('goalState')) {
+          _goalState = nextGoal;
+        }
+      });
+    } catch (_) {
+      // Best-effort sync of goal state.
+    }
+  }
+
+  Future<void> _resolveGoal(String action, {String? feedback}) async {
+    final sessionId = _sessionId;
+    if (sessionId == null) return;
+    try {
+      await widget.connection.agentCommand(sessionId, {
+        'type': 'goal_resolve',
+        'action': action,
+        if (feedback != null && feedback.trim().isNotEmpty) 'feedback': feedback.trim(),
+      });
+      if (!mounted) return;
+      if (action == 'reject' || action == 'extend') {
+        setState(() => _awaitingFirst = true);
+      }
+      await _refreshGoalState();
+    } catch (err) {
+      if (mounted) setState(() => _error = err.toString());
     }
   }
 
@@ -1178,11 +1254,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     });
   }
 
-  Future<void> _respondApproval(Map<String, dynamic> approval, bool confirmed) async {
-    final requestId = approval['requestId'] as String?;
+  Future<void> _respondUiCard(Map<String, dynamic> req, Map<String, dynamic> body) async {
+    final requestId = req['requestId'] as String?;
     if (requestId == null) return;
-    setState(() => _approvals.remove(approval));
-    await _sendUiResponse(requestId, {'confirmed': confirmed});
+    setState(() => _approvals.remove(req));
+    await _sendUiResponse(requestId, body);
+    if (req['method'] == 'editor') {
+      unawaited(_refreshGoalState());
+    }
   }
 
   /// Flat extension_ui_response body — the Host's ExtensionUiResponse shape.
@@ -1325,6 +1404,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final text = _promptController.text.trim();
     final images = List<AttachedImage>.from(_pendingImages);
     if (text.isEmpty && images.isEmpty) return;
+    if (text == '/goal' && images.isEmpty) {
+      setState(() => _error = '请输入目标内容，例如：/goal 修复样式并补充测试');
+      _promptController.text = '/goal ';
+      _promptController.selection = TextSelection.collapsed(
+        offset: _promptController.text.length,
+      );
+      return;
+    }
+    if (text == '/mcp' && images.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请在电脑端「设置」中管理 MCP 服务')),
+      );
+      _promptController.clear();
+      setState(() => _slashOpen = false);
+      return;
+    }
     // Optimistic feedback immediately (the stream mirrors the user message
     // back later; until then these pending items + loading row show).
     setState(() {
@@ -1506,6 +1601,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         child: ChatImage(ref: image, sessionId: sessionId, cache: _imageCache),
       );
     }
+    if (line.kind == 'outcome') {
+      return _OutcomeCard(line: line);
+    }
     final isUser = line.role == 'user';
     final bubbleMaxWidth = (MediaQuery.sizeOf(context).width * 0.84).clamp(240.0, 420.0);
     final baseStyle = TextStyle(
@@ -1649,7 +1747,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               margin: const EdgeInsets.fromLTRB(12, 6, 12, 2),
             ),
           for (final approval in _approvals)
-            _ApprovalCard(approval: approval, onRespond: _respondApproval),
+            ExtensionUiCard(
+              key: ValueKey(approval['requestId'] ?? approval),
+              request: approval,
+              onRespond: _respondUiCard,
+            ),
+          if (_goalState != null && _goalState!.statusKey != _dismissedGoalKey)
+            GoalPanel(
+              state: _goalState!,
+              onAction: (action, {feedback}) => _resolveGoal(action, feedback: feedback),
+              onDismiss: () => setState(() => _dismissedGoalKey = _goalState!.statusKey),
+            ),
           if (_turnRunning && (_steeringQueue.isNotEmpty || _followUpQueue.isNotEmpty))
             _QueueBar(
               steering: _steeringQueue,
@@ -2050,6 +2158,44 @@ class _ThinkingCard extends StatelessWidget {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Model request failure / stopped-turn card, mirroring the desktop
+/// AssistantOutcome: failures get a red-bordered card with the provider's
+/// error detail; aborts get a muted "已停止" card.
+class _OutcomeCard extends StatelessWidget {
+  final ChatLine line;
+
+  const _OutcomeCard({required this.line});
+
+  @override
+  Widget build(BuildContext context) {
+    final stopped = line.stopped;
+    final color = stopped ? AppColors.textMuted : AppColors.danger;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: stopped ? AppColors.surface : AppColors.dangerBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: stopped ? AppColors.border : AppColors.dangerBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            stopped ? '已停止' : '模型请求失败',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color),
+          ),
+          if (line.text.isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(line.text, style: TextStyle(fontSize: 12.5, height: 1.45, color: color)),
+          ],
         ],
       ),
     );
@@ -2485,52 +2631,6 @@ class _ComposerActionButton extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ApprovalCard extends StatelessWidget {
-  const _ApprovalCard({required this.approval, required this.onRespond});
-
-  final Map<String, dynamic> approval;
-  final Future<void> Function(Map<String, dynamic>, bool) onRespond;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasExpiry = approval['expiresAt'] != null;
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      color: Theme.of(context).colorScheme.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '待审批：${approval['method'] ?? 'confirm'}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(approval['title']?.toString() ?? '', style: const TextStyle(fontSize: 13)),
-            if (hasExpiry)
-              const Text('此审批在桌面端有超时，到点将自动拒绝。', style: TextStyle(fontSize: 11)),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => onRespond(approval, false),
-                  child: const Text('拒绝'),
-                ),
-                FilledButton(
-                  onPressed: () => onRespond(approval, true),
-                  child: const Text('批准'),
-                ),
-              ],
-            ),
-          ],
         ),
       ),
     );

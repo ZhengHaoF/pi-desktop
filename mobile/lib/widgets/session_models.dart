@@ -6,9 +6,9 @@ library;
 import 'image_block.dart';
 
 /// One rendered line in the chat view: a text bubble, thinking card, tool
-/// card or image.
+/// card, image or outcome card.
 class ChatLine {
-  final String kind; // 'text' | 'thinking' | 'tool' | 'image'
+  final String kind; // 'text' | 'thinking' | 'tool' | 'image' | 'outcome'
   String role;
   String text;
   bool done;
@@ -35,6 +35,9 @@ class ChatLine {
   /// Live events carry no entry id, so this plus [messageIndex] is the only
   /// identity a streamed image has.
   int imageOrdinal;
+  // Outcome card fields (kind == 'outcome'). True for a stopped turn ("已停止"
+  // muted card), false for a model request failure (red card).
+  final bool stopped;
   ChatLine.text({required this.role, required this.text, this.done = false, this.messageIndex})
       : kind = 'text',
         fromToolCall = false,
@@ -42,6 +45,7 @@ class ChatLine {
         resultImages = const [],
         image = null,
         imageOrdinal = 0,
+        stopped = false,
         running = false;
   ChatLine.thinking({required this.role, required this.text, this.done = false, this.messageIndex})
       : kind = 'thinking',
@@ -50,6 +54,7 @@ class ChatLine {
         resultImages = const [],
         image = null,
         imageOrdinal = 0,
+        stopped = false,
         running = false;
   ChatLine.tool({
     required this.toolCallId,
@@ -65,7 +70,8 @@ class ChatLine {
         resultIsError = false,
         resultImages = const [],
         image = null,
-        imageOrdinal = 0;
+        imageOrdinal = 0,
+        stopped = false;
   ChatLine.image({
     required this.image,
     required this.role,
@@ -77,6 +83,23 @@ class ChatLine {
         fromToolCall = false,
         resultIsError = false,
         resultImages = const [],
+        stopped = false,
+        running = false;
+  /// Outcome card for a finished assistant message: a model request failure
+  /// (red card, [text] carries the detail) or a stopped turn (muted card).
+  /// Always done — outcomes only exist for settled messages.
+  ChatLine.outcome({
+    required this.role,
+    required this.text,
+    required this.stopped,
+    this.messageIndex,
+  })  : kind = 'outcome',
+        done = true,
+        fromToolCall = false,
+        resultIsError = false,
+        resultImages = const [],
+        image = null,
+        imageOrdinal = 0,
         running = false;
 }
 
@@ -256,6 +279,29 @@ bool isGeneratedImageResult(Map<dynamic, dynamic> message) {
   );
 }
 
+/// Outcome line for a settled assistant message, or null for ordinary ones.
+///
+/// Mirrors the desktop AssistantOutcome (src/shared/message-display.ts):
+/// `stopReason: "error"` renders a failure card with the provider's
+/// `errorMessage` as detail, `stopReason: "aborted"` a muted stopped card.
+/// These messages carry no displayable content block (just an empty text
+/// placeholder), so without this they vanish from the transcript entirely.
+ChatLine? assistantOutcomeLine(Map<dynamic, dynamic> message, {int? messageIndex}) {
+  if (message['role'] != 'assistant') return null;
+  final stopReason = message['stopReason'];
+  final stopped = stopReason == 'aborted';
+  if (!stopped && stopReason != 'error') return null;
+  final rawDetail = stopped ? null : message['errorMessage'];
+  final detail = rawDetail is String ? rawDetail.trim() : '';
+  return ChatLine.outcome(
+    role: 'assistant',
+    // Desktop falls back to this text when the provider returned no detail.
+    text: detail.isEmpty && !stopped ? '模型服务未返回错误详情，请检查 API 密钥、服务地址和模型配置。' : detail,
+    stopped: stopped,
+    messageIndex: messageIndex,
+  );
+}
+
 /// Build chat lines from a sessions.get detail (history), including tool
 /// cards paired with their results.
 ///
@@ -298,12 +344,16 @@ List<ChatLine> historyLinesFromDetail(Map<String, dynamic> detail, {int ordinalO
       closeTurn();
       turnStartOrdinal = ordinal;
     }
+    // A failed/stopped assistant message trails its turn as an outcome card,
+    // after any displayable blocks it might still carry.
+    final outcome = role == 'assistant' ? assistantOutcomeLine(message, messageIndex: ordinal) : null;
     final content = message['content'];
     if (content is! List) {
       final text = extractText(content);
       if (text != null && text.trim().isNotEmpty) {
         lines.add(ChatLine.text(role: role, text: text.trim(), done: true, messageIndex: ordinal));
       }
+      if (outcome != null) lines.add(outcome);
       continue;
     }
     for (final block in content) {
@@ -325,6 +375,7 @@ List<ChatLine> historyLinesFromDetail(Map<String, dynamic> detail, {int ordinalO
         if (parsed != null) lines.add(ChatLine.image(image: ImageRef(parsed), role: role, messageIndex: ordinal));
       }
     }
+    if (outcome != null) lines.add(outcome);
   }
   closeTurn();
 
