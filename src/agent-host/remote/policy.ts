@@ -45,6 +45,7 @@ export const ALLOWED_AGENT_COMMAND_TYPES: readonly string[] = [
   "extension_ui_response",
   "extension_ui_input",
   "compact",
+  "goal_resolve",
 ];
 
 export const ALLOWED_STREAM_TOPICS: readonly string[] = [

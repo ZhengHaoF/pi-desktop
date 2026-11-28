@@ -147,6 +147,14 @@ test("policy: skill catalog is read-only; session rename/delete allowed", async 
   assert.equal(mod.isMethodAllowed("skills.getContent"), false);
   assert.equal(mod.isMethodAllowed("sessions.rename"), true);
   assert.equal(mod.isMethodAllowed("sessions.delete"), true);
+  assert.equal(mod.isAgentCommandTypeAllowed("goal_resolve"), true);
+  assert.equal(
+    mod.isAgentCommandPayloadAllowed({
+      sessionId: "s1",
+      command: { type: "goal_resolve", action: "accept" },
+    }),
+    true,
+  );
 });
 
 test("gateway: sends hello on open and bridges allowlisted RPC", async () => {

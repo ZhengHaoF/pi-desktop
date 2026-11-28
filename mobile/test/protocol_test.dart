@@ -14,6 +14,7 @@ void main() {
     expect(isMethodAllowed('mcp.oauth.submit'), isFalse);
     expect(isAgentCommandTypeAllowed('abort'), isTrue);
     expect(isAgentCommandTypeAllowed('extension_ui_response'), isTrue);
+    expect(isAgentCommandTypeAllowed('goal_resolve'), isTrue);
     expect(isAgentCommandTypeAllowed('set_tools'), isFalse);
     expect(isSubscriptionAllowed('agent.events', 's1'), isTrue);
     expect(isSubscriptionAllowed('agent.events', '*'), isFalse);

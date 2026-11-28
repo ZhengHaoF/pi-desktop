@@ -173,6 +173,7 @@ const List<String> allowedAgentCommandTypes = [
   'extension_ui_response',
   'extension_ui_input',
   'compact',
+  'goal_resolve',
 ];
 
 const List<String> allowedStreamTopics = [
