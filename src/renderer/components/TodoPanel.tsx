@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { useI18n } from "@/i18n";
 import type { TodoPlanState } from "@/lib/types";
 import { Button } from "./ui/Button";
+import { ProgressRail } from "./ui/ProgressRail";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 
 export interface TodoPanelProps {
@@ -81,6 +82,18 @@ export function TodoPanel({ plan, onDismiss }: TodoPanelProps) {
           >
             {t("todoPlanTitle", "Plan")} {plan.completed}/{plan.items.length}
           </span>
+          {plan.items.length > 0 ? (
+            <span
+              style={{
+                fontSize: 11,
+                fontFamily: "var(--font-mono)",
+                color: "var(--text-dim)",
+                flexShrink: 0,
+              }}
+            >
+              {Math.round((plan.completed / plan.items.length) * 100)}%
+            </span>
+          ) : null}
           {collapsed ? (
             <span
               style={{
@@ -118,25 +131,31 @@ export function TodoPanel({ plan, onDismiss }: TodoPanelProps) {
       </div>
 
       {!collapsed ? (
-        <ol
+        <div
           style={{
-            listStyle: "none",
-            margin: 0,
+            display: "flex",
+            gap: 7,
             padding: "2px 10px 9px",
-            display: "grid",
-            gap: 5,
             maxHeight: "min(40vh, 320px)",
             overflowY: "auto",
           }}
         >
-          {plan.items.map((item, index) => (
-            <li
-              key={`${index}-${item.content}`}
-              title={statusLabel(item.status, t)}
-              style={{ display: "flex", alignItems: "flex-start", gap: 7, minWidth: 0 }}
-            >
-              <ItemGlyph status={item.status} />
-              <span
+          <ProgressRail items={plan.items} nodeSize={13} />
+          <ol
+            style={{
+              listStyle: "none",
+              margin: 0,
+              padding: 0,
+              display: "grid",
+              gap: 5,
+              minHeight: 0,
+              minWidth: 0,
+            }}
+          >
+            {plan.items.map((item, index) => (
+              <li
+                key={`${index}-${item.content}`}
+                title={statusLabel(item.status, t)}
                 style={{
                   fontSize: 13,
                   lineHeight: 1.45,
@@ -146,64 +165,11 @@ export function TodoPanel({ plan, onDismiss }: TodoPanelProps) {
                 }}
               >
                 {item.content}
-              </span>
-            </li>
-          ))}
-        </ol>
+              </li>
+            ))}
+          </ol>
+        </div>
       ) : null}
     </div>
-  );
-}
-
-function ItemGlyph({ status }: { status: TodoPlanState["items"][number]["status"] }) {
-  if (status === "completed")
-    return (
-      <span
-        aria-hidden="true"
-        style={{
-          width: 13,
-          height: 13,
-          marginTop: 2,
-          flexShrink: 0,
-          borderRadius: "50%",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "var(--text-dim)",
-          color: "var(--bg-panel)",
-          fontSize: 9,
-          lineHeight: 1,
-        }}
-      >
-        ✓
-      </span>
-    );
-  if (status === "in_progress")
-    return (
-      <span
-        aria-hidden="true"
-        className="todo-item-active"
-        style={{
-          width: 13,
-          height: 13,
-          marginTop: 2,
-          flexShrink: 0,
-          borderRadius: "50%",
-          border: "2px solid var(--accent)",
-        }}
-      />
-    );
-  return (
-    <span
-      aria-hidden="true"
-      style={{
-        width: 13,
-        height: 13,
-        marginTop: 2,
-        flexShrink: 0,
-        borderRadius: "50%",
-        border: "1.5px solid var(--border)",
-      }}
-    />
   );
 }

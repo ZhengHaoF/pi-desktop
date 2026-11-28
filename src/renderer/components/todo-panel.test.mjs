@@ -54,13 +54,19 @@ test("shows the progress header and every item", async (t) => {
   });
   const rendered = text(renderer);
   assert.match(rendered, /Plan 1\/3/);
+  // The header shows the completion percentage next to the count.
+  assert.match(rendered, /33%/);
   for (const item of items) assert.ok(rendered.includes(item.content), item.content);
   // Completed items are dimmed; the others keep the full text colour.
   const dimmed = renderer.root.findAll(
     (node) => typeof node.type === "string" && node.props.style?.color === "var(--text-dim)",
   );
-  assert.equal(dimmed.length, 1);
-  assert.equal(flatten(dimmed[0].props.children), "Read the projection");
+  const dimmedTexts = dimmed.map((node) => flatten(node.props.children));
+  assert.ok(dimmedTexts.includes("Read the projection"));
+  assert.ok(
+    dimmedTexts.some((value) => value === "33%"),
+    "the percentage chip is dimmed too",
+  );
 });
 
 test("the header toggles expansion and remembers a manual collapse", async (t) => {

@@ -27,7 +27,7 @@ import { useI18n } from "@/i18n";
 import { ChevronDown } from "lucide-react";
 import type { ThinkingExpansionStore } from "@/lib/thinking-expansion-store";
 import { skillInvocationCommandText } from "@shared/skill-invocation";
-import { localizedExtensionConfirmCopy } from "@/lib/extension-ui-copy";
+import { localizedExtensionConfirmCopy, localizedExtensionEditorCopy } from "@/lib/extension-ui-copy";
 import { Button } from "@/components/ui/Button";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { Textarea } from "@/components/ui/Textarea";
@@ -922,6 +922,7 @@ function ExtensionDialog({
   const { t } = useI18n();
   const [value, setValue] = useState(request.method === "editor" ? (request.prefill ?? "") : "");
   const confirmCopy = request.method === "confirm" ? localizedExtensionConfirmCopy(request, t) : null;
+  const editorCopy = request.method === "editor" ? localizedExtensionEditorCopy(request, t) : null;
 
   useEffect(() => {
     setValue(request.method === "editor" ? (request.prefill ?? "") : "");
@@ -962,7 +963,7 @@ function ExtensionDialog({
       >
         <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)" }}>
           <div style={{ color: "var(--text)", fontSize: scaledChatFont(14), fontWeight: 650 }}>
-            {confirmCopy?.title ?? request.title}
+            {confirmCopy?.title ?? editorCopy?.title ?? request.title}
           </div>
           <div
             style={{
@@ -1072,7 +1073,7 @@ function ExtensionDialog({
               borderRadius: 6,
             }}
           >
-            {t("cancel", "Cancel")}
+            {editorCopy?.cancelLabel ?? t("cancel", "Cancel")}
           </Button>
           {request.method === "confirm" ? (
             <Button
@@ -1094,7 +1095,7 @@ function ExtensionDialog({
                 borderRadius: 6,
               }}
             >
-              {t("submit", "Submit")}
+              {editorCopy?.submitLabel ?? t("submit", "Submit")}
             </Button>
           ) : null}
         </div>

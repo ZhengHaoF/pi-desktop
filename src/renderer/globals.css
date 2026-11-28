@@ -1105,7 +1105,8 @@ body {
 
 /* In-progress plan step: a slow pulse, so it reads as "working" without
    drawing the eye away from the transcript. */
-.todo-item-active {
+.todo-item-active,
+.rail-node-active {
   animation: todo-item-pulse 1.8s ease-in-out infinite;
 }
 
@@ -1960,7 +1961,8 @@ span.linenumber {
     animation-duration: 0.001ms !important;
   }
 
-  .todo-item-active {
+  .todo-item-active,
+  .rail-node-active {
     animation: none;
   }
 

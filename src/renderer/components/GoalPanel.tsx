@@ -9,6 +9,7 @@ import { useI18n } from "@/i18n";
 import type { GoalResolveAction, GoalState } from "@/lib/types";
 import { Button } from "./ui/Button";
 import { Textarea } from "./ui/Textarea";
+import { ProgressRail } from "./ui/ProgressRail";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 
 export interface GoalPanelProps {
@@ -107,6 +108,20 @@ export function GoalPanel({ state, onAction, onDismiss }: GoalPanelProps) {
           >
             {t("goalPanelTitle", "Goal")}
           </span>
+          {report ? (
+            <span
+              style={{
+                flex: "0 0 auto",
+                fontSize: 11,
+                fontFamily: "var(--font-mono)",
+                color: "var(--text-dim)",
+              }}
+            >
+              {t("goalCriteriaProgress", "{met}/{total} met")
+                .replace("{met}", String(report.criteria.filter((criterion) => criterion.met).length))
+                .replace("{total}", String(report.criteria.length))}
+            </span>
+          ) : null}
           <span
             style={{
               flex: "0 0 auto",
@@ -153,7 +168,18 @@ export function GoalPanel({ state, onAction, onDismiss }: GoalPanelProps) {
       </div>
 
       {!collapsed ? (
-        <div style={{ display: "grid", gap: 8, padding: "2px 10px 10px" }}>
+        <div
+          data-testid="goal-panel-body"
+          style={{
+            display: "grid",
+            gap: 8,
+            padding: "2px 10px 10px",
+            // Reports can be arbitrarily long; let them scroll instead of
+            // pushing the card past the transcript and covering the composer.
+            maxHeight: "min(40vh, 320px)",
+            overflowY: "auto",
+          }}
+        >
           <div style={{ fontSize: 13, lineHeight: 1.45, color: "var(--text)", wordBreak: "break-word" }}>
             {state.goal}
           </div>
@@ -173,33 +199,26 @@ export function GoalPanel({ state, onAction, onDismiss }: GoalPanelProps) {
                   {report.summary}
                 </div>
               ) : null}
-              <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
-                {report.criteria.map((criterion, index) => (
-                  <li
-                    key={`${index}-${criterion.criterion}`}
-                    style={{ display: "flex", alignItems: "flex-start", gap: 7, minWidth: 0 }}
-                  >
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        width: 13,
-                        height: 13,
-                        marginTop: 2,
-                        flexShrink: 0,
-                        borderRadius: "50%",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background: criterion.met ? "var(--text-dim)" : "transparent",
-                        border: criterion.met ? "none" : "1.5px solid var(--border)",
-                        color: "var(--bg-panel)",
-                        fontSize: 9,
-                        lineHeight: 1,
-                      }}
-                    >
-                      {criterion.met ? "✓" : ""}
-                    </span>
-                    <span style={{ display: "grid", gap: 2, minWidth: 0 }}>
+              <div style={{ display: "flex", gap: 7, minWidth: 0 }}>
+                <ProgressRail
+                  items={report.criteria.map((criterion) => ({
+                    status: criterion.met ? "completed" : "pending",
+                  }))}
+                  nodeSize={13}
+                />
+                <ol
+                  style={{
+                    listStyle: "none",
+                    margin: 0,
+                    padding: 0,
+                    display: "grid",
+                    gap: 0,
+                    minHeight: 0,
+                    minWidth: 0,
+                  }}
+                >
+                  {report.criteria.map((criterion, index) => (
+                    <li key={`${index}-${criterion.criterion}`} style={{ display: "grid", gap: 2, minWidth: 0 }}>
                       <span
                         style={{
                           fontSize: 13,
@@ -222,10 +241,10 @@ export function GoalPanel({ state, onAction, onDismiss }: GoalPanelProps) {
                           {criterion.evidence}
                         </span>
                       ) : null}
-                    </span>
-                  </li>
-                ))}
-              </ol>
+                    </li>
+                  ))}
+                </ol>
+              </div>
             </div>
           ) : state.criteria.length ? (
             <div style={{ display: "grid", gap: 4 }}>

@@ -95,6 +95,12 @@ test("the report lists evidence and only a user click accepts", async (t) => {
   assert.match(rendered, /Fixture summary/);
   assert.match(rendered, /npm test: 120 passing/);
   assert.match(rendered, /README still missing the section/);
+  // The header shows the criteria progress count; the list renders as a rail.
+  assert.match(rendered, /1\/2 met/);
+  assert.ok(
+    renderer.root.findAll((node) => node.props?.["aria-hidden"] === "true").length > 0,
+    "rail nodes are decorative",
+  );
 
   await act(async () => hostButton(renderer, "Accept")[0].props.onClick());
   assert.deepEqual(actions, [{ action: "accept", feedback: undefined }]);
@@ -155,6 +161,16 @@ test("a decided goal starts collapsed and can still be expanded or dismissed", a
 
   await act(async () => renderer.root.findByProps({ "aria-label": "Hide until the goal changes" }).props.onClick());
   assert.deepEqual(dismissed, [true]);
+});
+
+test("long goal reports scroll inside the card instead of covering the composer", async (t) => {
+  const renderer = await mountPanel(t, {
+    state: { ...working, status: "awaiting_acceptance", report },
+    onAction: () => {},
+  });
+  const body = renderer.root.findByProps({ "data-testid": "goal-panel-body" });
+  assert.equal(body.props.style.overflowY, "auto");
+  assert.equal(body.props.style.maxHeight, "min(40vh, 320px)");
 });
 
 test("a rejected goal shows the last feedback while it works", async (t) => {

@@ -2,11 +2,31 @@ import type { ExtensionUiRequest } from "@shared/types";
 
 type Translate = (key: string, fallback: string) => string;
 type ConfirmRequest = Extract<ExtensionUiRequest, { method: "confirm" }>;
+type EditorRequest = Extract<ExtensionUiRequest, { method: "editor" }>;
+
+/** The `/goal` extension's raw prompt for acceptance criteria. */
+const GOAL_CRITERIA_TITLE = "Acceptance criteria (optional, one per line)";
 
 function format(template: string, values: Record<string, string | number>): string {
   return template.replace(/\{([A-Za-z0-9_]+)\}/g, (token, key: string) =>
     Object.prototype.hasOwnProperty.call(values, key) ? String(values[key]) : token,
   );
+}
+
+export function localizedExtensionEditorCopy(
+  request: EditorRequest,
+  t: Translate,
+): { title: string; cancelLabel?: string; submitLabel?: string } {
+  if (request.title === GOAL_CRITERIA_TITLE) {
+    // Cancelling this dialog does not abort `/goal`; it starts with no
+    // criteria, so label the button by what it actually does.
+    return {
+      title: t("goalCriteriaEditorTitle", "Acceptance criteria (optional, one per line)"),
+      cancelLabel: t("goalCriteriaEditorSkip", "Skip and start"),
+      submitLabel: t("goalCriteriaEditorConfirm", "Confirm and start"),
+    };
+  }
+  return { title: request.title };
 }
 
 export function localizedExtensionConfirmCopy(

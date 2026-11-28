@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { enUS, zhCN } from "../i18n-dictionaries.ts";
-import { localizedExtensionConfirmCopy } from "./extension-ui-copy.ts";
+import { localizedExtensionConfirmCopy, localizedExtensionEditorCopy } from "./extension-ui-copy.ts";
 
 const translate = (dictionary) => (key, fallback) => dictionary[key] ?? fallback;
 const base = { type: "extension_ui_request", id: "confirm-a", method: "confirm" };
@@ -63,4 +63,33 @@ test("MCP permission confirmation uses the existing modal with localized server 
   assert.match(copy.message, /2 个工具/);
   assert.match(copy.message, /本会话不再重复询问/);
   assert.match(copy.message, /query-docs/);
+});
+
+test("goal acceptance criteria editor localizes its title and action labels", () => {
+  const request = {
+    type: "extension_ui_request",
+    id: "editor-goal",
+    method: "editor",
+    title: "Acceptance criteria (optional, one per line)",
+  };
+  assert.deepEqual(localizedExtensionEditorCopy(request, translate(zhCN)), {
+    title: "可选：填写验收标准（每行一条）",
+    cancelLabel: "跳过并开始",
+    submitLabel: "确认并开始",
+  });
+  assert.deepEqual(localizedExtensionEditorCopy(request, translate(enUS)), {
+    title: "Acceptance criteria (optional, one per line)",
+    cancelLabel: "Skip and start",
+    submitLabel: "Confirm and start",
+  });
+});
+
+test("other editors keep the extension-provided title", () => {
+  assert.deepEqual(
+    localizedExtensionEditorCopy(
+      { type: "extension_ui_request", id: "editor-plain", method: "editor", title: "Write a summary" },
+      translate(zhCN),
+    ),
+    { title: "Write a summary" },
+  );
 });
